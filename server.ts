@@ -70,7 +70,17 @@ process.on("uncaughtException", (err) => {
   console.error("Ushlanmagan istisno:", err);
 });
 
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+let googleClient: OAuth2Client | null = null;
+function getGoogleClient() {
+  if (!googleClient) {
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      console.warn("GOOGLE_CLIENT_ID topilmadi. Google bilan kirish ishlamasligi mumkin.");
+      return null;
+    }
+    googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+  }
+  return googleClient;
+}
 
 const app = express();
 
@@ -1105,8 +1115,12 @@ app.post("/api/auth/login", authLimiter, async (req: Request, res: Response) => 
 
 app.post("/api/auth/google", async (req: Request, res: Response) => {
   const { credential } = req.body;
+  const client = getGoogleClient();
+  if (!client) {
+    return res.status(500).json({ error: "Google Auth konfiguratsiyasi serverda mavjud emas." });
+  }
   try {
-    const ticket = await googleClient.verifyIdToken({
+    const ticket = await client.verifyIdToken({
       idToken: credential,
       audience: process.env.GOOGLE_CLIENT_ID,
     });
