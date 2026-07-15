@@ -2,6 +2,7 @@ import { execSync } from 'child_process';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import * as fs from 'fs';
 import * as path from 'path';
+import crypto from 'crypto';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import { decryptSecret } from '../src/lib/crypto';
@@ -26,21 +27,38 @@ async function getSetting(key: string): Promise<string | null> {
 async function sendToTelegram(filePath: string, filename: string) {
   const botToken = await getSetting("TELEGRAM_BOT_TOKEN");
   const chatId = await getSetting("TELEGRAM_BACKUP_CHAT_ID");
+  const encryptionKey = process.env.ENCRYPTION_KEY;
 
   if (!botToken || !chatId) {
     console.log("[Telegram] Credentials (TELEGRAM_BOT_TOKEN/TELEGRAM_BACKUP_CHAT_ID) are not configured. Skipping Telegram backup.");
     return;
   }
 
-  console.log(`\n[Telegram] Sending backup file ${filename} to Telegram chat/channel ${chatId}...`);
+  if (!encryptionKey || encryptionKey.length < 32) {
+    console.error("[Telegram] CRITICAL ERROR: ENCRYPTION_KEY is not defined or too short (min 32 chars). Backup will NOT be sent unencrypted.");
+    return;
+  }
+
+  console.log(`\n[Telegram] Encrypting and sending backup file ${filename} to Telegram chat/channel ${chatId}...`);
   try {
     const fileBuffer = fs.readFileSync(filePath);
-    const blob = new Blob([fileBuffer]);
+    
+    // AES-256-GCM Encryption (Matches src/lib/crypto.ts logic)
+    const key = crypto.createHash('sha256').update(encryptionKey).digest();
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+    
+    let encrypted = cipher.update(fileBuffer);
+    encrypted = Buffer.concat([encrypted, cipher.final()]);
+    const tag = cipher.getAuthTag();
+    
+    const encryptedContent = `${iv.toString('hex')}:${encrypted.toString('hex')}:${tag.toString('hex')}`;
+    const encryptedFilename = `${filename}.enc`;
     
     const formData = new FormData();
     formData.append("chat_id", chatId);
-    formData.append("document", blob, filename);
-    formData.append("caption", `Savdo24 Zaxira nusxasi (Backup)\nSana: ${new Date().toLocaleString()}\nFayl: ${filename}`);
+    formData.append("document", new Blob([encryptedContent]), encryptedFilename);
+    formData.append("caption", `Savdo24 Zaxira nusxasi (SHIFRLANGAN)\nSana: ${new Date().toLocaleString()}\nFayl: ${encryptedFilename}\n\n⚠️ Bu fayl AES-256-GCM bilan shifrlangan. Ochish uchun loyihaning ENCRYPTION_KEY qiymatidan foydalaning.`);
 
     const response = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, {
       method: "POST",
@@ -49,12 +67,12 @@ async function sendToTelegram(filePath: string, filename: string) {
 
     const result = await response.json() as any;
     if (result.ok) {
-      console.log("🎉 [Telegram] Backup successfully sent via Telegram Bot!");
+      console.log("🎉 [Telegram] Encrypted backup successfully sent via Telegram Bot!");
     } else {
       console.error("[Telegram] Bot API returned an error:", result);
     }
   } catch (err: any) {
-    console.error("[Telegram] Error sending backup via Telegram:", err.message);
+    console.error("[Telegram] Error encrypting or sending backup via Telegram:", err.message);
   }
 }
 

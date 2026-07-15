@@ -3576,7 +3576,7 @@ app.get("/api/telegram/user-stats/:telegramUserId", async (req: Request, res: Re
   const secret = req.headers["x-telegram-bot-secret"];
 
   const internalSecret = await getSetting("TELEGRAM_BOT_INTERNAL_SECRET") || process.env.TELEGRAM_BOT_INTERNAL_SECRET;
-  if (secret !== internalSecret) {
+  if (!internalSecret || !secret || typeof secret !== "string" || !safeCompare(secret, internalSecret)) {
     return res.status(403).json({ error: "Ruxsat etilmagan." });
   }
 
