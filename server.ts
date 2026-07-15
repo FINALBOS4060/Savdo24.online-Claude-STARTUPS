@@ -70,6 +70,14 @@ process.on("uncaughtException", (err) => {
   console.error("Ushlanmagan istisno:", err);
 });
 
+// Environment variable validation
+const JWT_SECRET = process.env.JWT_SECRET || "savdo24-default-jwt-secret-for-dev-only";
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "savdo24-default-encryption-key-32-bytes";
+
+if (!process.env.JWT_SECRET || !process.env.ENCRYPTION_KEY) {
+  console.warn("DIQQAT: JWT_SECRET yoki ENCRYPTION_KEY muhit o'zgaruvchilari topilmadi. Development fallback qiymatlari ishlatilmoqda.");
+}
+
 let googleClient: OAuth2Client | null = null;
 function getGoogleClient() {
   if (!googleClient) {
@@ -89,6 +97,15 @@ const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: { origin: process.env.APP_URL || "https://savdo24.online" }
 });
+
+// requireAdmin middleware
+function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  const authReq = req as AuthRequest;
+  if (authReq.user?.role !== "Admin") {
+    return res.status(403).json({ error: "Ruxsat etilmagan. Admin ruxsati talab qilinadi." });
+  }
+  next();
+}
 
 const isPostgres = !!(process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith("postgres"));
 const prisma: any = isPostgres 
@@ -141,9 +158,7 @@ function getReferralTier(referralCount: number) {
 }
 
 // GET /api/admin/cron/newsletter — Haftalik newsletter yuborish (Internal/Admin)
-app.get("/api/admin/cron/newsletter", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "Admin") return res.status(403).json({ error: "Ruxsat etilmagan." });
-  
+app.get("/api/admin/cron/newsletter", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   await sendWeeklyNewsletter();
   res.json({ message: "Newsletter yuborish boshlandi." });
 });
@@ -211,9 +226,9 @@ async function sendWeeklyNewsletter() {
 
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
-  if (!token) return next(new Error("Authentication error"));
-  jwt.verify(token, process.env.JWT_SECRET || "supersecret", (err: any, decoded: any) => {
-    if (err) return next(new Error("Authentication error"));
+  if (!token) return next(new Error("Autentifikatsiya xatosi: Token topilmadi"));
+  jwt.verify(token, JWT_SECRET, (err: any, decoded: any) => {
+    if (err) return next(new Error("Autentifikatsiya xatosi: Yaroqsiz token"));
     socket.data.user = decoded;
     next();
   });
@@ -247,8 +262,6 @@ const reportLimiter = rateLimit({
 });
 
 const PORT = 3000;
-
-const JWT_SECRET = process.env.JWT_SECRET || "savdo24-jwt-secret-placeholder";
 
 // Health check endpoint
 app.get('/api/health', async (req, res) => {
@@ -1566,8 +1579,7 @@ app.get("/api/b2b/profile", authenticateToken, async (req: AuthRequest, res: Res
 });
 
 // --- ADMIN B2B ---
-app.patch("/api/admin/b2b/:id/verify", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "Admin") return res.status(403).json({ error: "Ruxsat etilmagan." });
+app.patch("/api/admin/b2b/:id/verify", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   const { verified } = req.body;
 
@@ -1803,9 +1815,7 @@ app.get("/api/referrals/my-stats", authenticateToken, async (req: AuthRequest, r
 });
 
 // GET /api/admin/referrals — Admin stats
-app.get("/api/admin/referrals", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "Admin") return res.status(403).json({ error: "Ruxsat etilmagan." });
-
+app.get("/api/admin/referrals", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const allReferrals = await prisma.referral.findMany({
       include: {
@@ -1820,9 +1830,7 @@ app.get("/api/admin/referrals", authenticateToken, async (req: AuthRequest, res:
     res.status(500).json({ error: "Admin ma'lumotlarini yuklashda xatolik." });
   }
 });
-app.get("/api/admin/analytics", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "Admin") return res.status(403).json({ error: "Ruxsat etilmagan amal." });
-  
+app.get("/api/admin/analytics", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const period = (req.query.period as string) || "day";
     const days = period === "day" ? 1 : period === "week" ? 7 : 30;
@@ -1862,11 +1870,7 @@ app.get("/api/admin/analytics", authenticateToken, async (req: AuthRequest, res:
 });
 
 // GET /api/admin/users — Barcha foydalanuvchilar (Admin)
-app.get("/api/admin/users", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "Admin") {
-    return res.status(403).json({ error: "Ruxsat etilmagan amal." });
-  }
-
+app.get("/api/admin/users", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { search, page = 1, limit = 20 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
@@ -1915,11 +1919,7 @@ app.get("/api/admin/users", authenticateToken, async (req: AuthRequest, res: Res
 });
 
 // PATCH /api/admin/users/:id/ban — Foydalanuvchini bloklash/ochish (Admin)
-app.patch("/api/admin/users/:id/ban", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "Admin") {
-    return res.status(403).json({ error: "Ruxsat etilmagan amal." });
-  }
-
+app.patch("/api/admin/users/:id/ban", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { isBanned } = req.body;
@@ -1946,11 +1946,7 @@ app.patch("/api/admin/users/:id/ban", authenticateToken, async (req: AuthRequest
 });
 
 // GET /api/admin/users/:id — Foydalanuvchi haqida to'liq tafsilot (Admin)
-app.get("/api/admin/users/:id", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "Admin") {
-    return res.status(403).json({ error: "Ruxsat etilmagan amal." });
-  }
-
+app.get("/api/admin/users/:id", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const user = await prisma.user.findUnique({
@@ -2005,8 +2001,7 @@ app.get("/api/admin/users/:id", authenticateToken, async (req: AuthRequest, res:
 });
 
 // PATCH /api/admin/users/:id/vip — Qo'lda VIP berish (Admin)
-app.patch("/api/admin/users/:id/vip", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "Admin") return res.status(403).json({ error: "Ruxsat etilmagan." });
+app.patch("/api/admin/users/:id/vip", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { isVip, vipExpiresAt } = req.body;
@@ -2029,8 +2024,7 @@ app.patch("/api/admin/users/:id/vip", authenticateToken, async (req: AuthRequest
 });
 
 // PATCH /api/admin/users/:id/role — Rolni o'zgartirish (Admin)
-app.patch("/api/admin/users/:id/role", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "Admin") return res.status(403).json({ error: "Ruxsat etilmagan." });
+app.patch("/api/admin/users/:id/role", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { role } = req.body;
@@ -2053,8 +2047,7 @@ app.patch("/api/admin/users/:id/role", authenticateToken, async (req: AuthReques
 });
 
 // DELETE /api/admin/users/:id — Hisobni o'chirish (Admin)
-app.delete("/api/admin/users/:id", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "Admin") return res.status(403).json({ error: "Ruxsat etilmagan." });
+app.delete("/api/admin/users/:id", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const user = await prisma.user.findUnique({ where: { id: Number(id) } });
@@ -3991,11 +3984,7 @@ app.post("/api/disputes", authenticateToken, async (req: AuthRequest, res: Respo
 });
 
 // GET /api/disputes — Barcha nizolarni olish (Admin)
-app.get("/api/disputes", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "Admin") {
-    return res.status(403).json({ error: "Ruxsat etilmagan amal (Faqat admin uchun)." });
-  }
-
+app.get("/api/disputes", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const disputes = await prisma.dispute.findMany({
       include: {
@@ -4029,11 +4018,7 @@ app.get("/api/disputes", authenticateToken, async (req: AuthRequest, res: Respon
 });
 
 // PATCH /api/disputes/:id — Nizoni yangilash (Admin)
-app.patch("/api/disputes/:id", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "Admin") {
-    return res.status(403).json({ error: "Ruxsat etilmagan amal (Faqat admin uchun)." });
-  }
-
+app.patch("/api/disputes/:id", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   const disputeId = parseInt(req.params.id);
   const { status, adminNote } = req.body;
 
@@ -4085,11 +4070,7 @@ app.patch("/api/disputes/:id", authenticateToken, async (req: AuthRequest, res: 
 });
 
 // GET /api/admin/stats — Platforma komissiyasi va sotuvlar statistikasi (Admin)
-app.get("/api/admin/stats", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "Admin") {
-    return res.status(403).json({ error: "Ruxsat etilmagan amal (Faqat admin uchun)." });
-  }
-
+app.get("/api/admin/stats", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const now = new Date();
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -4198,11 +4179,7 @@ app.post("/api/reports", authenticateToken, reportLimiter, async (req: AuthReque
 });
 
 // GET /api/reports — Barcha shikoyatlarni olish (Admin)
-app.get("/api/reports", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "Admin") {
-    return res.status(403).json({ error: "Ruxsat etilmagan amal (Faqat admin uchun)." });
-  }
-
+app.get("/api/reports", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const reports = await prisma.report.findMany({
       orderBy: { createdAt: "desc" }
@@ -4216,11 +4193,7 @@ app.get("/api/reports", authenticateToken, async (req: AuthRequest, res: Respons
 });
 
 // GET /api/admin/audit-logs — Admin amallari tarixi (Admin)
-app.get("/api/admin/audit-logs", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "Admin") {
-    return res.status(403).json({ error: "Ruxsat etilmagan amal (Faqat admin uchun)." });
-  }
-
+app.get("/api/admin/audit-logs", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const logs = await prisma.auditLog.findMany({
       orderBy: { createdAt: "desc" }
@@ -4233,11 +4206,7 @@ app.get("/api/admin/audit-logs", authenticateToken, async (req: AuthRequest, res
 });
 
 // PATCH /api/reports/:id/status — Shikoyat statusini yangilash (Admin)
-app.patch("/api/reports/:id/status", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "Admin") {
-    return res.status(403).json({ error: "Ruxsat etilmagan amal (Faqat admin uchun)." });
-  }
-
+app.patch("/api/reports/:id/status", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   const id = parseInt(req.params.id);
   const { status } = req.body; // "reviewed" or "dismissed"
 
@@ -4268,11 +4237,7 @@ app.patch("/api/reports/:id/status", authenticateToken, async (req: AuthRequest,
 });
 
 // DELETE /api/admin/startups/:id — E'lonni o'chirish (Admin)
-app.delete("/api/admin/startups/:id", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "Admin") {
-    return res.status(403).json({ error: "Siz admin emassiz." });
-  }
-
+app.delete("/api/admin/startups/:id", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   try {
     await prisma.review.deleteMany({ where: { startupId: id } });
@@ -4302,11 +4267,7 @@ app.delete("/api/admin/startups/:id", authenticateToken, async (req: AuthRequest
 });
 
 // DELETE /api/admin/ideas/:id — G'oya/Izohni o'chirish (Admin)
-app.delete("/api/admin/ideas/:id", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "Admin") {
-    return res.status(403).json({ error: "Siz admin emassiz." });
-  }
-
+app.delete("/api/admin/ideas/:id", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   const id = parseInt(req.params.id);
   try {
     await prisma.ideaVote.deleteMany({ where: { ideaId: id } });
@@ -4335,11 +4296,7 @@ function maskValue(val: string): string {
 }
 
 // GET /api/admin/settings — Barcha sozlamalarni qisman yashirgan holda olish (Admin)
-app.get("/api/admin/settings", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "Admin") {
-    return res.status(403).json({ error: "Ruxsat etilmagan amal (Faqat admin uchun)." });
-  }
-
+app.get("/api/admin/settings", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   const ALL_KEYS = [
     "COINGATE_API_TOKEN",
     "CONTABO_S3_ENDPOINT",
@@ -4379,11 +4336,7 @@ app.get("/api/admin/settings", authenticateToken, async (req: AuthRequest, res: 
 });
 
 // PUT /api/admin/settings/:key — Sozlama qiymatini yangilash (Admin)
-app.put("/api/admin/settings/:key", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "Admin") {
-    return res.status(403).json({ error: "Ruxsat etilmagan amal (Faqat admin uchun)." });
-  }
-
+app.put("/api/admin/settings/:key", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   const { key } = req.params;
   const { value } = req.body;
 
@@ -4450,11 +4403,7 @@ app.put("/api/admin/settings/:key", authenticateToken, async (req: AuthRequest, 
 });
 
 // GET /api/admin/sponsor-channels — Barcha sponsor kanallarni olish (Admin)
-app.get("/api/admin/sponsor-channels", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "Admin") {
-    return res.status(403).json({ error: "Ruxsat etilmagan amal (Faqat admin uchun)." });
-  }
-
+app.get("/api/admin/sponsor-channels", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const channels = await prisma.sponsorChannel.findMany({
       orderBy: { createdAt: "desc" }
@@ -4467,11 +4416,7 @@ app.get("/api/admin/sponsor-channels", authenticateToken, async (req: AuthReques
 });
 
 // POST /api/admin/sponsor-channels — Yangi sponsor kanal qo'shish (Admin)
-app.post("/api/admin/sponsor-channels", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "Admin") {
-    return res.status(403).json({ error: "Ruxsat etilmagan amal (Faqat admin uchun)." });
-  }
-
+app.post("/api/admin/sponsor-channels", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   const { channelId, channelUsername, displayName, advertiserContact, pricePerMonth, startDate, endDate } = req.body;
 
   if (!channelId || !channelUsername || !displayName) {
@@ -4509,11 +4454,7 @@ app.post("/api/admin/sponsor-channels", authenticateToken, async (req: AuthReque
 });
 
 // PATCH /api/admin/sponsor-channels/:id — Sponsor kanalni yangilash (Admin)
-app.patch("/api/admin/sponsor-channels/:id", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "Admin") {
-    return res.status(403).json({ error: "Ruxsat etilmagan amal (Faqat admin uchun)." });
-  }
-
+app.patch("/api/admin/sponsor-channels/:id", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   const id = parseInt(req.params.id);
   const { isActive, channelId, channelUsername, displayName, advertiserContact, pricePerMonth, startDate, endDate } = req.body;
 
@@ -4549,11 +4490,7 @@ app.patch("/api/admin/sponsor-channels/:id", authenticateToken, async (req: Auth
 });
 
 // DELETE /api/admin/sponsor-channels/:id — Sponsor kanalni o'chirish (Admin)
-app.delete("/api/admin/sponsor-channels/:id", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "Admin") {
-    return res.status(403).json({ error: "Ruxsat etilmagan amal (Faqat admin uchun)." });
-  }
-
+app.delete("/api/admin/sponsor-channels/:id", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   const id = parseInt(req.params.id);
 
   try {
@@ -4675,8 +4612,7 @@ app.get("/api/categories", async (req, res) => {
   }
 });
 
-app.post("/api/admin/categories", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "Admin") return res.status(403).json({ error: "Ruxsat yo'q." });
+app.post("/api/admin/categories", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { id, name, icon, fields } = req.body;
     const category = await prisma.category.create({
@@ -4688,8 +4624,7 @@ app.post("/api/admin/categories", authenticateToken, async (req: AuthRequest, re
   }
 });
 
-app.patch("/api/admin/categories/:id", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "Admin") return res.status(403).json({ error: "Ruxsat yo'q." });
+app.patch("/api/admin/categories/:id", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { name, icon, fields } = req.body;
     const category = await prisma.category.update({
@@ -4702,8 +4637,7 @@ app.patch("/api/admin/categories/:id", authenticateToken, async (req: AuthReques
   }
 });
 
-app.delete("/api/admin/categories/:id", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "Admin") return res.status(403).json({ error: "Ruxsat yo'q." });
+app.delete("/api/admin/categories/:id", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     await prisma.category.delete({ where: { id: req.params.id } });
     res.json({ success: true });
