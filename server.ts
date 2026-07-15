@@ -275,7 +275,9 @@ const allowedOrigins = [
   'http://savdo24.online',
   'http://www.savdo24.online',
   'http://localhost:3000',
-  'http://localhost:5173'
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173'
 ];
 
 app.use(cors({
@@ -294,13 +296,13 @@ app.use(cors({
     if (isAllowed) {
       callback(null, true);
     } else {
-      console.error(`[CORS Blocked] origin: ${origin}`);
+      console.warn(`[CORS Blocked] Origin not allowed: ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-Requested-With', 'Accept']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-Requested-With', 'Accept', 'X-Redirect-Origin']
 }));
 
 // Multer & Contabo S3 Configuration
@@ -789,8 +791,27 @@ async function seedDatabase() {
         }
       ];
 
+      console.log(`Seeding ${startupsToSeed.length} startups...`);
       for (const startup of startupsToSeed) {
-        await prisma.startup.create({ data: startup });
+        try {
+          // Attempt normal creation
+          await prisma.startup.create({ data: startup as any });
+        } catch (error: any) {
+          // Handle case where DB column might be missing (e.g. currentTier)
+          const errorMessage = error.message || "";
+          if (errorMessage.includes('currentTier') || errorMessage.includes('column')) {
+            console.warn(`[Seed Warning] Column issue for ${startup.id}. Retrying without 'currentTier'...`);
+            const { currentTier, ...dataWithoutTier } = startup as any;
+            await prisma.startup.create({ data: dataWithoutTier }).catch(e => {
+              console.error(`[Seed Error] Failed to seed ${startup.id} even without currentTier:`, e.message);
+            });
+          } else if (error.code === 'P2002') {
+            // Unique constraint violation (already exists) - ignore
+            console.log(`[Seed Info] Startup ${startup.id} already exists, skipping.`);
+          } else {
+            console.error(`[Seed Error] Unexpected error for ${startup.id}:`, error.message);
+          }
+        }
       }
       console.log("Database seeded successfully!");
     }
