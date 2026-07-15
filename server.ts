@@ -16,7 +16,6 @@ import jwt from "jsonwebtoken";
 import cookieParser from "cookie-parser";
 import multer from "multer";
 import sharp from "sharp";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import crypto from "crypto";
 import { Bot } from "grammy";
 import nodemailer from "nodemailer";
@@ -71,11 +70,21 @@ process.on("uncaughtException", (err) => {
 });
 
 // Environment variable validation
-const JWT_SECRET = process.env.JWT_SECRET || "savdo24-default-jwt-secret-for-dev-only";
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "savdo24-default-encryption-key-32-bytes";
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  console.error("XATOLIK: JWT_SECRET muhit o'zgaruvchisi topilmadi yoki juda qisqa (kamida 32 belgi bo'lishi kerak). Server to'xtatilmoqda.");
+  process.exit(1);
+}
+if (!process.env.ENCRYPTION_KEY || process.env.ENCRYPTION_KEY.length < 32) {
+  console.error("XATOLIK: ENCRYPTION_KEY muhit o'zgaruvchisi topilmadi yoki juda qisqa. Server to'xtatilmoqda.");
+  process.exit(1);
+}
 
-if (!process.env.JWT_SECRET || !process.env.ENCRYPTION_KEY) {
-  console.warn("DIQQAT: JWT_SECRET yoki ENCRYPTION_KEY muhit o'zgaruvchilari topilmadi. Development fallback qiymatlari ishlatilmoqda.");
+const JWT_SECRET = process.env.JWT_SECRET;
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
+
+// Coingate production check
+if (process.env.NODE_ENV === "production" && !process.env.COINGATE_API_TOKEN) {
+  console.warn("⚠️ DIQQAT: Production muhitida COINGATE_API_TOKEN topilmadi. To'lov tizimi ishlamaydi!");
 }
 
 let googleClient: OAuth2Client | null = null;
@@ -162,6 +171,80 @@ app.get("/api/admin/cron/newsletter", authenticateToken, requireAdmin, async (re
   await sendWeeklyNewsletter();
   res.json({ message: "Newsletter yuborish boshlandi." });
 });
+
+// GET /api/admin/cron/escrow-release — Escrow to'lovlarini avtomatik ozod qilish
+app.get("/api/admin/cron/escrow-release", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+  await autoReleaseEscrows();
+  res.json({ message: "Escrow auto-release jarayoni yakunlandi." });
+});
+
+async function autoReleaseEscrows() {
+  try {
+    const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+    
+    // Find escrows held for more than 14 days
+    const escrowsToRelease = await prisma.escrowPayment.findMany({
+      where: {
+        status: "held",
+        createdAt: { lt: fourteenDaysAgo }
+      },
+      include: {
+        payment: {
+          include: {
+            startup: {
+              include: { user: true }
+            }
+          }
+        }
+      }
+    });
+
+    console.log(`Checking ${escrowsToRelease.length} escrows for auto-release...`);
+
+    for (const escrow of escrowsToRelease) {
+      // Check if there are any open disputes
+      const openDispute = await prisma.dispute.findFirst({
+        where: {
+          paymentId: escrow.paymentId,
+          status: { in: ["open", "reviewing"] }
+        }
+      });
+
+      if (!openDispute) {
+        // Auto release
+        await prisma.escrowPayment.update({
+          where: { id: escrow.id },
+          data: {
+            status: "released",
+            releasedAt: new Date()
+          }
+        });
+
+        // Notify seller
+        const seller = escrow.payment.startup?.user;
+        if (seller) {
+          await createNotification(
+            seller.id,
+            "SYSTEM",
+            "Mablag' ozod qilindi",
+            `Sizning '${escrow.payment.startup.name}' loyihangiz uchun escrow to'lovi 14 kunlik muddatdan so'ng avtomatik ozod qilindi.`,
+            "/profile"
+          );
+
+          await sendEmail(
+            seller.email,
+            "Escrow to'lovi ozod qilindi",
+            `<p>Tabriklaymiz! <b>${escrow.payment.startup.name}</b> loyihasi uchun escrow to'lovi 14 kundan so'ng avtomatik ravishda ozod qilindi va balansingizga o'tkazildi.</p>`
+          );
+        }
+        
+        console.log(`Auto-released escrow for payment ${escrow.paymentId}`);
+      }
+    }
+  } catch (err) {
+    console.error("Escrow auto-release error:", err);
+  }
+}
 
 async function sendWeeklyNewsletter() {
   try {
@@ -3081,6 +3164,10 @@ app.get("/api/payments/my", authenticateToken, async (req: AuthRequest, res: Res
 });
 
 app.get("/api/payments/coingate-simulator", async (req: Request, res: Response) => {
+  // Extra security layer for production
+  if (process.env.NODE_ENV === "production" && !process.env.COINGATE_API_TOKEN) {
+    console.warn("Attempt to use Coingate simulator in production while API token is missing!");
+  }
   const coingateToken = await getSetting("COINGATE_API_TOKEN");
   if (process.env.NODE_ENV === "production" && coingateToken) {
     return res.status(403).json({ error: "Forbidden: Mock gateway is not available when real API is configured in production." });
@@ -4130,7 +4217,12 @@ app.get("/api/admin/stats", authenticateToken, requireAdmin, async (req: AuthReq
         reason: r.reason,
         status: r.status,
         date: r.createdAt
-      }))
+      })),
+      systemStatus: {
+        coingateConfigured: !!(process.env.COINGATE_API_TOKEN),
+        isProduction: process.env.NODE_ENV === "production",
+        envWarnings: (process.env.NODE_ENV === "production" && !process.env.COINGATE_API_TOKEN) ? ["To'lov tizimi sozlanmagan (COINGATE_API_TOKEN topilmadi)"] : []
+      }
     });
   } catch (err: any) {
     console.error("Get stats error:", err);

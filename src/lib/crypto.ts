@@ -1,7 +1,10 @@
 import crypto from 'crypto';
 
 function getEncryptionKey(): Buffer {
-  const secret = process.env.ENCRYPTION_KEY || "savdo24-default-encryption-key-32-bytes";
+  const secret = process.env.ENCRYPTION_KEY;
+  if (!secret) {
+    throw new Error("CRITICAL ERROR: ENCRYPTION_KEY is not defined in environment variables.");
+  }
   return crypto.createHash('sha256').update(secret).digest();
 }
 
