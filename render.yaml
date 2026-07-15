@@ -10,9 +10,39 @@ services:
         sync: false
       - key: JWT_SECRET
         generateValue: true
-      - key: BINANCE_API_KEY
+      - key: ENCRYPTION_KEY
+        generateValue: true
+      - key: COINGATE_API_TOKEN
         sync: false
-      - key: BINANCE_SECRET_KEY
+      - key: CONTABO_S3_ENDPOINT
         sync: false
-      - key: CLOUDINARY_URL
+      - key: CONTABO_ACCESS_KEY
+        sync: false
+      - key: CONTABO_SECRET_KEY
+        sync: false
+      - key: CONTABO_BUCKET_NAME
+        sync: false
+      - key: CDN_DOMAIN
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_STORAGE_CHANNEL_ID
+        sync: false
+      - key: TELEGRAM_BOT_INTERNAL_SECRET
+        sync: false
+      - key: TELEGRAM_BACKUP_CHAT_ID
+        sync: false
+      - key: BACKUP_GITHUB_TOKEN
+        sync: false
+      - key: BACKUP_GITHUB_REPO
+        sync: false
+      - key: BACKUP_GITHUB_EMAIL
+        sync: false
+      - key: BACKUP_GITHUB_NAME
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: APP_URL
         sync: false

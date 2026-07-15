@@ -685,6 +685,23 @@ export default function AdminPage({
         </p>
       </div>
 
+      {/* System Status Warnings */}
+      {stats?.systemStatus?.envWarnings?.length > 0 && (
+        <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-2xl animate-pulse">
+          <div className="flex items-start gap-3">
+            <span className="material-symbols-outlined text-red-500">warning</span>
+            <div className="space-y-1">
+              <h4 className="text-sm font-bold text-red-400">Tizim xavfsizligi va sozlamalari bo'yicha ogohlantirishlar:</h4>
+              <ul className="list-disc list-inside text-xs text-red-300/80">
+                {stats.systemStatus.envWarnings.map((warning: string, i: number) => (
+                  <li key={i}>{warning}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Platform Statistics */}
       {activeTab === 'dashboard' && stats && (
         <div className="space-y-8 animate-fade-in">

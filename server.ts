@@ -20,6 +20,7 @@ import crypto from "crypto";
 import { Bot } from "grammy";
 import nodemailer from "nodemailer";
 import Stripe from "stripe";
+import cron from "node-cron";
 
 async function getTransporter() {
   const host = await getSetting("SMTP_HOST") || process.env.SMTP_HOST;
@@ -4794,6 +4795,19 @@ app.delete("/api/auth/sessions", authenticateToken, async (req: AuthRequest, res
 
   httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
+  });
+
+  // Scheduled Tasks (Internal Cron)
+  // Har kuni soat 03:00 da escrow to'lovlarini tekshirish
+  cron.schedule("0 3 * * *", () => {
+    console.log("[CRON] Running autoReleaseEscrows...");
+    autoReleaseEscrows();
+  });
+
+  // Har haftalik newsletter yuborish (Dushanba kuni 09:00)
+  cron.schedule("0 9 * * 1", () => {
+    console.log("[CRON] Running sendWeeklyNewsletter...");
+    sendWeeklyNewsletter();
   });
 }
 
