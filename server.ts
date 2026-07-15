@@ -345,6 +345,18 @@ const reportLimiter = rateLimit({
   message: { error: "Juda ko'p shikoyat yuborildi. Iltimos, 15 daqiqadan so'ng qayta urinib ko'ring." }
 });
 
+const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: "Juda ko'p fayl yuklandi. Iltimos, 15 daqiqadan so'ng qayta urinib ko'ring." }
+});
+
+const passwordResetLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  message: { error: "Juda ko'p urinish. Iltimos, 1 soatdan so'ng qayta urinib ko'ring." }
+});
+
 const PORT = 3000;
 
 // Health check endpoint
@@ -1282,7 +1294,7 @@ app.post("/api/auth/google", async (req: Request, res: Response) => {
 });
 
 // POST /api/auth/forgot-password — Parolni tiklash so'rovi
-app.post("/api/auth/forgot-password", async (req: Request, res: Response) => {
+app.post("/api/auth/forgot-password", passwordResetLimiter, async (req: Request, res: Response) => {
   const { email } = req.body;
   if (!email) {
     return res.status(400).json({ error: "Email manzilini kiritish majburiy." });
@@ -1362,7 +1374,7 @@ app.post("/api/auth/forgot-password", async (req: Request, res: Response) => {
 });
 
 // POST /api/auth/reset-password — Yangi parolni saqlash
-app.post("/api/auth/reset-password", async (req: Request, res: Response) => {
+app.post("/api/auth/reset-password", passwordResetLimiter, async (req: Request, res: Response) => {
   const { token, password } = req.body;
 
   if (!token || !password) {
@@ -2890,7 +2902,7 @@ app.post("/api/ideas/:id/upvote", upvoteLimiter, async (req: Request, res: Respo
 });
 
 // --- FILE UPLOAD (TELEGRAM STORAGE) ---
-app.post("/api/upload", authenticateToken, upload.single("file"), async (req: AuthRequest, res: Response) => {
+app.post("/api/upload", authenticateToken, uploadLimiter, upload.single("file"), async (req: AuthRequest, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "Fayl yuklanmadi." });
