@@ -1,0 +1,6 @@
+{
+  "name": "Savdo24",
+  "description": "A modern startup equity and investment marketplace for Central Asia, connecting founders with verified investors.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

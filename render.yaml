@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: savdo24-marketplace
+    env: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm run start
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: BINANCE_API_KEY
+        sync: false
+      - key: BINANCE_SECRET_KEY
+        sync: false
+      - key: CLOUDINARY_URL
+        sync: false
