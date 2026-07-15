@@ -357,6 +357,12 @@ const passwordResetLimiter = rateLimit({
   message: { error: "Juda ko'p urinish. Iltimos, 1 soatdan so'ng qayta urinib ko'ring." }
 });
 
+const paymentStatusLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: { error: "To'lov holatini tekshirish limiti tugadi. Iltimos, 15 daqiqadan so'ng qayta urinib ko'ring." }
+});
+
 const PORT = 3000;
 
 // Health check endpoint
@@ -1158,7 +1164,6 @@ app.post("/api/auth/register", authLimiter, async (req: Request, res: Response) 
       token: accessToken,
       accessToken,
       refreshToken,
-      verificationToken, // Returned for simplified development/testing setup
       user: {
         id: user.id,
         name: user.name,
@@ -3135,6 +3140,12 @@ app.post("/api/payments/create", authenticateToken, async (req: AuthRequest, res
     }
 
     if (!paymentUrl) {
+      if (process.env.NODE_ENV === "production") {
+        const stripeKey = await getSetting("STRIPE_SECRET_KEY") || process.env.STRIPE_SECRET_KEY;
+        if (!coingateToken && !stripeKey) {
+          return res.status(503).json({ error: "To'lov tizimi vaqtincha mavjud emas, keyinroq urinib ko'ring." });
+        }
+      }
       paymentUrl = `/api/payments/coingate-simulator?orderId=${orderId}&token=${secureToken}&amount=${realAmount.toFixed(2)}&title=${encodeURIComponent(startupRecord.name)}`;
     }
 
@@ -3177,13 +3188,8 @@ app.get("/api/payments/my", authenticateToken, async (req: AuthRequest, res: Res
 });
 
 app.get("/api/payments/coingate-simulator", async (req: Request, res: Response) => {
-  // Extra security layer for production
-  if (process.env.NODE_ENV === "production" && !process.env.COINGATE_API_TOKEN) {
-    console.warn("Attempt to use Coingate simulator in production while API token is missing!");
-  }
-  const coingateToken = await getSetting("COINGATE_API_TOKEN");
-  if (process.env.NODE_ENV === "production" && coingateToken) {
-    return res.status(403).json({ error: "Forbidden: Mock gateway is not available when real API is configured in production." });
+  if (process.env.NODE_ENV === "production") {
+    return res.status(403).json({ error: "Forbidden: Mock gateway is only available in development mode." });
   }
 
   const { orderId, token, amount, title } = req.query;
@@ -3803,7 +3809,7 @@ app.patch("/api/conversations/:id/read", authenticateToken, async (req: AuthRequ
 });
 
 // GET /api/payments/status/:id — to'lov holatini tekshirish
-app.get("/api/payments/status/:id", async (req: Request, res: Response) => {
+app.get("/api/payments/status/:id", authenticateToken, paymentStatusLimiter, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const payment = await prisma.payment.findUnique({
@@ -3812,6 +3818,11 @@ app.get("/api/payments/status/:id", async (req: Request, res: Response) => {
     });
     if (!payment) {
       return res.status(404).json({ error: "To'lov topilmadi." });
+    }
+
+    // Ownership check
+    if (payment.userId !== req.user?.id && req.user?.role !== "Admin") {
+      return res.status(403).json({ error: "Ruxsat etilmagan. Faqat o'z to'lovlaringizni ko'rishingiz mumkin." });
     }
     
     if (payment.status === "completed" && payment.startup) {

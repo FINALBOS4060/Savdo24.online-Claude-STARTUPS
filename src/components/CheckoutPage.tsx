@@ -120,7 +120,12 @@ export default function CheckoutPage({
 
     const pollInterval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/payments/status/${activeOrderId}`);
+        const token = localStorage.getItem('savdo24_token');
+        const res = await fetch(`/api/payments/status/${activeOrderId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
         if (res.ok) {
           const data = await res.json();
           if (data.status === 'completed') {
@@ -175,7 +180,12 @@ export default function CheckoutPage({
     }
     setIsChecking(true);
     try {
-      const res = await fetch(`/api/payments/status/${activeOrderId}`);
+      const token = localStorage.getItem('savdo24_token');
+      const res = await fetch(`/api/payments/status/${activeOrderId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       if (res.ok) {
         const data = await res.json();
         if (data.status === 'completed') {
