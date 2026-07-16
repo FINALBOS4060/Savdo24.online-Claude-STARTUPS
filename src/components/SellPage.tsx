@@ -511,9 +511,12 @@ export default function SellPage({ onAddStartup, onActionToast, setView, categor
                 <div className="flex flex-col items-center justify-center space-y-2 w-full">
                   <img
                     src={imageUrl}
-                    alt="Uploaded preview"
+                    alt="Yuklangan startap rasmi"
                     className="max-h-32 rounded-xl object-cover border border-white/10"
                     referrerPolicy="no-referrer"
+                    loading="lazy"
+                    width={160}
+                    height={128}
                   />
                   <div className="flex gap-2 items-center">
                     <p className="text-[10px] text-green-400 font-bold flex items-center gap-1">

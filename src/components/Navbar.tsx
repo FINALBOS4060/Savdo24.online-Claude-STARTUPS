@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Send } from 'lucide-react';
 import { UserProfileData, Notification } from '../types';
 import { apiFetch as fetch } from '../lib/api';
 
@@ -121,6 +122,16 @@ export default function Navbar({
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
+
+        <a
+          href="https://t.me/Dasturchilar_Python_JS_HTML_CSS"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="p-2 text-on-primary-container hover:text-secondary-container transition-colors rounded-lg bg-white/5 hidden sm:flex"
+          title="Telegram guruh"
+        >
+          <Send className="w-4 h-4" />
+        </a>
 
         {/* Notifications */}
         {user.name !== 'Mehmon' && (

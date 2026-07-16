@@ -12,6 +12,7 @@ interface BrowsePageProps {
   onActionToast: (message: string) => void;
   user: UserProfileData;
   categories: Category[];
+  isLoading?: boolean;
 }
 
 export default function BrowsePage({
@@ -22,6 +23,7 @@ export default function BrowsePage({
   onActionToast,
   user,
   categories,
+  isLoading = false,
 }: BrowsePageProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [subFilters, setSubFilters] = useState<Record<string, any>>({});
@@ -237,6 +239,9 @@ export default function BrowsePage({
             className="w-full h-full object-contain object-right-bottom p-4 max-h-[380px]"
             src="https://lh3.googleusercontent.com/aida-public/AB6AXuB0iLGg-o6MQzTDLv1u5AjmyWEA7UwnBl07faLmhB9Lskr3vDBhBkAvHMSU94EOGnfeZ2WXSt8R_6kVK6qrJIsjTKKADfxvmQzJh5lKX1sQqs7YDjY9uuEeCTXERqBb233TqiEPyV-KQN8wGLFKheOFBmjKICwB6vVNx-l4p_dIElaGoETLdPaxA1Z4TLX5e86GVNoX7acF2qLdndudADhXDwxb93oXoUtubCd4o59IQDBh5CpmBxHzUWyx2pYWZVGzwiplk9y-yHE"
             alt="G'oyalar va startaplar bozori modeli"
+            loading="lazy"
+            width={500}
+            height={380}
           />
         </div>
       </section>
@@ -354,6 +359,7 @@ export default function BrowsePage({
                         placeholder={field.placeholder || "Izlash..."}
                         value={subFilters[field.key] || ''}
                         onChange={(e) => setSubFilters({ ...subFilters, [field.key]: e.target.value })}
+                        aria-label={field.label}
                       />
                     </div>
                   );
@@ -393,6 +399,7 @@ export default function BrowsePage({
                 checked={onlyActive}
                 onChange={(e) => setOnlyActive(e.target.checked)}
                 className="w-4 h-4 accent-secondary-container bg-[#0b1426] border border-outline-variant/30 rounded cursor-pointer"
+                aria-label="Faqat faol e'lonlar"
               />
               Faqat faol e'lonlar
             </label>
@@ -410,7 +417,22 @@ export default function BrowsePage({
           </div>
         </div>
 
-        {selectedCategory && categoryActiveStartups.length === 0 ? (
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="bg-white dark:bg-primary-container/40 border border-outline-variant/20 rounded-2xl overflow-hidden p-6 space-y-4 animate-pulse">
+                <div className="h-48 bg-white/5 rounded-xl"></div>
+                <div className="h-6 bg-white/10 rounded-md w-2/3"></div>
+                <div className="h-4 bg-white/5 rounded-md w-full"></div>
+                <div className="h-4 bg-white/5 rounded-md w-5/6"></div>
+                <div className="flex justify-between items-center pt-4">
+                  <div className="h-8 bg-white/10 rounded-lg w-1/3"></div>
+                  <div className="h-10 bg-secondary-container/10 rounded-xl w-1/3"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : selectedCategory && categoryActiveStartups.length === 0 ? (
           <div className="text-center py-16 border border-dashed border-outline-variant/20 rounded-xl bg-white/5 max-w-lg mx-auto flex flex-col items-center p-8">
             <span className="material-symbols-outlined text-5xl text-on-primary-container mb-3">folder_open</span>
             <p className="text-on-primary-container font-semibold mb-4 text-base">Bu kategoriyada hali e'lonlar yo'q. Birinchi bo'lib siz qo'shing!</p>
@@ -455,6 +477,8 @@ export default function BrowsePage({
                         src={startup.image}
                         alt={startup.name}
                         loading="lazy"
+                        width={224}
+                        height={144}
                       />
                       {startup.soldStatus === 'sotildi' && (
                         <div className="absolute inset-0 bg-red-600/70 backdrop-blur-[2px] flex items-center justify-center">
@@ -519,6 +543,8 @@ export default function BrowsePage({
                       src={startup.image}
                       alt={startup.name}
                       loading="lazy"
+                      width={350}
+                      height={192}
                     />
                     <div className="absolute top-4 left-4 bg-primary-container/90 text-white border border-white/10 px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider">
                       {categories.find(c => c.id === startup.category)?.name || startup.category}
@@ -661,6 +687,7 @@ export default function BrowsePage({
             placeholder="Elektron pochtangizni kiriting"
             value={newsletterEmail}
             onChange={(e) => setNewsletterEmail(e.target.value)}
+            aria-label="Elektron pochta manzili"
           />
           <button
             type="submit"

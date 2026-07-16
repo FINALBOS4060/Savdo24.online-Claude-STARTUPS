@@ -168,6 +168,32 @@ export default function DetailPage({
     fetchSellerReviews();
   }, [startup.id, startup.userId]);
 
+  // Dynamically update document title and meta description for SEO
+  useEffect(() => {
+    if (startup) {
+      document.title = `${startup.name} — Savdo24`;
+      
+      const metaDescription = document.querySelector('meta[name="description"]');
+      if (metaDescription) {
+        metaDescription.setAttribute('content', startup.slogan || startup.description || `${startup.name} sotiladi.`);
+      } else {
+        const meta = document.createElement('meta');
+        meta.name = "description";
+        meta.content = startup.slogan || startup.description || `${startup.name} sotiladi.`;
+        document.head.appendChild(meta);
+      }
+    }
+    
+    // Clean up to restore default values when leaving DetailPage
+    return () => {
+      document.title = "Savdo24 — Startaplar va raqamli loyihalar bozori";
+      const metaDescription = document.querySelector('meta[name="description"]');
+      if (metaDescription) {
+        metaDescription.setAttribute('content', "O'zbekistondagi eng yirik startaplar, loyihalar va raqamli bizneslar savdo maydonchasi.");
+      }
+    };
+  }, [startup]);
+
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reviewComment.trim()) {
@@ -399,7 +425,10 @@ export default function DetailPage({
           <img
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-102"
             src={startup.image}
-            alt={startup.name}
+            alt={`${startup.name} - asosiy startap rasmi`}
+            loading="lazy"
+            width={600}
+            height={500}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-primary-container via-primary-container/40 to-transparent"></div>
           <div className="absolute bottom-0 left-0 w-full p-6">
@@ -434,7 +463,10 @@ export default function DetailPage({
             <img
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               src={startup.gallery[0]}
-              alt={`${startup.name} ikkinchi rasm 1`}
+              alt={`${startup.name} qo'shimcha rasm 1`}
+              loading="lazy"
+              width={280}
+              height={240}
             />
           </div>
         ) : (
@@ -448,7 +480,10 @@ export default function DetailPage({
             <img
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               src={startup.gallery[1]}
-              alt={`${startup.name} ikkinchi rasm 2`}
+              alt={`${startup.name} qo'shimcha rasm 2`}
+              loading="lazy"
+              width={280}
+              height={240}
             />
           </div>
         ) : (
@@ -462,7 +497,10 @@ export default function DetailPage({
             <img
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               src={startup.gallery[2]}
-              alt={`${startup.name} dinamik banner`}
+              alt={`${startup.name} yordamchi banner`}
+              loading="lazy"
+              width={580}
+              height={240}
             />
           </div>
         ) : (
@@ -589,7 +627,10 @@ export default function DetailPage({
                   <img
                     className="w-16 h-16 rounded-full object-cover border-2 border-secondary-container shadow-md"
                     src={member.imgUrl}
-                    alt={member.name}
+                    alt={`${member.name} - ${member.role}`}
+                    loading="lazy"
+                    width={64}
+                    height={64}
                   />
                   <div>
                     <h4 className="text-white font-extrabold text-sm">{member.name}</h4>
@@ -789,8 +830,11 @@ export default function DetailPage({
                       <div className="flex items-center gap-2.5">
                         <img
                           src={rev.buyer?.avatarUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${rev.buyer?.name}`}
-                          alt={rev.buyer?.name}
+                          alt={`${rev.buyer?.name} xaridor avatari`}
                           className="w-8 h-8 rounded-full border border-white/10"
+                          loading="lazy"
+                          width={32}
+                          height={32}
                         />
                         <div>
                           <span className="text-white font-bold text-xs block">{rev.buyer?.name}</span>
@@ -1000,7 +1044,10 @@ export default function DetailPage({
                   key={index}
                   className="w-10 h-10 rounded-full border-2 border-[#0b1426] bg-white object-cover shadow-sm"
                   src={logo}
-                  alt={`Maslahatchi logotipi ${index}`}
+                  alt={`Maslahatchi professional ${index + 1}`}
+                  loading="lazy"
+                  width={40}
+                  height={40}
                 />
               ))}
               <div className="w-10 h-10 rounded-full border-2 border-[#0b1426] bg-secondary-container flex items-center justify-center text-[9px] font-bold text-[#12161c] shadow-sm">

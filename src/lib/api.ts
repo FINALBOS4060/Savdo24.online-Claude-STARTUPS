@@ -1,10 +1,21 @@
-// Global Fetch Interceptor to add Authorization header and handle auto-token-refresh on 401
+// Global Fetch Interceptor to add CSRF header, handle credentials, and auto-token-refresh on 401
 const originalFetch = window.fetch;
 
+function getCookie(name: string): string | null {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+  return null;
+}
+
 export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  const token = localStorage.getItem('savdo24_token');
   let options = init || {};
-  if (token) {
+  options.credentials = 'include'; // Send cookies with all requests
+  
+  // Set CSRF token header for state-changing requests
+  const csrfToken = getCookie('csrfToken');
+  const method = (options.method || 'GET').toUpperCase();
+  if (csrfToken && !['GET', 'HEAD', 'OPTIONS'].includes(method)) {
     options.headers = options.headers || {};
     if (!(options.headers instanceof Headers)) {
       if (Array.isArray(options.headers)) {
@@ -12,58 +23,42 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
       } else {
         options.headers = {
           ...options.headers,
-          'Authorization': `Bearer ${token}`
+          'x-csrf-token': csrfToken
         };
       }
     } else {
-      options.headers.set('Authorization', `Bearer ${token}`);
+      options.headers.set('x-csrf-token', csrfToken);
     }
   }
 
   let response = await originalFetch(input, options);
 
   if (response.status === 401 && !String(input).includes('/api/auth/refresh') && !String(input).includes('/api/auth/login')) {
-    const refreshToken = localStorage.getItem('savdo24_refresh_token');
-    if (refreshToken) {
-      try {
-        const refreshResponse = await originalFetch('/api/auth/refresh', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken })
-        });
+    try {
+      const refreshResponse = await originalFetch('/api/auth/refresh', {
+        method: 'POST',
+        credentials: 'include'
+      });
 
-        if (refreshResponse.ok) {
-          const refreshData = await refreshResponse.json();
-          const newToken = refreshData.accessToken;
-          const newRefreshToken = refreshData.refreshToken;
+      if (refreshResponse.ok) {
+        // Dispatch event to sync react state
+        window.dispatchEvent(new CustomEvent('savdo24_auth_change', { detail: { token: 'cookie_authenticated' } }));
 
-          localStorage.setItem('savdo24_token', newToken);
-          if (newRefreshToken) {
-            localStorage.setItem('savdo24_refresh_token', newRefreshToken);
-          }
-
-          // Dispatch event to sync react state
-          window.dispatchEvent(new CustomEvent('savdo24_auth_change', { detail: { token: newToken } }));
-
-          // Retry
-          if (options.headers && !Array.isArray(options.headers) && !(options.headers instanceof Headers)) {
-            (options.headers as any)['Authorization'] = `Bearer ${newToken}`;
-          } else if (options.headers instanceof Headers) {
-            options.headers.set('Authorization', `Bearer ${newToken}`);
-          }
-          response = await originalFetch(input, options);
-        } else {
-          // Refresh failed
-          localStorage.removeItem('savdo24_token');
-          localStorage.removeItem('savdo24_refresh_token');
-          localStorage.removeItem('savdo24_user');
-          window.dispatchEvent(new CustomEvent('savdo24_auth_change', { detail: { token: null, logout: true } }));
-        }
-      } catch (err) {
-        console.error("Token refresh failed:", err);
+        // Retry the original request
+        response = await originalFetch(input, options);
+      } else {
+        // Refresh failed, notify logout
+        window.dispatchEvent(new CustomEvent('savdo24_auth_change', { detail: { token: null, logout: true } }));
       }
+    } catch (err) {
+      console.error("Token refresh failed:", err);
     }
   }
 
   return response;
 }
+
+// Intercept window.fetch globally so any standard fetch call uses our credentials and CSRF setup
+window.fetch = apiFetch;
+
+

@@ -18,6 +18,7 @@ import PrivacyPage from './components/PrivacyPage';
 import RefundPolicyPage from './components/RefundPolicyPage';
 import ForgotPasswordPage from './components/ForgotPasswordPage';
 import ResetPasswordPage from './components/ResetPasswordPage';
+import Footer from './components/Footer';
 import { apiFetch as fetch } from './lib/api';
 import { io } from 'socket.io-client';
 
@@ -33,6 +34,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isDark, setIsDark] = useState<boolean>(true);
   const [checkoutAmount, setCheckoutAmount] = useState<number>(1250.00);
+  const [isLoadingStartups, setIsLoadingStartups] = useState<boolean>(true);
 
   useEffect(() => {
     if (currentView === 'profile' && initialProfileTab) {
@@ -42,7 +44,7 @@ export default function App() {
   }, [currentView, initialProfileTab]);
 
   // Auth States
-  const [token, setToken] = useState<string | null>(localStorage.getItem('savdo24_token'));
+  const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<UserProfileData>({
     name: 'Mehmon',
     role: 'Xaridor',
@@ -103,11 +105,8 @@ export default function App() {
           });
           const data = await res.json();
           if (res.ok) {
-            setToken(data.accessToken);
+            setToken('cookie_authenticated');
             setUser(data.user);
-            localStorage.setItem('savdo24_token', data.accessToken);
-            localStorage.setItem('savdo24_refresh_token', data.refreshToken);
-            localStorage.setItem('savdo24_user', JSON.stringify(data.user));
             showToast(`Xush kelibsiz, ${data.user.name}!`);
             setAuthModalOpen(false);
           } else {
@@ -154,7 +153,7 @@ export default function App() {
     return () => window.removeEventListener('savdo24_auth_change', handleAuthChange);
   }, []);
 
-  // Load User from /api/auth/me (secure httpOnly cookie-based) or localStorage on mount
+  // Load User from /api/auth/me (secure httpOnly cookie-based) on mount
   useEffect(() => {
     const fetchCurrentUser = async () => {
       try {
@@ -162,19 +161,13 @@ export default function App() {
         if (res.ok) {
           const data = await res.json();
           setUser(data.user);
-          setToken(localStorage.getItem('savdo24_token') || 'cookie_authenticated');
+          setToken('cookie_authenticated');
         } else {
-          const storedUser = localStorage.getItem('savdo24_user');
-          const storedToken = localStorage.getItem('savdo24_token');
-          if (storedUser && storedToken) {
-            setUser(JSON.parse(storedUser));
-            setToken(storedToken);
-          } else {
-            setToken(null);
-          }
+          setToken(null);
         }
       } catch (err) {
         console.error("Error fetching current user:", err);
+        setToken(null);
       }
     };
     fetchCurrentUser();
@@ -226,6 +219,7 @@ export default function App() {
 
   // Fetch Startups from our Real API
   const fetchStartups = async () => {
+    setIsLoadingStartups(true);
     try {
       const res = await fetch('/api/startups');
       if (res.ok) {
@@ -236,6 +230,8 @@ export default function App() {
       }
     } catch (err) {
       console.error("Failed to connect to startups API:", err);
+    } finally {
+      setIsLoadingStartups(false);
     }
   };
 
@@ -294,8 +290,7 @@ export default function App() {
       const res = await fetch('/api/startups', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(newStartup),
       });
@@ -342,11 +337,8 @@ export default function App() {
 
       if (res.ok) {
         const data = await res.json();
-        setToken(data.token);
+        setToken('cookie_authenticated');
         setUser(data.user);
-        localStorage.setItem('savdo24_token', data.token);
-        localStorage.setItem('savdo24_refresh_token', data.refreshToken);
-        localStorage.setItem('savdo24_user', JSON.stringify(data.user));
         showToast(`Xush kelibsiz, ${data.user.name}!`);
         setAuthModalOpen(false);
         // Clear forms
@@ -378,11 +370,8 @@ export default function App() {
 
       if (res.ok) {
         const data = await res.json();
-        setToken(data.token);
+        setToken('cookie_authenticated');
         setUser(data.user);
-        localStorage.setItem('savdo24_token', data.token);
-        localStorage.setItem('savdo24_refresh_token', data.refreshToken);
-        localStorage.setItem('savdo24_user', JSON.stringify(data.user));
         showToast(`Muvaffaqiyatli ro'yxatdan o'tdingiz, ${data.user.name}!`);
         setAuthModalOpen(false);
         // Clear forms
@@ -401,11 +390,8 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
-      const refreshToken = localStorage.getItem('savdo24_refresh_token');
       await fetch('/api/auth/logout', { 
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken })
+        method: 'POST'
       });
     } catch (err) {
       console.error("Error logging out from server:", err);
@@ -418,9 +404,6 @@ export default function App() {
       joinDate: 'bugun',
       avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Guest',
     });
-    localStorage.removeItem('savdo24_token');
-    localStorage.removeItem('savdo24_refresh_token');
-    localStorage.removeItem('savdo24_user');
     showToast("Tizimdan chiqdingiz.");
     setView('browse');
   };
@@ -455,6 +438,7 @@ export default function App() {
         {/* Core Main Area */}
         <main className="flex-grow w-full pl-0 lg:pl-64 pt-24 pb-28 md:pb-12 transition-all duration-300">
           <div className="max-w-7xl mx-auto px-4 md:px-8">
+            {/* Warning and Pages */}
             {user.name !== 'Mehmon' && !user.emailVerified && (
             <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-in text-left">
               <div className="flex items-start gap-3">
@@ -509,6 +493,7 @@ export default function App() {
                   onActionToast={showToast}
                   user={user}
                   categories={categories}
+                  isLoading={isLoadingStartups}
                 />
               )}
 
@@ -664,6 +649,7 @@ export default function App() {
           </div>
         </main>
       </div>
+      <Footer setView={setView} />
 
       {/* Global Auth Modal */}
       <AnimatePresence>
@@ -716,12 +702,13 @@ export default function App() {
                 </button>
               </div>
 
-              {authTab === 'login' ? (
+               {authTab === 'login' ? (
                 <form onSubmit={handleLoginSubmit} className="space-y-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-on-primary-container">Email manzili</label>
+                    <label htmlFor="login-email" className="text-xs font-bold text-on-primary-container">Email manzili</label>
                     <input
                       type="email"
+                      id="login-email"
                       required
                       placeholder="email@example.com"
                       value={authEmail}
@@ -731,7 +718,7 @@ export default function App() {
                   </div>
                   <div className="space-y-1.5">
                     <div className="flex justify-between items-center">
-                      <label className="text-xs font-bold text-on-primary-container">Parol</label>
+                      <label htmlFor="login-password" className="text-xs font-bold text-on-primary-container">Parol</label>
                       <button
                         type="button"
                         id="forgot-password-link"
@@ -746,6 +733,7 @@ export default function App() {
                     </div>
                     <input
                       type="password"
+                      id="login-password"
                       required
                       placeholder="••••••••"
                       value={authPassword}
@@ -765,9 +753,10 @@ export default function App() {
               ) : (
                 <form onSubmit={handleRegisterSubmit} className="space-y-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-on-primary-container">To'liq ism</label>
+                    <label htmlFor="register-name" className="text-xs font-bold text-on-primary-container">To'liq ism</label>
                     <input
                       type="text"
+                      id="register-name"
                       required
                       placeholder="Toshmatov Eshmat"
                       value={authName}
@@ -776,9 +765,10 @@ export default function App() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-on-primary-container">Email manzili</label>
+                    <label htmlFor="register-email" className="text-xs font-bold text-on-primary-container">Email manzili</label>
                     <input
                       type="email"
+                      id="register-email"
                       required
                       placeholder="email@example.com"
                       value={authEmail}
@@ -787,9 +777,10 @@ export default function App() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-on-primary-container">Parol</label>
+                    <label htmlFor="register-password" className="text-xs font-bold text-on-primary-container">Parol</label>
                     <input
                       type="password"
+                      id="register-password"
                       required
                       placeholder="••••••••"
                       value={authPassword}

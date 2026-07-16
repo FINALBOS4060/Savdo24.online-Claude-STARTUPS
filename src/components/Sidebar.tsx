@@ -37,7 +37,10 @@ export default function Sidebar({
           <img
             className="w-full h-full object-cover transition-transform group-hover:scale-105"
             src={user.avatarUrl}
-            alt="Savdo24 hamkor avatarlari"
+            alt="Savdo24 foydalanuvchi avatarlari"
+            loading="lazy"
+            width={64}
+            height={64}
           />
         </div>
         <h3 className="font-bold text-sm text-on-surface dark:text-white">{user.name}</h3>
@@ -84,17 +87,6 @@ export default function Sidebar({
         })}
       </nav>
 
-      {/* Legal Footer Links inside Sidebar */}
-      <div className="border-t border-outline-variant/30 pt-4 mt-4 space-y-2 text-center">
-        <div className="flex flex-wrap gap-x-2 gap-y-1 justify-center text-[10px] text-secondary-fixed-dim font-bold">
-          <button onClick={() => setView('terms')} className="hover:text-white transition-colors cursor-pointer">Foydalanish shartlari</button>
-          <span>•</span>
-          <button onClick={() => setView('privacy')} className="hover:text-white transition-colors cursor-pointer">Maxfiylik</button>
-          <span>•</span>
-          <button onClick={() => setView('refund')} className="hover:text-white transition-colors cursor-pointer">Qaytarish siyosati</button>
-        </div>
-        <p className="text-[9px] text-[#8892b0] font-medium">© 2026 Savdo24. Barcha huquqlar himoyalangan.</p>
-      </div>
     </aside>
   );
 }

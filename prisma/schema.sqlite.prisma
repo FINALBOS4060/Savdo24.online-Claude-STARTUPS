@@ -11,9 +11,11 @@ generator client {
 model User {
   id              Int       @id @default(autoincrement())
   email           String    @unique
-  password        String
+  password        String?
   name            String
   role            String    // "Sotuvchi" or "Xaridor" or "Admin"
+  googleId        String?   @unique
+  authProvider    String    @default("email") // "email" | "google"
   verified        Boolean   @default(false)
   joinDate        String
   avatarUrl       String
@@ -60,7 +62,7 @@ model Startup {
   longDescription String
   category        String
   price           Float     @default(0)
-  listingType     String    @default("Butunlay sotiladi")
+  listingType     String    @default("To'liq loyiha (manba kodi bilan)")
   techStack       String    @default("[]") // Serialized JSON array of strings
   demoUrl         String?
   repoIncluded    Boolean   @default(false)
@@ -88,6 +90,10 @@ model Startup {
   topBoosts       TopBoost[]
   currentTier     String     @default("standard")
   subscriptions   ListingSubscription[]
+
+  @@index([category])
+  @@index([status])
+  @@index([soldStatus])
 }
 
 model Payment {
@@ -107,6 +113,9 @@ model Payment {
   referralId         String?
   disputes           Dispute[]
   escrow             EscrowPayment?
+
+  @@index([userId])
+  @@index([status])
 }
 
 model Idea {
@@ -160,6 +169,9 @@ model Dispute {
   adminNote   String?
   createdAt   DateTime @default(now())
   resolvedAt  DateTime?
+
+  @@index([paymentId])
+  @@index([status])
 }
 
 model RefreshToken {
@@ -175,7 +187,7 @@ model RefreshToken {
 
 model Report {
   id          Int      @id @default(autoincrement())
-  targetType  String   // "startup" | "idea" | "user" | "conversation"
+  targetType  String   // "startup" | "idea" | "user"
   targetId    String
   reporterId  Int
   reason      String
@@ -328,6 +340,8 @@ model EscrowPayment {
   holdEndDate DateTime  // auto-release after buyer confirms or timeout
   createdAt   DateTime @default(now())
   disputes    DisputeResolution[]
+
+  @@index([status])
 }
 
 model DisputeResolution {

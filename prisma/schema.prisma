@@ -89,6 +89,10 @@ model Startup {
   topBoosts       TopBoost[]
   currentTier     String     @default("standard")
   subscriptions   ListingSubscription[]
+
+  @@index([category])
+  @@index([status])
+  @@index([soldStatus])
 }
 
 model Payment {
@@ -108,6 +112,9 @@ model Payment {
   referralId         String?
   disputes           Dispute[]
   escrow             EscrowPayment?
+
+  @@index([userId])
+  @@index([status])
 }
 
 model Idea {
@@ -161,6 +168,9 @@ model Dispute {
   adminNote   String?
   createdAt   DateTime @default(now())
   resolvedAt  DateTime?
+
+  @@index([paymentId])
+  @@index([status])
 }
 
 model RefreshToken {
@@ -329,6 +339,8 @@ model EscrowPayment {
   holdEndDate DateTime  // auto-release after buyer confirms or timeout
   createdAt   DateTime @default(now())
   disputes    DisputeResolution[]
+
+  @@index([status])
 }
 
 model DisputeResolution {

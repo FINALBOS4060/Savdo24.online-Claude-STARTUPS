@@ -22,6 +22,14 @@ import nodemailer from "nodemailer";
 import Stripe from "stripe";
 import cron from "node-cron";
 import dotenv from "dotenv";
+import {
+  ideaLimiter,
+  upvoteLimiter,
+  reportLimiter,
+  uploadLimiter,
+  paymentStatusLimiter,
+  globalLimiter
+} from "./src/lib/rateLimiters";
 
 dotenv.config();
 
@@ -41,7 +49,7 @@ async function getTransporter() {
   });
 }
 
-async function sendEmail(to: string, subject: string, html: string) {
+export async function sendEmail(to: string, subject: string, html: string) {
   try {
     const transporter = await getTransporter();
     if (!transporter) return;
@@ -74,7 +82,7 @@ process.on("uncaughtException", (err) => {
 });
 
 // Environment variable validation
-const JWT_SECRET = (process.env.JWT_SECRET && process.env.JWT_SECRET.length >= 32)
+export const JWT_SECRET = (process.env.JWT_SECRET && process.env.JWT_SECRET.length >= 32)
   ? process.env.JWT_SECRET
   : (() => {
       if (process.env.NODE_ENV === "production") {
@@ -118,6 +126,7 @@ function getGoogleClient() {
 }
 
 const app = express();
+app.use('/api', globalLimiter);
 
 // Newsletter logic moved down
 const httpServer = createServer(app);
@@ -135,7 +144,7 @@ function requireAdmin(req: Request, res: Response, next: NextFunction) {
 }
 
 const isPostgres = !!(process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith("postgres"));
-const prisma: any = isPostgres 
+export const prisma: any = isPostgres 
   ? new PGClient() 
   : new SQLiteClient({
       datasources: {
@@ -145,7 +154,7 @@ const prisma: any = isPostgres
       }
     });
 
-async function getSetting(key: string): Promise<string | null> {
+export async function getSetting(key: string): Promise<string | null> {
   try {
     const dbSetting = await prisma.setting.findUnique({ where: { key } });
     if (dbSetting) {
@@ -225,16 +234,20 @@ async function autoReleaseEscrows() {
 
     console.log(`Checking ${escrowsToRelease.length} escrows for auto-release...`);
 
-    for (const escrow of escrowsToRelease) {
-      // Check if there are any open disputes
-      const openDispute = await prisma.dispute.findFirst({
-        where: {
-          paymentId: escrow.paymentId,
-          status: { in: ["open", "reviewing"] }
-        }
-      });
+    const paymentIds = escrowsToRelease.map(e => e.paymentId);
+    const activeDisputes = await prisma.dispute.findMany({
+      where: {
+        paymentId: { in: paymentIds },
+        status: { in: ["open", "reviewing"] }
+      }
+    });
 
-      if (!openDispute) {
+    const disputedPaymentIds = new Set(activeDisputes.map(d => d.paymentId));
+
+    for (const escrow of escrowsToRelease) {
+      const isDisputed = disputedPaymentIds.has(escrow.paymentId);
+
+      if (!isDisputed) {
         // Auto release
         await prisma.escrowPayment.update({
           where: { id: escrow.id },
@@ -344,47 +357,7 @@ io.on("connection", (socket) => {
   socket.join(`user:${socket.data.user.id}`);
 });
 
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  message: { error: "Juda ko'p so'rov yuborildi. Iltimos, 15 daqiqadan so'ng qayta urinib ko'ring." }
-});
 
-const ideaLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
-  max: 3,
-  message: { error: "Juda ko'p komment qoldirildi. Iltimos, 1 daqiqadan so'ng qayta urinib ko'ring." }
-});
-
-const upvoteLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
-  max: 10,
-  message: { error: "Juda ko'p ovoz berildi. Iltimos, 1 daqiqadan so'ng qayta urinib ko'ring." }
-});
-
-const reportLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5,
-  message: { error: "Juda ko'p shikoyat yuborildi. Iltimos, 15 daqiqadan so'ng qayta urinib ko'ring." }
-});
-
-const uploadLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  message: { error: "Juda ko'p fayl yuklandi. Iltimos, 15 daqiqadan so'ng qayta urinib ko'ring." }
-});
-
-const passwordResetLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 3,
-  message: { error: "Juda ko'p urinish. Iltimos, 1 soatdan so'ng qayta urinib ko'ring." }
-});
-
-const paymentStatusLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 30,
-  message: { error: "To'lov holatini tekshirish limiti tugadi. Iltimos, 15 daqiqadan so'ng qayta urinib ko'ring." }
-});
 
 const PORT = 3000;
 
@@ -403,7 +376,34 @@ app.use(cookieParser());
 
 // Security Headers & CORS
 app.use(helmet({
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://accounts.google.com", "https://*.stripe.com"],
+      connectSrc: [
+        "'self'", 
+        "https://api.dicebear.com", 
+        "https://lh3.googleusercontent.com", 
+        "https://accounts.google.com", 
+        "https://*.stripe.com", 
+        "https://*.coingate.com",
+        "ws:", 
+        "wss:"
+      ],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://*.stripe.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+      imgSrc: [
+        "'self'", 
+        "data:", 
+        "blob:",
+        "https://lh3.googleusercontent.com", 
+        "https://api.dicebear.com", 
+        "https://*.stripe.com", 
+        "https://*.coingate.com"
+      ],
+      frameSrc: ["'self'", "https://accounts.google.com", "https://*.stripe.com"],
+    },
+  },
   crossOriginEmbedderPolicy: false
 }));
 
@@ -962,7 +962,7 @@ async function seedDatabase() {
 }
 
 // Authentication Middleware
-interface AuthRequest extends Request {
+export interface AuthRequest extends Request {
   user?: {
     id: number;
     email: string;
@@ -987,7 +987,7 @@ async function sendTelegramMessage(telegramUserId: string, text: string) {
   }
 }
 
-async function authenticateToken(req: AuthRequest, res: Response, next: NextFunction) {
+export async function authenticateToken(req: AuthRequest, res: Response, next: NextFunction) {
   let token = req.cookies?.token;
   if (!token) {
     const authHeader = req.headers["authorization"];
@@ -1068,7 +1068,7 @@ app.post("/api/newsletter/subscribe", async (req: Request, res: Response) => {
 });
 
 // Email Verification Helper Function
-async function sendVerificationEmail(email: string, token: string, name: string) {
+export async function sendVerificationEmail(email: string, token: string, name: string) {
   const appUrl = await getSetting("APP_URL") || "http://localhost:3000";
   const verifyUrl = `${appUrl}/api/auth/verify-email?token=${token}`;
   console.log("==================================================");
@@ -1124,7 +1124,7 @@ async function sendVerificationEmail(email: string, token: string, name: string)
 }
 
 // Refresh Token Helper
-async function generateRefreshToken(userId: number, req: Request): Promise<string> {
+export async function generateRefreshToken(userId: number, req: Request): Promise<string> {
   const tokenValue = `${crypto.randomBytes(40).toString("hex")}-${userId}`;
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 7); // 7 days from now
@@ -1142,144 +1142,9 @@ async function generateRefreshToken(userId: number, req: Request): Promise<strin
   return tokenValue;
 }
 
-// JWT AUTH: Register
-app.post("/api/auth/register", authLimiter, async (req: Request, res: Response) => {
-  const { email, password, name } = req.body;
-
-  if (!email || !password || !name) {
-    return res.status(400).json({ error: "Barcha maydonlarni to'ldiring." });
-  }
-
-  try {
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      return res.status(400).json({ error: "Ushbu email orqali ro'yxatdan o'tilgan." });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const userRole = "Xaridor";
-    const verificationToken = crypto.randomBytes(32).toString("hex");
-
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        name,
-        role: userRole,
-        joinDate: new Date().toLocaleDateString("uz-UZ", { year: "numeric", month: "long" }) + "-yil",
-        avatarUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(name)}`,
-        verified: false,
-        emailVerified: false,
-        verificationToken,
-      },
-    });
-
-    // Send verification email in background
-    sendVerificationEmail(user.email, verificationToken, user.name).catch(console.error);
-
-    const accessToken = jwt.sign(
-      { id: user.id, email: user.email, name: user.name, role: user.role },
-      JWT_SECRET,
-      { expiresIn: "15m" }
-    );
-
-    const refreshToken = await generateRefreshToken(user.id, req);
-
-    // Set cookie (storing accessToken with 15m age)
-    res.cookie("token", accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 15 * 60 * 1000 // 15 minutes
-    });
-
-    res.status(201).json({
-      token: accessToken,
-      accessToken,
-      refreshToken,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        verified: user.verified,
-        emailVerified: user.emailVerified,
-        joinDate: user.joinDate,
-        avatarUrl: user.avatarUrl,
-        walletConnected: user.walletConnected,
-        walletAddress: user.walletAddress,
-      },
-    });
-  } catch (err: any) {
-    console.error("Register error:", err);
-    res.status(500).json({ error: "Serverda xatolik yuz berdi." });
-  }
-});
-
-// JWT AUTH: Login
-app.post("/api/auth/login", authLimiter, async (req: Request, res: Response) => {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({ error: "Email va parolni kiriting." });
-  }
-
-  try {
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      return res.status(400).json({ error: "Email yoki parol noto'g'ri." });
-    }
-
-    const isMatch = user.password && await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      if (user.authProvider === 'google') {
-        return res.status(400).json({ error: "Bu hisob Google orqali ro'yxatdan o'tgan, iltimos Google tugmasi orqali kiring." });
-      }
-      return res.status(400).json({ error: "Email yoki parol noto'g'ri." });
-    }
-
-    if (user.isBanned) {
-      return res.status(403).json({ error: "Sizning hisobingiz bloklangan. Qo'shimcha ma'lumot uchun qo'llab-quvvatlash xizmatiga murojaat qiling." });
-    }
-
-    const accessToken = jwt.sign(
-      { id: user.id, email: user.email, name: user.name, role: user.role },
-      JWT_SECRET,
-      { expiresIn: "15m" }
-    );
-
-    const refreshToken = await generateRefreshToken(user.id, req);
-
-    // Set cookie
-    res.cookie("token", accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 15 * 60 * 1000 // 15 minutes
-    });
-
-    res.json({
-      token: accessToken,
-      accessToken,
-      refreshToken,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        verified: user.verified,
-        emailVerified: user.emailVerified,
-        joinDate: user.joinDate,
-        avatarUrl: user.avatarUrl,
-        walletConnected: user.walletConnected,
-        walletAddress: user.walletAddress,
-      },
-    });
-  } catch (err: any) {
-    console.error("Login error:", err);
-    res.status(500).json({ error: "Serverda xatolik yuz berdi." });
-  }
-});
+// Lazy load auth router to prevent circular dependencies
+import authRouter from "./src/routes/auth";
+app.use("/api/auth", authRouter);
 
 app.get("/api/auth/google-client-id", async (req: Request, res: Response) => {
   try {
@@ -1348,125 +1213,7 @@ app.post("/api/auth/google", async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/auth/forgot-password — Parolni tiklash so'rovi
-app.post("/api/auth/forgot-password", passwordResetLimiter, async (req: Request, res: Response) => {
-  const { email } = req.body;
-  if (!email) {
-    return res.status(400).json({ error: "Email manzilini kiritish majburiy." });
-  }
-
-  try {
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      return res.status(404).json({ error: "Ushbu email manzili bilan foydalanuvchi topilmadi." });
-    }
-
-    if (user.isBanned) {
-      return res.status(403).json({ error: "Sizning hisobingiz bloklangan. Parolni tiklash imkoniyati cheklangan." });
-    }
-
-    const token = crypto.randomBytes(32).toString("hex");
-    const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        resetToken: token,
-        resetTokenExpiry: expiry
-      }
-    });
-
-    const appUrl = await getSetting("APP_URL") || "http://localhost:3000";
-    const resetUrl = `${appUrl}/reset-password?token=${token}`;
-
-    const smtpHost = await getSetting("SMTP_HOST");
-    const rawSmtpPort = await getSetting("SMTP_PORT");
-    const smtpPort = rawSmtpPort ? parseInt(rawSmtpPort) : 587;
-    const smtpUser = await getSetting("SMTP_USER");
-    const smtpPass = await getSetting("SMTP_PASS");
-
-    if (smtpHost && smtpUser && smtpPass) {
-      const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: smtpPort,
-        secure: smtpPort === 465,
-        auth: {
-          user: smtpUser,
-          pass: smtpPass,
-        },
-      });
-
-      await transporter.sendMail({
-        from: `"Savdo24 Support" <${smtpUser}>`,
-        to: email,
-        subject: "Savdo24 — Parolni qayta tiklash",
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px; background-color: #0d131a; color: #ffffff;">
-            <h2 style="color: #10b981; text-align: center;">Parolni qayta tiklash so'rovi</h2>
-            <p>Salom <strong>${user.name}</strong>,</p>
-            <p>Siz Savdo24 platformasida parolingizni unutganingiz sababli tiklash so'rovini yubordingiz. Parolingizni qayta tiklash uchun quyidagi tugmani bosing:</p>
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${resetUrl}" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Parolni yangilash</a>
-            </div>
-            <p>Ushbu havola faqat 1 soat davomida amal qiladi.</p>
-            <p style="font-size: 12px; color: #8892b0;">Agar siz bunday so'rov yubormagan bo'lsangiz, ushbu xatni shunchaki e'tiborsiz qoldiring.</p>
-            <p style="font-size: 12px; color: #10b981; word-break: break-all;">${resetUrl}</p>
-            <hr style="border: none; border-top: 1px solid #18202c; margin: 20px 0;" />
-            <p style="font-size: 11px; color: #8892b0; text-align: center;">Savdo24 — Startaplar va raqamli loyihalar bozori</p>
-          </div>
-        `,
-      });
-      console.log(`Reset password link sent to ${email}`);
-    } else {
-      console.log("SMTP configured locally: reset url is:", resetUrl);
-    }
-
-    res.json({ success: true, message: "Parolni tiklash havolasi email manzilingizga yuborildi.", token });
-  } catch (err: any) {
-    console.error("Forgot password error:", err);
-    res.status(500).json({ error: "Parolni tiklash so'rovida xatolik yuz berdi." });
-  }
-});
-
-// POST /api/auth/reset-password — Yangi parolni saqlash
-app.post("/api/auth/reset-password", passwordResetLimiter, async (req: Request, res: Response) => {
-  const { token, password } = req.body;
-
-  if (!token || !password) {
-    return res.status(400).json({ error: "Token va yangi parol kiritilishi shart." });
-  }
-
-  try {
-    const user = await prisma.user.findFirst({
-      where: {
-        resetToken: token,
-        resetTokenExpiry: {
-          gt: new Date()
-        }
-      }
-    });
-
-    if (!user) {
-      return res.status(400).json({ error: "Yaroqsiz yoki muddati o'tgan havola." });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        password: hashedPassword,
-        resetToken: null,
-        resetTokenExpiry: null
-      }
-    });
-
-    res.json({ success: true, message: "Parolingiz muvaffaqiyatli o'zgartirildi. Endi tizimga yangi parol bilan kirishingiz mumkin." });
-  } catch (err: any) {
-    console.error("Reset password error:", err);
-    res.status(500).json({ error: "Parolni yangilashda xatolik yuz berdi." });
-  }
-});
+// POST /api/auth/forgot-password and reset-password are handled by authRouter
 
 // GET /api/users/me/earnings — Foydalanuvchining daromadlari
 app.get("/api/users/me/earnings", authenticateToken, async (req: AuthRequest, res: Response) => {
@@ -2232,147 +1979,7 @@ app.delete("/api/admin/users/:id", authenticateToken, requireAdmin, async (req: 
   }
 });
 
-// JWT AUTH: Get Profile (Me)
-app.get("/api/auth/me", async (req: AuthRequest, res: Response) => {
-  try {
-    let token = req.cookies?.token;
-    if (!token) {
-      const authHeader = req.headers["authorization"];
-      token = authHeader && authHeader.split(" ")[1];
-    }
-
-    if (!token) {
-      return res.status(401).json({ error: "Tizimga kirilmagan (Sessiya muddati tugagan)." });
-    }
-
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-    const user = await prisma.user.findUnique({ where: { id: decoded.id } });
-    if (!user) {
-      return res.status(404).json({ error: "Foydalanuvchi topilmadi." });
-    }
-
-    res.json({
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        verified: user.verified,
-        emailVerified: user.emailVerified,
-        joinDate: user.joinDate,
-        avatarUrl: user.avatarUrl,
-        walletConnected: user.walletConnected,
-        walletAddress: user.walletAddress,
-      },
-    });
-  } catch (err) {
-    res.status(401).json({ error: "Yaroqsiz token yoki sessiya muddati tugagan." });
-  }
-});
-
-// JWT AUTH: Refresh Token
-app.post("/api/auth/refresh", async (req: Request, res: Response) => {
-  const { refreshToken } = req.body;
-  if (!refreshToken) {
-    return res.status(401).json({ error: "Refresh token talab qilinadi." });
-  }
-
-  try {
-    const dbToken = await prisma.refreshToken.findUnique({
-      where: { token: refreshToken },
-      include: { user: true },
-    });
-
-    if (!dbToken) {
-      // Rotation & reuse detection
-      const parts = refreshToken.split("-");
-      if (parts.length === 2) {
-        const userId = parseInt(parts[1]);
-        if (!isNaN(userId)) {
-          // Delete all tokens for this user because of reuse attempt
-          await prisma.refreshToken.deleteMany({ where: { userId } }).catch(() => {});
-          return res.status(401).json({ error: "Refresh token allaqachon ishlatilgan yoki yaroqsiz! Xavfsizlik choralari tufayli foydalanuvchining barcha faol seanslari tugatildi." });
-        }
-      }
-      return res.status(401).json({ error: "Yaroqsiz refresh token." });
-    }
-
-    if (dbToken.user.isBanned) {
-      return res.status(403).json({ error: "Sizning hisobingiz bloklangan. Qo'shimcha ma'lumot uchun qo'llab-quvvatlash xizmatiga murojaat qiling." });
-    }
-
-    if (new Date() > dbToken.expiresAt) {
-      await prisma.refreshToken.delete({ where: { token: refreshToken } }).catch(() => {});
-      return res.status(401).json({ error: "Refresh token muddati tugagan." });
-    }
-
-    // Delete the old refresh token (rotation)
-    await prisma.refreshToken.delete({ where: { token: refreshToken } }).catch(() => {});
-
-    // Create a new rotated refresh token
-    const newRefreshToken = await generateRefreshToken(dbToken.user.id, req);
-
-    const accessToken = jwt.sign(
-      { id: dbToken.user.id, email: dbToken.user.email, name: dbToken.user.name, role: dbToken.user.role },
-      JWT_SECRET,
-      { expiresIn: "15m" }
-    );
-
-    res.cookie("token", accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 15 * 60 * 1000 // 15 minutes
-    });
-
-    res.json({
-      token: accessToken,
-      accessToken,
-      refreshToken: newRefreshToken,
-    });
-  } catch (err) {
-    console.error("Refresh token error:", err);
-    res.status(500).json({ error: "Tokenni yangilashda xatolik yuz berdi." });
-  }
-});
-
-// JWT AUTH: Logout
-app.post("/api/auth/logout", async (req: Request, res: Response) => {
-  const { refreshToken } = req.body;
-  if (refreshToken) {
-    await prisma.refreshToken.deleteMany({
-      where: { token: refreshToken }
-    }).catch(() => {});
-  }
-  res.clearCookie("token");
-  res.json({ success: true, message: "Sessiya tugatildi." });
-});
-
-// POST /api/auth/resend-verification — Tasdiqlash emailini qayta yuborish
-app.post("/api/auth/resend-verification", authenticateToken, async (req: AuthRequest, res: Response) => {
-  try {
-    const user = await prisma.user.findUnique({ where: { id: req.user?.id } });
-    if (!user) {
-      return res.status(404).json({ error: "Foydalanuvchi topilmadi." });
-    }
-
-    if (user.emailVerified) {
-      return res.status(400).json({ error: "Sizning email manzilingiz allaqachon tasdiqlangan." });
-    }
-
-    const token = crypto.randomBytes(32).toString("hex");
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { verificationToken: token }
-    });
-
-    await sendVerificationEmail(user.email, token, user.name);
-    res.json({ success: true, message: "Tasdiqlash xati muvaffaqiyatli qayta yuborildi. Iltimos pochtangizni tekshiring." });
-  } catch (err: any) {
-    console.error("Resend verification error:", err);
-    res.status(500).json({ error: "Xatni yuborishda xatolik yuz berdi." });
-  }
-});
+// JWT AUTH: Get Profile (Me), Refresh Token, Logout, and Resend Verification are handled by authRouter
 
 // GET /api/startups - barcha startaplarni olish (filter: kategoriya, status, qidiruv, listingType va sahifalash bo'yicha)
 app.get("/api/startups", async (req: Request, res: Response) => {
@@ -2404,40 +2011,26 @@ app.get("/api/startups", async (req: Request, res: Response) => {
       ];
     }
 
-    if (page || limit) {
-      const pageNum = page ? parseInt(page as string) : 1;
-      const limitNum = limit ? parseInt(limit as string) : 12;
-      const skip = (pageNum - 1) * limitNum;
+    const pageNum = page ? parseInt(page as string) : 1;
+    const limitNum = limit ? parseInt(limit as string) : 50;
+    const skip = (pageNum - 1) * limitNum;
 
-      const totalCount = await prisma.startup.count({ where: filter });
-      const totalPages = Math.ceil(totalCount / limitNum);
+    const totalCount = await prisma.startup.count({ where: filter });
+    const totalPages = Math.ceil(totalCount / limitNum);
 
-      const startupsList = await prisma.startup.findMany({
-        where: filter,
-        orderBy: [
-          { isTop: "desc" },
-          { id: "desc" }
-        ],
-        skip,
-        take: limitNum,
-        include: { user: { select: { name: true, isVip: true, avatarUrl: true } } }
-      });
+    const startupsList = await prisma.startup.findMany({
+      where: filter,
+      orderBy: [
+        { isTop: "desc" },
+        { id: "desc" }
+      ],
+      skip,
+      take: limitNum,
+      include: { user: { select: { name: true, isVip: true, avatarUrl: true } } }
+    });
 
-      const formatted = startupsList.map(formatStartup);
-      res.json({ startups: formatted, totalCount, totalPages });
-    } else {
-      const startupsList = await prisma.startup.findMany({
-        where: filter,
-        orderBy: [
-          { isTop: "desc" },
-          { id: "desc" }
-        ],
-        include: { user: { select: { name: true, isVip: true, avatarUrl: true } } }
-      });
-
-      const formatted = startupsList.map(formatStartup);
-      res.json(formatted);
-    }
+    const formatted = startupsList.map(formatStartup);
+    res.json({ startups: formatted, totalCount, totalPages });
   } catch (err: any) {
     console.error("GET /api/startups error:", err);
     res.status(500).json({ error: "Startaplarni yuklashda xatolik yuz berdi." });
@@ -4870,6 +4463,56 @@ app.delete("/api/auth/sessions", authenticateToken, async (req: AuthRequest, res
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: "Barcha sessiyalardan chiqishda xatolik." });
+  }
+});
+
+// Dinamik sitemap.xml generatsiya qiluvchi endpoint
+app.get("/sitemap.xml", async (req: Request, res: Response) => {
+  try {
+    const startups = await prisma.startup.findMany({
+      where: { status: "active" },
+      select: { id: true, updatedAt: true }
+    });
+
+    const appUrl = await getSetting("APP_URL") || "https://savdo24.online";
+    
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${appUrl}/</loc>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>${appUrl}/browse</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${appUrl}/ideas</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>`;
+
+    for (const startup of startups) {
+      const lastMod = startup.updatedAt ? new Date(startup.updatedAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+      xml += `
+  <url>
+    <loc>${appUrl}/startup/${startup.id}</loc>
+    <lastmod>${lastMod}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>`;
+    }
+
+    xml += `
+</urlset>`;
+
+    res.header("Content-Type", "application/xml");
+    res.send(xml);
+  } catch (err) {
+    console.error("Sitemap generation error:", err);
+    res.status(500).end();
   }
 });
 

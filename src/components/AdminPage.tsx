@@ -840,7 +840,14 @@ export default function AdminPage({
                   >
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-3">
-                        <img src={u.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&background=random`} className="w-8 h-8 rounded-full border border-white/10" alt="" />
+                        <img 
+                          src={u.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&background=random`} 
+                          className="w-8 h-8 rounded-full border border-white/10" 
+                          alt={`${u.name} avatari`}
+                          loading="lazy"
+                          width={32}
+                          height={32}
+                        />
                         <div>
                           <div className="font-bold text-white group-hover:text-secondary-container transition-colors flex items-center gap-1.5">
                             {u.name}
@@ -1125,7 +1132,10 @@ export default function AdminPage({
                     <img 
                       src={selectedUserDetail.user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedUserDetail.user.name)}&background=random`} 
                       className="w-24 h-24 rounded-full border-4 border-secondary-container/20 mx-auto object-cover" 
-                      alt="" 
+                      alt={`${selectedUserDetail.user.name} avatari`} 
+                      loading="lazy"
+                      width={96}
+                      height={96}
                     />
                     {selectedUserDetail.user.isVip && (
                       <div className="absolute -top-1 -right-1 w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center text-black border-4 border-[#0b1426]">
@@ -1478,9 +1488,12 @@ export default function AdminPage({
                   <div className="flex items-center gap-4 flex-1">
                     <img
                       src={startup.image}
-                      alt={startup.name}
+                      alt={`${startup.name} startap rasmi`}
                       className="w-16 h-16 rounded-xl object-cover border border-white/5 flex-shrink-0"
                       referrerPolicy="no-referrer"
+                      loading="lazy"
+                      width={64}
+                      height={64}
                     />
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">

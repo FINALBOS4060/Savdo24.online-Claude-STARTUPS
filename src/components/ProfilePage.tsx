@@ -40,10 +40,7 @@ export default function ProfilePage({
 
   React.useEffect(() => {
     if (activeTab === 'purchases' && user.id) {
-      const token = localStorage.getItem('savdo24_token');
-      fetch('/api/payments/my', {
-        headers: { 'Authorization': 'Bearer ' + token }
-      })
+      fetch('/api/payments/my')
       .then(res => res.json())
       .then(data => {
         if (data.payments) setMyPurchases(data.payments);
@@ -289,7 +286,10 @@ export default function ProfilePage({
               <img
                 className="w-full h-full object-cover"
                 src={user.avatarUrl}
-                alt={user.name}
+                alt={`${user.name} profil avatari`}
+                loading="lazy"
+                width={160}
+                height={160}
               />
             </div>
             <div className="absolute bottom-2 right-2 w-8 h-8 bg-secondary-container rounded-full flex items-center justify-center border-4 border-[#0b1426] shadow-lg">
@@ -477,7 +477,7 @@ export default function ProfilePage({
                   const formData = new FormData(e.currentTarget);
                   const res = await fetch('/api/b2b/onboard', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('savdo24_token')}` },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                       companyName: formData.get('companyName'),
                       taxId: formData.get('taxId')
@@ -556,7 +556,7 @@ export default function ProfilePage({
             {!referralStats.referrals.length && (
               <button 
                 onClick={async () => {
-                  const res = await fetch('/api/referrals/generate', { method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('savdo24_token')}` } });
+                  const res = await fetch('/api/referrals/generate', { method: 'POST' });
                   if (res.ok) {
                     const data = await res.json();
                     setReferralStats(prev => ({ ...prev, referrals: [{ code: data.code, isActive: true }] }));
@@ -890,7 +890,10 @@ export default function ProfilePage({
                     <img
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       src={startup.image}
-                      alt={startup.name}
+                      alt={`${startup.name} saqlangan startap rasmi`}
+                      loading="lazy"
+                      width={320}
+                      height={160}
                     />
                     <div className="absolute top-4 left-4 bg-primary-container/95 text-white border border-white/10 px-3 py-1 rounded-lg text-xs font-bold uppercase">
                       {categories.find(c => c.id === startup.category)?.name || startup.category}
@@ -968,7 +971,7 @@ export default function ProfilePage({
                             onClick={async () => {
                               const res = await fetch('/api/escrow/release', {
                                 method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('savdo24_token')}` },
+                                headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ paymentId: payment.id })
                               });
                               if (res.ok) {
@@ -986,7 +989,7 @@ export default function ProfilePage({
                               if (reason) {
                                   fetch('/api/escrow/dispute', {
                                     method: 'POST',
-                                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('savdo24_token')}` },
+                                    headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ paymentId: payment.id, reason })
                                   }).then(async (res) => {
                                     const data = await res.json();
@@ -1102,7 +1105,14 @@ export default function ProfilePage({
                   <div key={review.id} className="bg-[#0b1426] border border-outline-variant/10 rounded-xl p-5">
                     <div className="flex justify-between items-start mb-3">
                       <div className="flex items-center gap-3">
-                        <img src={review.buyer?.avatarUrl} className="w-10 h-10 rounded-full border border-outline-variant/20" alt="" />
+                        <img 
+                          src={review.buyer?.avatarUrl} 
+                          className="w-10 h-10 rounded-full border border-outline-variant/20" 
+                          alt={`${review.buyer?.name} xaridor avatari`}
+                          loading="lazy"
+                          width={40}
+                          height={40}
+                        />
                         <div>
                           <p className="text-sm font-bold text-white">{review.buyer?.name}</p>
                           <p className="text-[10px] text-on-primary-container">{new Date(review.createdAt).toLocaleDateString()} • {review.startup?.name}</p>
@@ -1180,7 +1190,14 @@ export default function ProfilePage({
                       <span className="text-[10px] font-bold text-secondary-container">Yuklanmoqda...</span>
                     </div>
                   ) : (
-                    <img src={editAvatar} alt="Profile" className="w-full h-full object-cover group-hover:opacity-50 transition-all" />
+                    <img 
+                      src={editAvatar} 
+                      alt="Profil rasmini yangilash" 
+                      className="w-full h-full object-cover group-hover:opacity-50 transition-all" 
+                      loading="lazy"
+                      width={96}
+                      height={96}
+                    />
                   )}
                 </div>
                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
