@@ -70,10 +70,10 @@ router.post("/register", authLimiter, async (req: Request, res: Response) => {
   try {
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-      return res.status(400).json({ error: "Ushbu email orqali ro'yxatdan o'tilgan." });
+      return res.status(400).json({ error: "Ro'yxatdan o'tishda xatolik yuz berdi." });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 12);
     const userRole = "Xaridor";
     const verificationToken = crypto.randomBytes(32).toString("hex");
 
@@ -344,7 +344,8 @@ router.post("/forgot-password", passwordResetLimiter, async (req: Request, res: 
   try {
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      return res.status(404).json({ error: "Ushbu email manzili bilan foydalanuvchi topilmadi." });
+      // Return a generic message to prevent email enumeration
+      return res.json({ success: true, message: "Agar bu email tizimda mavjud bo'lsa, parolni tiklash havolasi yuborildi." });
     }
 
     if (user.isBanned) {
@@ -414,7 +415,7 @@ router.post("/reset-password", passwordResetLimiter, async (req: Request, res: R
       return res.status(400).json({ error: "Faol bo'lmagan yoki muddati o'tgan parol tiklash tokeni." });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 12);
     await prisma.user.update({
       where: { id: user.id },
       data: {

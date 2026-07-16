@@ -672,6 +672,16 @@ export default function ProfilePage({
                   </div>
 
                   <div className="flex items-center justify-between pt-4 border-t border-white/5 gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // TODO: Implement edit logic
+                        onActionToast("Tahrirlash funksiyasi tez orada qo'shiladi.");
+                      }}
+                      className="flex-1 py-2 bg-blue-400/10 border border-blue-400/30 hover:bg-blue-400/20 text-blue-400 rounded-lg font-bold text-[10px] transition-all flex items-center justify-center gap-1.5"
+                    >
+                      Tahrirlash
+                    </button>
                     {isActive ? (
                       <>
                         <button

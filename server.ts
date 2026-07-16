@@ -379,7 +379,7 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://accounts.google.com", "https://*.stripe.com"],
+      scriptSrc: ["'self'", "https://accounts.google.com", "https://*.stripe.com"],
       connectSrc: [
         "'self'", 
         "https://api.dicebear.com", 
@@ -390,7 +390,7 @@ app.use(helmet({
         "ws:", 
         "wss:"
       ],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://*.stripe.com"],
+      styleSrc: ["'self'", "https://fonts.googleapis.com", "https://*.stripe.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
       imgSrc: [
         "'self'", 
@@ -943,7 +943,7 @@ async function seedDatabase() {
           if (errorMessage.includes('currentTier') || errorMessage.includes('column')) {
             console.warn(`[Seed Warning] Column issue for ${startup.id}. Retrying without 'currentTier'...`);
             const { currentTier, ...dataWithoutTier } = startup as any;
-            await prisma.startup.create({ data: dataWithoutTier }).catch(e => {
+            await prisma.startup.create({ data: dataWithoutTier }).catch((e: Error) => {
               console.error(`[Seed Error] Failed to seed ${startup.id} even without currentTier:`, e.message);
             });
           } else if (error.code === 'P2002') {
@@ -1693,7 +1693,7 @@ app.get("/api/referrals/my-stats", authenticateToken, async (req: AuthRequest, r
       }
     });
 
-    const totalEarned = referrals.reduce((sum, r) => sum + r.rewards.reduce((s, rw) => s + rw.rewardAmount, 0), 0);
+    const totalEarned = referrals.reduce((sum: number, r: any) => sum + r.rewards.reduce((s: number, rw: any) => s + rw.rewardAmount, 0), 0);
     const referralCount = await prisma.referral.count({ where: { referrerId: req.user.id, refereeId: { not: null } } });
     const tier = getReferralTier(referralCount);
 
@@ -1701,7 +1701,7 @@ app.get("/api/referrals/my-stats", authenticateToken, async (req: AuthRequest, r
       referralCount,
       totalEarned,
       tier,
-      referrals: referrals.map(r => ({
+      referrals: referrals.map((r: any) => ({
         code: r.code,
         isActive: r.isActive,
         rewardCount: r._count.rewards
@@ -2289,6 +2289,40 @@ app.post("/api/startups", authenticateToken, async (req: AuthRequest, res: Respo
   }
 });
 
+// PATCH /api/startups/:id — startapni tahrirlash
+app.patch("/api/startups/:id", authenticateToken, async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  const { name, price, description, longDescription, category, listingType, demoUrl, githubUrl } = req.body;
+
+  try {
+    const startup = await prisma.startup.findUnique({ where: { id } });
+    if (!startup) {
+      return res.status(404).json({ error: "Startap topilmadi." });
+    }
+
+    if (startup.userId !== req.user?.id && req.user?.role !== "Admin") {
+      return res.status(403).json({ error: "Siz faqat o'z startaplaringizni tahrirlashingiz mumkin." });
+    }
+
+    const updatedData: any = { name, price, description, longDescription, category, listingType, demoUrl, githubUrl };
+    
+    // Agar faol bo'lsa, moderatsiyaga qaytarsin
+    if (startup.status === "active") {
+        updatedData.status = "pending";
+    }
+
+    const updated = await prisma.startup.update({
+      where: { id },
+      data: updatedData,
+    });
+
+    res.json(formatStartup(updated));
+  } catch (err: any) {
+    console.error("PATCH /api/startups/:id error:", err);
+    res.status(500).json({ error: "Startapni tahrirlashda xatolik yuz berdi." });
+  }
+});
+
 // PATCH /api/startups/:id/status — admin tomonidan tasdiqlash/rad etish
 app.patch("/api/startups/:id/status", authenticateToken, async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
@@ -2300,10 +2334,13 @@ app.patch("/api/startups/:id/status", authenticateToken, async (req: AuthRequest
 
   // Check if admin
   if (req.user?.role !== "Admin") {
-    // We can also allow founders to mark their own startups as sold
+    // Only allow founders to mark their own startups as sold
+    if (status !== "sold") {
+      return res.status(403).json({ error: "Siz faqat o'z startapingizni 'sold' holatiga o'tkaza olasiz." });
+    }
     const startup = await prisma.startup.findUnique({ where: { id } });
     if (!startup || startup.userId !== req.user?.id) {
-      return res.status(403).json({ error: "Ushbu amalni bajarish uchun sizda ruxsat yo'q (Faqat Admin)." });
+      return res.status(403).json({ error: "Ushbu amalni bajarish uchun sizda ruxsat yo'q." });
     }
   }
 
@@ -3274,7 +3311,7 @@ app.get("/api/telegram/user-stats/:telegramUserId", async (req: Request, res: Re
 
     const referral = await prisma.referral.findFirst({ where: { referrerId: user.id, isActive: true } });
     const referralCount = await prisma.referral.count({ where: { referrerId: user.id, refereeId: { not: null } } });
-    const totalEarned = user.referrals.reduce((sum, r) => sum + r.rewards.reduce((s, rw) => s + rw.rewardAmount, 0), 0);
+    const totalEarned = user.referrals.reduce((sum: number, r: any) => sum + r.rewards.reduce((s: number, rw: any) => s + rw.rewardAmount, 0), 0);
 
     res.json({
       name: user.name,
