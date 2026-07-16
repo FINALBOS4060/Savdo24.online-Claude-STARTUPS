@@ -428,9 +428,11 @@ app.use(cors({
       allowedOrigins.includes(origin) || 
       (process.env.APP_URL && origin === process.env.APP_URL) ||
       origin.endsWith('.savdo24.online') || 
-      origin.endsWith('.run.app') || 
-      origin.includes('localhost') || 
-      origin.includes('127.0.0.1');
+      (process.env.NODE_ENV !== 'production' && (
+        origin.endsWith('.run.app') || 
+        origin.startsWith('http://localhost:') || 
+        origin.startsWith('http://127.0.0.1:')
+      ));
 
     if (isAllowed) {
       callback(null, true);
@@ -1012,7 +1014,14 @@ async function authenticateToken(req: AuthRequest, res: Response, next: NextFunc
       user.isVip = false;
     }
 
-    req.user = decoded;
+    req.user = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      isVip: user.isVip,
+      vipExpiresAt: user.vipExpiresAt ? user.vipExpiresAt.toISOString() : undefined
+    };
     next();
   } catch (err) {
     return res.status(401).json({ error: "Yaroqsiz yoki muddati o'tgan token." });
@@ -1324,6 +1333,13 @@ app.post("/api/auth/google", async (req: Request, res: Response) => {
 
     const accessToken = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: "15m" });
     const refreshToken = await generateRefreshToken(user.id, req);
+
+    res.cookie("token", accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 15 * 60 * 1000 // 15 minutes
+    });
 
     res.json({ accessToken, refreshToken, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
   } catch (err) {
@@ -2012,9 +2028,10 @@ app.get("/api/admin/users", authenticateToken, requireAdmin, async (req: AuthReq
 
     const where: any = {};
     if (search) {
+      const mode = isPostgres ? "insensitive" : undefined;
       where.OR = [
-        { name: { contains: String(search) } },
-        { email: { contains: String(search) } }
+        { name: { contains: String(search), mode } },
+        { email: { contains: String(search), mode } }
       ];
     }
 
@@ -2163,6 +2180,16 @@ app.patch("/api/admin/users/:id/role", authenticateToken, requireAdmin, async (r
   try {
     const { id } = req.params;
     const { role } = req.body;
+
+    const allowedRoles = ["Sotuvchi", "Xaridor", "Admin"];
+    if (!allowedRoles.includes(role)) {
+      return res.status(400).json({ error: "Yaroqsiz rol qiymati. Ruxsat berilgan rollar: Sotuvchi, Xaridor, Admin" });
+    }
+
+    if (Number(id) === req.user.id) {
+      return res.status(400).json({ error: "O'z rolingizni o'zgartira olmaysiz." });
+    }
+
     const user = await prisma.user.update({
       where: { id: Number(id) },
       data: { role }
@@ -2369,10 +2396,11 @@ app.get("/api/startups", async (req: Request, res: Response) => {
 
     if (search) {
       const searchStr = search as string;
+      const mode = isPostgres ? "insensitive" : undefined;
       filter.OR = [
-        { name: { contains: searchStr } },
-        { description: { contains: searchStr } },
-        { category: { contains: searchStr } },
+        { name: { contains: searchStr, mode } },
+        { description: { contains: searchStr, mode } },
+        { category: { contains: searchStr, mode } },
       ];
     }
 

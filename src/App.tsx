@@ -67,10 +67,13 @@ export default function App() {
       try {
         const res = await fetch('/api/auth/google-client-id');
         if (res.ok) {
-          const data = await res.json();
-          if (data.clientId) {
-            setGoogleClientId(data.clientId);
-            return;
+          const contentType = res.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const data = await res.json();
+            if (data.clientId) {
+              setGoogleClientId(data.clientId);
+              return;
+            }
           }
         }
       } catch (err) {
