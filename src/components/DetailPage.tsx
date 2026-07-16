@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useParams, Navigate } from 'react-router-dom';
 import { Startup, Idea, UserProfileData, Category } from '../types';
 import { FIELD_LABELS } from '../categoryFields';
 import { apiFetch as fetch } from '../lib/api';
 
 interface DetailPageProps {
-  startup: Startup;
+  startups: Startup[];
   setView: (view: string) => void;
   bookmarkedIds: string[];
   toggleBookmark: (id: string) => void;
@@ -15,7 +16,7 @@ interface DetailPageProps {
 }
 
 export default function DetailPage({
-  startup,
+  startups,
   setView,
   bookmarkedIds,
   toggleBookmark,
@@ -24,7 +25,52 @@ export default function DetailPage({
   user,
   categories,
 }: DetailPageProps) {
+  const { id } = useParams<{ id: string }>();
+  
+  // Find the current startup by ID from URL
+  const startup = startups.find(s => s.id === id);
+
+  // If not found and we have startups loaded, redirect to home
+  if (!startup && startups.length > 0) {
+    return <Navigate to="/" replace />;
+  }
+
+  // If startups are still loading or empty, show a loader or just wait
+  if (!startup) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="w-12 h-12 border-4 border-[#f0b90b]/20 border-t-[#f0b90b] rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   const isBookmarked = bookmarkedIds.includes(startup.id);
+
+  // Update SEO Meta Tags
+  useEffect(() => {
+    document.title = `${startup.name} | Savdo24`;
+    
+    const setMetaTag = (property: string, content: string) => {
+      let element = document.querySelector(`meta[property="${property}"]`);
+      if (!element) {
+        element = document.createElement('meta');
+        element.setAttribute('property', property);
+        document.head.appendChild(element);
+      }
+      element.setAttribute('content', content);
+    };
+
+    setMetaTag('og:title', `${startup.name} - ${startup.slogan}`);
+    setMetaTag('og:description', startup.description);
+    setMetaTag('og:image', startup.image);
+    setMetaTag('og:type', 'website');
+    
+    // Cleanup function when component unmounts
+    return () => {
+      document.title = 'Savdo24 | Startaplar bozori';
+      // Ideally remove or reset the meta tags, but leaving them is generally harmless for SPAs
+    };
+  }, [startup]);
 
   // Parse dynamic category-specific attributes
   let parsedAttrs: Record<string, string> = {};
@@ -463,7 +509,7 @@ export default function DetailPage({
             <img
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               src={startup.gallery[0]}
-              alt={`${startup.name} qo'shimcha rasm 1`}
+              alt={`${startup.name} - qo'shimcha galereya rasmi 1`}
               loading="lazy"
               width={280}
               height={240}
@@ -480,7 +526,7 @@ export default function DetailPage({
             <img
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               src={startup.gallery[1]}
-              alt={`${startup.name} qo'shimcha rasm 2`}
+              alt={`${startup.name} - qo'shimcha galereya rasmi 2`}
               loading="lazy"
               width={280}
               height={240}
@@ -497,7 +543,7 @@ export default function DetailPage({
             <img
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               src={startup.gallery[2]}
-              alt={`${startup.name} yordamchi banner`}
+              alt={`${startup.name} - yordamchi banner muqovasi`}
               loading="lazy"
               width={580}
               height={240}
@@ -828,14 +874,14 @@ export default function DetailPage({
                   <div key={rev.id} className="p-4 bg-[#0b1426]/50 border border-white/5 rounded-xl space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
-                        <img
-                          src={rev.buyer?.avatarUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${rev.buyer?.name}`}
-                          alt={`${rev.buyer?.name} xaridor avatari`}
-                          className="w-8 h-8 rounded-full border border-white/10"
-                          loading="lazy"
-                          width={32}
-                          height={32}
-                        />
+                    <img
+                      src={rev.buyer?.avatarUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${rev.buyer?.name}`}
+                      alt={`${rev.buyer?.name || 'Xaridor'} avatari`}
+                      className="w-8 h-8 rounded-full border border-white/10"
+                      loading="lazy"
+                      width={32}
+                      height={32}
+                    />
                         <div>
                           <span className="text-white font-bold text-xs block">{rev.buyer?.name}</span>
                           <span className="text-on-primary-container text-[10px] block">
@@ -1044,7 +1090,7 @@ export default function DetailPage({
                   key={index}
                   className="w-10 h-10 rounded-full border-2 border-[#0b1426] bg-white object-cover shadow-sm"
                   src={logo}
-                  alt={`Maslahatchi professional ${index + 1}`}
+                  alt={`Maslahatchi professional hamkor ${index + 1}`}
                   loading="lazy"
                   width={40}
                   height={40}

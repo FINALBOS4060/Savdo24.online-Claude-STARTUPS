@@ -212,6 +212,7 @@ export default function Navbar({
           onClick={toggleTheme}
           className="p-2 text-on-primary-container hover:text-secondary-container transition-colors rounded-lg bg-white/5"
           title={isDark ? "Yorug' rejimga o'tish" : "Qorong'i rejimga o'tish"}
+          aria-label={isDark ? "Yorug' rejimga o'tish" : "Qorong'i rejimga o'tish"}
         >
           <span className="material-symbols-outlined select-none text-xl leading-none">
             {isDark ? 'light_mode' : 'dark_mode'}
@@ -231,6 +232,7 @@ export default function Navbar({
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           className="md:hidden p-2 text-on-primary-container hover:text-secondary-container transition-colors"
+          aria-label={mobileMenuOpen ? "Menuni yopish" : "Menuni ochish"}
         >
           <span className="material-symbols-outlined select-none">
             {mobileMenuOpen ? 'close' : 'menu'}

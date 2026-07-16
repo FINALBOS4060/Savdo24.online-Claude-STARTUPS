@@ -675,8 +675,7 @@ export default function ProfilePage({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        // TODO: Implement edit logic
-                        onActionToast("Tahrirlash funksiyasi tez orada qo'shiladi.");
+                        setView('edit-startup', startup.id);
                       }}
                       className="flex-1 py-2 bg-blue-400/10 border border-blue-400/30 hover:bg-blue-400/20 text-blue-400 rounded-lg font-bold text-[10px] transition-all flex items-center justify-center gap-1.5"
                     >
@@ -900,7 +899,7 @@ export default function ProfilePage({
                     <img
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       src={startup.image}
-                      alt={`${startup.name} saqlangan startap rasmi`}
+                      alt={`${startup.name} - saqlangan loyiha muqovasi`}
                       loading="lazy"
                       width={320}
                       height={160}
@@ -1118,7 +1117,7 @@ export default function ProfilePage({
                         <img 
                           src={review.buyer?.avatarUrl} 
                           className="w-10 h-10 rounded-full border border-outline-variant/20" 
-                          alt={`${review.buyer?.name} xaridor avatari`}
+                          alt={`${review.buyer?.name || 'Xaridor'} avatari`}
                           loading="lazy"
                           width={40}
                           height={40}
@@ -1202,7 +1201,7 @@ export default function ProfilePage({
                   ) : (
                     <img 
                       src={editAvatar} 
-                      alt="Profil rasmini yangilash" 
+                      alt="Profil rasmini yangilash - yangi rasm tanlash" 
                       className="w-full h-full object-cover group-hover:opacity-50 transition-all" 
                       loading="lazy"
                       width={96}

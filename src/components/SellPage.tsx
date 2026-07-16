@@ -1,4 +1,5 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Startup, Category } from '../types';
 import { CATEGORY_FIELDS } from '../categoryFields';
 import { apiFetch as fetch } from '../lib/api';
@@ -8,9 +9,23 @@ interface SellPageProps {
   onActionToast: (message: string) => void;
   setView: (view: string) => void;
   categories: Category[];
+  isEditing?: boolean;
+  startups?: Startup[];
+  fetchStartups?: () => void;
 }
 
-export default function SellPage({ onAddStartup, onActionToast, setView, categories }: SellPageProps) {
+export default function SellPage({ 
+  onAddStartup, 
+  onActionToast, 
+  setView, 
+  categories, 
+  isEditing = false,
+  startups = [],
+  fetchStartups
+}: SellPageProps) {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  
   const [name, setName] = useState('');
   const [category, setCategory] = useState(categories[0]?.id || 'startups');
   const [slogan, setSlogan] = useState('');
@@ -21,22 +36,54 @@ export default function SellPage({ onAddStartup, onActionToast, setView, categor
   const [customTechInput, setCustomTechInput] = useState('');
   const [demoUrl, setDemoUrl] = useState('');
   const [deliveryUrl, setDeliveryUrl] = useState('');
-  const repoIncluded = listingType === "To'liq loyiha (manba kodi bilan)";
-
-  // Dynamic category specific attributes state
   const [dynamicAttributes, setDynamicAttributes] = useState<Record<string, any>>({});
+  const [imageUrl, setImageUrl] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [telegram, setTelegram] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Load existing data if editing
+  useEffect(() => {
+    if (isEditing && id && startups.length > 0) {
+      const s = startups.find(item => item.id === id);
+      if (s) {
+        setName(s.name);
+        setCategory(s.category);
+        setSlogan(s.slogan);
+        setDescription(s.description);
+        setPrice(s.price?.toString() || '');
+        setListingType(s.listingType || "To'liq loyiha (manba kodi bilan)");
+        
+        let techs: string[] = [];
+        try {
+          techs = Array.isArray(s.techStack) ? s.techStack : JSON.parse(s.techStack as unknown as string);
+        } catch (e) { techs = ['Boshqa']; }
+        setSelectedTechs(techs);
+        
+        setDemoUrl(s.demoUrl || '');
+        setDeliveryUrl(s.deliveryUrl || '');
+        setImageUrl(s.image || '');
+        setEmail(s.contactEmail || '');
+        setPhone(s.contactPhone || '');
+        setTelegram(s.contactTelegram || '');
+
+        if (s.attributes) {
+          try {
+            setDynamicAttributes(JSON.parse(s.attributes));
+          } catch (e) { console.error("Error parsing attributes:", e); }
+        }
+      }
+    }
+  }, [isEditing, id, startups]);
+
+  const repoIncluded = listingType === "To'liq loyiha (manba kodi bilan)";
   
   // Image states
-  const [imageUrl, setImageUrl] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Contact Info states
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [telegram, setTelegram] = useState('');
 
   // Handle Dynamic Image Uploading to Backend
   const uploadImageFile = async (file: File) => {
@@ -101,22 +148,22 @@ export default function SellPage({ onAddStartup, onActionToast, setView, categor
     }
   };
 
-  const handlePublish = (e: React.FormEvent) => {
+  const handlePublish = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (isUploading) {
-      onActionToast("Iltimos, rasm yuklanishini kuting.");
+    if (isUploading || isSubmitting) {
+      onActionToast("Iltimos, kutib turing...");
       return;
     }
 
     if (!name || !slogan || !description) {
-      onActionToast('Iltimos, barcha majburiy maydonlarni to\'ldiring (Loyiha nomi, shiori, taqdimoti).');
+      onActionToast('Iltimos, barcha majburiy maydonlarni to\'ldiring.');
       return;
     }
 
-    // Default image if none uploaded
-    const finalImage = imageUrl || 'https://images.unsplash.com/photo-1559136555-9303baea8ebd?q=80&w=600&auto=format&fit=crop';
+    setIsSubmitting(true);
 
+    const finalImage = imageUrl || 'https://images.unsplash.com/photo-1559136555-9303baea8ebd?q=80&w=600&auto=format&fit=crop';
     const parsedPrice = parseFloat(price) || 0;
 
     const attrObj: Record<string, any> = {};
@@ -130,39 +177,62 @@ export default function SellPage({ onAddStartup, onActionToast, setView, categor
       }
     });
 
-    const attributesString = JSON.stringify(attrObj);
-
-    const newStartup: Startup = {
-      id: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+    const payload = {
       name,
       slogan,
       description,
-      longDescription: description, // Fallback
+      longDescription: description,
       category,
       price: parsedPrice,
       listingType,
-      techStack: selectedTechs.length > 0 ? selectedTechs : ['Boshqa'],
-      demoUrl: demoUrl || undefined,
-      deliveryUrl: deliveryUrl || undefined,
+      techStack: selectedTechs,
+      demoUrl: demoUrl || null,
+      deliveryUrl: deliveryUrl || null,
       repoIncluded,
-      soldStatus: 'sotuvda',
-      status: 'pending',
-      proposalsCount: 0,
       image: finalImage,
-      gallery: [],
-      team: [
-        { name: 'Alex Volkov', role: 'Asoschi', imgUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBki15-UiKMRHYRIBQdJTisfKqtSaYpxsncBO2y7YCY2JF255CApBYI6utaNMs1ChYUgtjn2tVfN1UcBGeBMlrJcc0TSK_r8Jcvi6roPh2Lw0AS9w0cQ2Fdo0oveTBUKZZzwCFWAVdbOg2YdRT_sg6_3OM_9HWxgw2p30u4Xgo6ypFGg57R-lBH42CqeD35KOqUZO5WHjOWlQ8A0isb4DXS32bS75MTekwYi9pN7vxQuETi_viEAdQshVhB4cCztZM-qT5BirtAcwA' }
-      ],
-      milestones: [],
       contactEmail: email,
       contactPhone: phone,
       contactTelegram: telegram,
-      attributes: attributesString,
+      attributes: JSON.stringify(attrObj),
     };
 
-    onAddStartup(newStartup);
-    onActionToast(`${name} muvaffaqiyatli tekshiruvga yuborildi.`);
-    setView('profile');
+    try {
+      if (isEditing && id) {
+        const res = await fetch(`/api/startups/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (res.ok) {
+          onActionToast(`${name} muvaffaqiyatli tahrirlandi.`);
+          if (fetchStartups) fetchStartups();
+          navigate('/profile');
+        } else {
+          const err = await res.json();
+          onActionToast(err.error || "Tahrirlashda xatolik yuz berdi.");
+        }
+      } else {
+        // Handle new startup via onAddStartup (which likely uses POST)
+        const newStartup: Startup = {
+          ...payload,
+          id: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+          soldStatus: 'sotuvda',
+          status: 'pending',
+          proposalsCount: 0,
+          gallery: [],
+          team: [{ name: 'Siz', role: 'Asoschi', imgUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=You' }],
+          milestones: [],
+          techStack: JSON.stringify(payload.techStack) as any,
+        };
+        onAddStartup(newStartup);
+      }
+    } catch (err) {
+      console.error(err);
+      onActionToast("Xatolik yuz berdi.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -511,7 +581,7 @@ export default function SellPage({ onAddStartup, onActionToast, setView, categor
                 <div className="flex flex-col items-center justify-center space-y-2 w-full">
                   <img
                     src={imageUrl}
-                    alt="Yuklangan startap rasmi"
+                    alt="Yuklangan startap loyihasi muqovasi"
                     className="max-h-32 rounded-xl object-cover border border-white/10"
                     referrerPolicy="no-referrer"
                     loading="lazy"

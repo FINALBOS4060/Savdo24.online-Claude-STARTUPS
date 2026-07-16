@@ -33,7 +33,7 @@ import {
 
 dotenv.config();
 
-async function getTransporter() {
+export async function getTransporter() {
   const host = await getSetting("SMTP_HOST") || process.env.SMTP_HOST;
   const port = parseInt(await getSetting("SMTP_PORT") || process.env.SMTP_PORT || "587");
   const user = await getSetting("SMTP_USER") || process.env.SMTP_USER;
@@ -66,7 +66,7 @@ export async function sendEmail(to: string, subject: string, html: string) {
 
 // Newsletter functionality moved down after app declaration
 
-async function getStripe() {
+export async function getStripe() {
   const key = await getSetting("STRIPE_SECRET_KEY") || process.env.STRIPE_SECRET_KEY;
   if (!key) return null;
   return new Stripe(key, { apiVersion: '2025-01-27' as any });
@@ -130,12 +130,12 @@ app.use('/api', globalLimiter);
 
 // Newsletter logic moved down
 const httpServer = createServer(app);
-const io = new Server(httpServer, {
+export const io = new Server(httpServer, {
   cors: { origin: process.env.APP_URL || "https://savdo24.online" }
 });
 
 // requireAdmin middleware
-function requireAdmin(req: Request, res: Response, next: NextFunction) {
+export function requireAdmin(req: Request, res: Response, next: NextFunction) {
   const authReq = req as AuthRequest;
   if (authReq.user?.role !== "Admin") {
     return res.status(403).json({ error: "Ruxsat etilmagan. Admin ruxsati talab qilinadi." });
@@ -173,7 +173,7 @@ async function getDynamicGoogleClientId(): Promise<string | null> {
   return process.env.GOOGLE_CLIENT_ID || null;
 }
 
-async function trackEvent(event: string, userId?: number, targetId?: string, source?: string, metadata: any = {}) {
+export async function trackEvent(event: string, userId?: number, targetId?: string, source?: string, metadata: any = {}) {
   try {
     await prisma.analyticsEvent.create({
       data: {
@@ -189,7 +189,7 @@ async function trackEvent(event: string, userId?: number, targetId?: string, sou
   }
 }
 
-function getReferralTier(referralCount: number) {
+export function getReferralTier(referralCount: number) {
   if (referralCount >= 21) {
     return { discount: 15, commission: 15, badge: "👑 Referral King", monthlyBonus: 50 };
   } else if (referralCount >= 6) {
@@ -1587,7 +1587,7 @@ app.post("/api/listings/:id/upgrade", authenticateToken, async (req: AuthRequest
     // In a real app, this would redirect to payment
     // For now, let's create a payment record and return a simulation URL or similar
     const totalAmount = tier.pricePerDay * tier.durationDays;
-    const orderId = "UPG-" + Math.floor(Math.random() * 1000000);
+    const orderId = "UPG-" + crypto.randomBytes(4).toString('hex').toUpperCase();
     const secureToken = crypto.randomBytes(24).toString('hex');
 
     const payment = await prisma.payment.create({
@@ -2012,7 +2012,8 @@ app.get("/api/startups", async (req: Request, res: Response) => {
     }
 
     const pageNum = page ? parseInt(page as string) : 1;
-    const limitNum = limit ? parseInt(limit as string) : 50;
+    let limitNum = limit ? parseInt(limit as string) : 50;
+    if (limitNum > 100) limitNum = 100; // Max limit 100 for security
     const skip = (pageNum - 1) * limitNum;
 
     const totalCount = await prisma.startup.count({ where: filter });
@@ -2050,6 +2051,29 @@ app.get("/api/startups/:id", async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Startap topilmadi." });
     }
 
+    // Visibility Check
+    if (startupRecord.status !== "active") {
+      let currentUser = null;
+      let token = req.cookies?.token;
+      if (!token) {
+        const authHeader = req.headers["authorization"];
+        token = authHeader && authHeader.split(" ")[1];
+      }
+      if (token) {
+        try {
+          const decoded = jwt.verify(token, JWT_SECRET) as any;
+          currentUser = await prisma.user.findUnique({ where: { id: decoded.id } });
+        } catch (err) {}
+      }
+
+      const isOwner = currentUser && currentUser.id === startupRecord.userId;
+      const isAdmin = currentUser && currentUser.role === "Admin";
+
+      if (!isOwner && !isAdmin) {
+        return res.status(404).json({ error: "Startap topilmadi." }); // Return 404 for privacy
+      }
+    }
+
     res.json(formatStartup(startupRecord));
   } catch (err: any) {
     console.error("GET /api/startups/:id error:", err);
@@ -2075,7 +2099,7 @@ app.post("/api/top-boost/create", authenticateToken, async (req: AuthRequest, re
     if (!startup) return res.status(404).json({ error: "Startap topilmadi." });
 
     const price = await calculateTopPrice(parseInt(days as string));
-    const orderId = `TOP-${days}-${Math.floor(Math.random() * 10000000)}`;
+    const orderId = `TOP-${days}-` + crypto.randomBytes(4).toString('hex').toUpperCase();
     const secureToken = crypto.randomBytes(24).toString('hex');
 
     await prisma.payment.create({
@@ -2148,7 +2172,7 @@ app.post("/api/vip/create", authenticateToken, async (req: AuthRequest, res: Res
     const totalBasePrice = basePricePerDay * parseInt(days as string);
     const price = Math.round(totalBasePrice * (1 - discountPercent / 100) * 100) / 100;
 
-    const orderId = `VIP-${days}-${Math.floor(Math.random() * 10000000)}`;
+    const orderId = `VIP-${days}-` + crypto.randomBytes(4).toString('hex').toUpperCase();
     const secureToken = crypto.randomBytes(24).toString('hex');
 
     await prisma.payment.create({
@@ -2292,7 +2316,11 @@ app.post("/api/startups", authenticateToken, async (req: AuthRequest, res: Respo
 // PATCH /api/startups/:id — startapni tahrirlash
 app.patch("/api/startups/:id", authenticateToken, async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
-  const { name, price, description, longDescription, category, listingType, demoUrl, githubUrl } = req.body;
+  const { 
+    name, price, description, longDescription, category, 
+    listingType, demoUrl, githubUrl, image, gallery, 
+    techStack, team, milestones, contactEmail, contactPhone, contactTelegram 
+  } = req.body;
 
   try {
     const startup = await prisma.startup.findUnique({ where: { id } });
@@ -2304,9 +2332,25 @@ app.patch("/api/startups/:id", authenticateToken, async (req: AuthRequest, res: 
       return res.status(403).json({ error: "Siz faqat o'z startaplaringizni tahrirlashingiz mumkin." });
     }
 
-    const updatedData: any = { name, price, description, longDescription, category, listingType, demoUrl, githubUrl };
+    const updatedData: any = {};
+    if (name !== undefined) updatedData.name = name;
+    if (price !== undefined) updatedData.price = parseFloat(price);
+    if (description !== undefined) updatedData.description = description;
+    if (longDescription !== undefined) updatedData.longDescription = longDescription;
+    if (category !== undefined) updatedData.category = category;
+    if (listingType !== undefined) updatedData.listingType = listingType;
+    if (demoUrl !== undefined) updatedData.demoUrl = demoUrl;
+    if (githubUrl !== undefined) updatedData.githubUrl = githubUrl;
+    if (image !== undefined) updatedData.image = image;
+    if (gallery !== undefined) updatedData.gallery = typeof gallery === 'string' ? gallery : JSON.stringify(gallery || []);
+    if (techStack !== undefined) updatedData.techStack = typeof techStack === 'string' ? techStack : JSON.stringify(techStack || []);
+    if (team !== undefined) updatedData.team = typeof team === 'string' ? team : JSON.stringify(team || []);
+    if (milestones !== undefined) updatedData.milestones = typeof milestones === 'string' ? milestones : JSON.stringify(milestones || []);
+    if (contactEmail !== undefined) updatedData.contactEmail = contactEmail;
+    if (contactPhone !== undefined) updatedData.contactPhone = contactPhone;
+    if (contactTelegram !== undefined) updatedData.contactTelegram = contactTelegram;
     
-    // Agar faol bo'lsa, moderatsiyaga qaytarsin
+    // Agar faol bo'lsa, moderatsiyaga qaytarsin (Xavfsizlik)
     if (startup.status === "active") {
         updatedData.status = "pending";
     }
@@ -2750,7 +2794,7 @@ app.post("/api/payments/create", authenticateToken, async (req: AuthRequest, res
       }
     }
 
-    const orderId = "CG-" + Math.floor(Math.random() * 10000000);
+    const orderId = "CG-" + crypto.randomBytes(4).toString('hex').toUpperCase();
     const secureToken = crypto.randomBytes(24).toString('hex');
 
     const payment = await prisma.payment.create({

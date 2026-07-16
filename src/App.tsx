@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { Startup, UserProfileData, ProfileTab, Category, Notification } from './types';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
@@ -23,7 +24,17 @@ import { apiFetch as fetch } from './lib/api';
 import { io } from 'socket.io-client';
 
 export default function App() {
-  const [currentView, setView] = useState<string>('browse');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const currentView = location.pathname.substring(1) || 'browse';
+  
+  const setView = (view: string, id?: string) => {
+    if (view === 'browse') navigate('/');
+    else if (view === 'detail') navigate(`/startup/${id || selectedStartupId}`);
+    else if (view === 'edit-startup') navigate(`/edit-startup/${id}`);
+    else navigate(`/${view}`);
+  };
+
   const [profileTab, setProfileTab] = useState<ProfileTab>('startups');
   const [initialProfileTab, setInitialProfileTab] = useState<ProfileTab | null>(null);
   const [startups, setStartups] = useState<Startup[]>([]);
@@ -241,42 +252,11 @@ export default function App() {
 
   // Listen to URL pathname changes to support /admin directly!
   useEffect(() => {
-    const handleUrlChange = () => {
-      if (window.location.pathname === '/admin') {
-        setView('admin');
-      } else if (window.location.pathname === '/forgot-password') {
-        setView('forgot-password');
-      } else if (window.location.pathname === '/reset-password') {
-        setView('reset-password');
-      }
-    };
-    handleUrlChange();
-    window.addEventListener('popstate', handleUrlChange);
-    return () => window.removeEventListener('popstate', handleUrlChange);
-  }, []);
-
-  // Update URL pathname when view changes
-  useEffect(() => {
-    if (currentView === 'admin') {
-      if (window.location.pathname !== '/admin') {
-        window.history.pushState({}, '', '/admin');
-      }
-    } else if (currentView === 'forgot-password') {
-      if (window.location.pathname !== '/forgot-password') {
-        window.history.pushState({}, '', '/forgot-password');
-      }
-    } else if (currentView === 'reset-password') {
-      if (window.location.pathname !== '/reset-password') {
-        window.history.pushState({}, '', `/reset-password${window.location.search}`);
-      }
-    } else if (
-      window.location.pathname === '/admin' || 
-      window.location.pathname === '/forgot-password' || 
-      window.location.pathname === '/reset-password'
-    ) {
-      window.history.pushState({}, '', '/');
+    // Initial fetch of notifications if user is logged in
+    if (token && user.id) {
+      // Logic handled in another useEffect
     }
-  }, [currentView]);
+  }, [token, user.id]);
 
   // Handle addition of newly published startups (connecting to real full-stack API!)
   const handleAddStartup = async (newStartup: Startup) => {
@@ -477,29 +457,35 @@ export default function App() {
           )}
 
           <AnimatePresence mode="wait">
-            <motion.div
-              key={currentView}
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.25, ease: 'easeInOut' }}
-            >
-              {currentView === 'browse' && (
-                <BrowsePage
-                  startups={startups}
-                  setView={setView}
-                  setSelectedStartupId={setSelectedStartupId}
-                  searchQuery={searchQuery}
-                  onActionToast={showToast}
-                  user={user}
-                  categories={categories}
-                  isLoading={isLoadingStartups}
-                />
-              )}
+            <Routes location={location} key={location.pathname}>
+              <Route path="/" element={
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.25, ease: 'easeInOut' }}
+                >
+                  <BrowsePage
+                    startups={startups}
+                    setView={setView}
+                    setSelectedStartupId={setSelectedStartupId}
+                    searchQuery={searchQuery}
+                    onActionToast={showToast}
+                    user={user}
+                    categories={categories}
+                    isLoading={isLoadingStartups}
+                  />
+                </motion.div>
+              } />
 
-              {currentView === 'profile' && (
-                <div className="space-y-6">
-                  {/* Auth Warning for Guests */}
+              <Route path="/profile" element={
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.25, ease: 'easeInOut' }}
+                  className="space-y-6"
+                >
                   {!token && (
                     <div className="bg-[#f0b90b]/10 border border-[#f0b90b]/30 rounded-2xl p-6 text-left flex flex-col md:flex-row items-center justify-between gap-4">
                       <div className="flex items-center gap-4">
@@ -544,107 +530,198 @@ export default function App() {
                       </button>
                     </div>
                   )}
-                </div>
-              )}
+                </motion.div>
+              } />
 
-              {currentView === 'detail' && (
-                <DetailPage
-                  startup={selectedStartup}
-                  setView={setView}
-                  bookmarkedIds={bookmarkedIds}
-                  toggleBookmark={toggleBookmark}
-                  onActionToast={showToast}
-                  setCheckoutAmount={setCheckoutAmount}
-                  user={user}
-                  categories={categories}
-                />
-              )}
+              <Route path="/startup/:id" element={
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.25, ease: 'easeInOut' }}
+                >
+                  <DetailPage
+                    startups={startups}
+                    setView={setView}
+                    bookmarkedIds={bookmarkedIds}
+                    toggleBookmark={toggleBookmark}
+                    onActionToast={showToast}
+                    setCheckoutAmount={setCheckoutAmount}
+                    user={user}
+                    categories={categories}
+                  />
+                </motion.div>
+              } />
 
-              {currentView === 'checkout' && (
-                <CheckoutPage
-                  amount={checkoutAmount}
-                  user={user}
-                  setUser={setUser}
-                  onActionToast={showToast}
-                  setView={setView}
-                  onSuccessPayment={handleSuccessPayment}
-                  startup={selectedStartup}
-                />
-              )}
+              <Route path="/edit-startup/:id" element={
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.25, ease: 'easeInOut' }}
+                >
+                  <SellPage
+                    onAddStartup={handleAddStartup}
+                    onActionToast={showToast}
+                    setView={setView}
+                    categories={categories}
+                    isEditing={true}
+                    startups={startups}
+                    fetchStartups={fetchStartups}
+                  />
+                </motion.div>
+              } />
 
-              {currentView === 'sell' && (
-                <SellPage
-                  onAddStartup={handleAddStartup}
-                  onActionToast={showToast}
-                  setView={setView}
-                  categories={categories}
-                />
-              )}
+              <Route path="/checkout" element={
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.25, ease: 'easeInOut' }}
+                >
+                  <CheckoutPage
+                    amount={checkoutAmount}
+                    user={user}
+                    setUser={setUser}
+                    onActionToast={showToast}
+                    setView={setView}
+                    onSuccessPayment={handleSuccessPayment}
+                    startup={selectedStartup}
+                  />
+                </motion.div>
+              } />
 
-              {currentView === 'admin' && (
-                <AdminPage
-                  user={user}
-                  startups={startups}
-                  fetchStartups={fetchStartups}
-                  onActionToast={showToast}
-                  setView={setView}
-                  categories={categories}
-                  fetchCategories={fetchCategories}
-                />
-              )}
+              <Route path="/sell" element={
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.25, ease: 'easeInOut' }}
+                >
+                  <SellPage
+                    onAddStartup={handleAddStartup}
+                    onActionToast={showToast}
+                    setView={setView}
+                    categories={categories}
+                  />
+                </motion.div>
+              } />
 
-              {currentView === 'ideas-rating' && (
-                <IdeasRatingPage
-                  setView={setView}
-                  setSelectedStartupId={setSelectedStartupId}
-                  onActionToast={showToast}
-                  categories={categories}
-                />
-              )}
+              <Route path="/admin" element={
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.25, ease: 'easeInOut' }}
+                >
+                  <AdminPage
+                    user={user}
+                    startups={startups}
+                    fetchStartups={fetchStartups}
+                    onActionToast={showToast}
+                    setView={setView}
+                    categories={categories}
+                    fetchCategories={fetchCategories}
+                  />
+                </motion.div>
+              } />
 
-              {currentView === 'support' && (
-                <SupportPage
-                  setView={setView}
-                />
-              )}
+              <Route path="/ideas-rating" element={
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.25, ease: 'easeInOut' }}
+                >
+                  <IdeasRatingPage
+                    setView={setView}
+                    setSelectedStartupId={setSelectedStartupId}
+                    onActionToast={showToast}
+                    categories={categories}
+                  />
+                </motion.div>
+              } />
 
-              {currentView === 'messages' && (
-                <MessagesPage
-                  user={user}
-                  onActionToast={showToast}
-                />
-              )}
+              <Route path="/support" element={
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.25, ease: 'easeInOut' }}
+                >
+                  <SupportPage setView={setView} />
+                </motion.div>
+              } />
 
-              {currentView === 'terms' && (
-                <TermsPage
-                  setView={setView}
-                />
-              )}
+              <Route path="/messages" element={
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.25, ease: 'easeInOut' }}
+                >
+                  <MessagesPage user={user} onActionToast={showToast} />
+                </motion.div>
+              } />
 
-              {currentView === 'privacy' && (
-                <PrivacyPage
-                  setView={setView}
-                />
-              )}
+              <Route path="/terms" element={
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.25, ease: 'easeInOut' }}
+                >
+                  <TermsPage setView={setView} />
+                </motion.div>
+              } />
 
-              {currentView === 'refund' && (
-                <RefundPolicyPage
-                  setView={setView}
-                />
-              )}
+              <Route path="/privacy" element={
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.25, ease: 'easeInOut' }}
+                >
+                  <PrivacyPage setView={setView} />
+                </motion.div>
+              } />
 
-              {currentView === 'forgot-password' && (
-                <ForgotPasswordPage
-                  onNavigate={setView}
-                />
-              )}
+              <Route path="/refund" element={
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.25, ease: 'easeInOut' }}
+                >
+                  <RefundPolicyPage setView={setView} />
+                </motion.div>
+              } />
 
-              {currentView === 'reset-password' && (
-                <ResetPasswordPage
-                  onNavigate={setView}
-                />
-              )}
-            </motion.div>
+              <Route path="/forgot-password" element={
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.25, ease: 'easeInOut' }}
+                >
+                  <ForgotPasswordPage onNavigate={setView} />
+                </motion.div>
+              } />
+
+              <Route path="/reset-password" element={
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.25, ease: 'easeInOut' }}
+                >
+                  <ResetPasswordPage onNavigate={setView} />
+                </motion.div>
+              } />
+
+              {/* Fallback */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
           </AnimatePresence>
           </div>
         </main>

@@ -70,7 +70,12 @@ router.post("/register", authLimiter, async (req: Request, res: Response) => {
   try {
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-      return res.status(400).json({ error: "Ro'yxatdan o'tishda xatolik yuz berdi." });
+      // Return 201 with a generic message to prevent email enumeration, 
+      // though the user won't be logged in. Or just return a generic error.
+      // User requested "Ikkala holatda ham bir xil umumiy javob qaytar"
+      return res.status(201).json({ 
+        message: "Ro'yxatdan o'tish so'rovi qabul qilindi. Iltimos, pochtangizni tekshiring." 
+      });
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
@@ -343,9 +348,10 @@ router.post("/forgot-password", passwordResetLimiter, async (req: Request, res: 
 
   try {
     const user = await prisma.user.findUnique({ where: { email } });
+    const genericMessage = "Agar ushbu email tizimda mavjud bo'lsa, parolni tiklash havolasi yuborildi.";
+    
     if (!user) {
-      // Return a generic message to prevent email enumeration
-      return res.json({ success: true, message: "Agar bu email tizimda mavjud bo'lsa, parolni tiklash havolasi yuborildi." });
+      return res.json({ success: true, message: genericMessage });
     }
 
     if (user.isBanned) {
@@ -386,7 +392,7 @@ router.post("/forgot-password", passwordResetLimiter, async (req: Request, res: 
       `
     );
 
-    res.json({ success: true, message: "Parolni tiklash havolasi email manzilingizga yuborildi." });
+    res.json({ success: true, message: genericMessage });
   } catch (err) {
     logger.error({ err }, "Forgot password error");
     res.status(500).json({ error: "Parolni tiklash so'rovida xatolik yuz berdi." });

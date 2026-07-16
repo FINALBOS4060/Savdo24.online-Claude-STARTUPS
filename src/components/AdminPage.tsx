@@ -843,7 +843,7 @@ export default function AdminPage({
                         <img 
                           src={u.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&background=random`} 
                           className="w-8 h-8 rounded-full border border-white/10" 
-                          alt={`${u.name} avatari`}
+                          alt={`${u.name || 'Foydalanuvchi'} profil avatari`}
                           loading="lazy"
                           width={32}
                           height={32}
@@ -1132,7 +1132,7 @@ export default function AdminPage({
                     <img 
                       src={selectedUserDetail.user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedUserDetail.user.name)}&background=random`} 
                       className="w-24 h-24 rounded-full border-4 border-secondary-container/20 mx-auto object-cover" 
-                      alt={`${selectedUserDetail.user.name} avatari`} 
+                      alt={`${selectedUserDetail.user.name || 'Foydalanuvchi'} batafsil profil avatari`} 
                       loading="lazy"
                       width={96}
                       height={96}
@@ -1488,7 +1488,7 @@ export default function AdminPage({
                   <div className="flex items-center gap-4 flex-1">
                     <img
                       src={startup.image}
-                      alt={`${startup.name} startap rasmi`}
+                      alt={`${startup.name} - kutilayotgan loyiha muqovasi`}
                       className="w-16 h-16 rounded-xl object-cover border border-white/5 flex-shrink-0"
                       referrerPolicy="no-referrer"
                       loading="lazy"

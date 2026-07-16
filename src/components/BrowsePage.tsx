@@ -409,6 +409,7 @@ export default function BrowsePage({
               onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
               className={`p-1.5 border rounded-lg transition-colors border-outline-variant/30 hover:bg-white/5 text-[#8892b0]`}
               title={viewMode === 'grid' ? "Ro'yxat ko'rinishi" : "Jadval ko'rinishi"}
+              aria-label={viewMode === 'grid' ? "Ro'yxat ko'rinishiga o'tish" : "Jadval ko'rinishiga o'tish"}
             >
               <span className="material-symbols-outlined text-lg leading-none">
                 {viewMode === 'grid' ? 'view_list' : 'grid_view'}
@@ -475,7 +476,7 @@ export default function BrowsePage({
                       <img
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         src={startup.image}
-                        alt={startup.name}
+                        alt={`${startup.name} - ${categories.find(c => c.id === startup.category)?.name || 'startap'} loyihasi muqovasi`}
                         loading="lazy"
                         width={224}
                         height={144}
@@ -541,7 +542,7 @@ export default function BrowsePage({
                     <img
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       src={startup.image}
-                      alt={startup.name}
+                      alt={`${startup.name} - ${categories.find(c => c.id === startup.category)?.name || 'startap'} loyihasi muqovasi`}
                       loading="lazy"
                       width={350}
                       height={192}

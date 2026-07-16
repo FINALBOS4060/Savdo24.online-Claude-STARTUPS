@@ -37,7 +37,7 @@ export default function Sidebar({
           <img
             className="w-full h-full object-cover transition-transform group-hover:scale-105"
             src={user.avatarUrl}
-            alt="Savdo24 foydalanuvchi avatarlari"
+            alt={`${user.name || 'Foydalanuvchi'} yon panel avatari`}
             loading="lazy"
             width={64}
             height={64}
