@@ -158,6 +158,12 @@ async function getSetting(key: string): Promise<string | null> {
   return process.env[key] || null;
 }
 
+async function getDynamicGoogleClientId(): Promise<string | null> {
+  const dbId = await getSetting("GOOGLE_CLIENT_ID");
+  if (dbId) return dbId;
+  return process.env.GOOGLE_CLIENT_ID || null;
+}
+
 async function trackEvent(event: string, userId?: number, targetId?: string, source?: string, metadata: any = {}) {
   try {
     await prisma.analyticsEvent.create({
@@ -420,8 +426,9 @@ app.use(cors({
     // 2. Check if origin is allowed
     const isAllowed = 
       allowedOrigins.includes(origin) || 
+      (process.env.APP_URL && origin === process.env.APP_URL) ||
       origin.endsWith('.savdo24.online') || 
-      origin.includes('asia-east1.run.app') || 
+      origin.endsWith('.run.app') || 
       origin.includes('localhost') || 
       origin.includes('127.0.0.1');
 
@@ -1265,16 +1272,26 @@ app.post("/api/auth/login", authLimiter, async (req: Request, res: Response) => 
   }
 });
 
+app.get("/api/auth/google-client-id", async (req: Request, res: Response) => {
+  try {
+    const clientId = await getDynamicGoogleClientId();
+    res.json({ clientId });
+  } catch (err) {
+    res.status(500).json({ error: "Google client ID yuklashda xatolik." });
+  }
+});
+
 app.post("/api/auth/google", async (req: Request, res: Response) => {
   const { credential } = req.body;
-  const client = getGoogleClient();
-  if (!client) {
+  const clientId = await getDynamicGoogleClientId();
+  if (!clientId) {
     return res.status(500).json({ error: "Google Auth konfiguratsiyasi serverda mavjud emas." });
   }
+  const client = new OAuth2Client(clientId);
   try {
     const ticket = await client.verifyIdToken({
       idToken: credential,
-      audience: process.env.GOOGLE_CLIENT_ID,
+      audience: clientId,
     });
     const payload = ticket.getPayload();
     if (!payload?.email) return res.status(400).json({ error: "Google email topilmadi." });
@@ -4690,6 +4707,13 @@ async function start() {
       console.log("PostgreSQL migrations deployed successfully.");
     } catch (migrateErr) {
       console.error("PostgreSQL migration deployment failed on startup:", migrateErr);
+    }
+    try {
+      console.log("DATABASE_URL found. Syncing PostgreSQL schema with db push...");
+      execSync("npx prisma db push --schema=prisma/schema.prisma --accept-data-loss", { stdio: "inherit" });
+      console.log("PostgreSQL schema synced successfully.");
+    } catch (pushErr) {
+      console.error("PostgreSQL db push failed on startup:", pushErr);
     }
   } else {
     try {

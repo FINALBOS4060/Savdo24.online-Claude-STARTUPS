@@ -59,6 +59,28 @@ export default function App() {
   const [authPassword, setAuthPassword] = useState('');
   const [authName, setAuthName] = useState('');
 
+  // Google client ID dynamic state
+  const [googleClientId, setGoogleClientId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchGoogleClientId = async () => {
+      try {
+        const res = await fetch('/api/auth/google-client-id');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.clientId) {
+            setGoogleClientId(data.clientId);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch Google client ID dynamically:", err);
+      }
+      setGoogleClientId(import.meta.env.VITE_GOOGLE_CLIENT_ID || null);
+    };
+    fetchGoogleClientId();
+  }, []);
+
   // Animated feedback toast state
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({
     message: '',
@@ -67,9 +89,9 @@ export default function App() {
 
   // Initialize Google Sign-In
   useEffect(() => {
-    if (authModalOpen) {
+    if (authModalOpen && googleClientId) {
       window.google?.accounts.id.initialize({
-        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+        client_id: googleClientId,
         callback: async (response: any) => {
           const res = await fetch('/api/auth/google', {
             method: 'POST',
@@ -95,7 +117,7 @@ export default function App() {
         { theme: 'outline', size: 'large', text: 'continue_with', locale: 'uz' }
       );
     }
-  }, [authModalOpen, authTab]);
+  }, [authModalOpen, authTab, googleClientId]);
 
   const showToast = (message: string) => {
     setToast({ message, visible: true });
