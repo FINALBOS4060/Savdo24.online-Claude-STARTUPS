@@ -21,6 +21,9 @@ import { Bot } from "grammy";
 import nodemailer from "nodemailer";
 import Stripe from "stripe";
 import cron from "node-cron";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 async function getTransporter() {
   const host = await getSetting("SMTP_HOST") || process.env.SMTP_HOST;
@@ -71,17 +74,31 @@ process.on("uncaughtException", (err) => {
 });
 
 // Environment variable validation
-if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
-  console.error("XATOLIK: JWT_SECRET muhit o'zgaruvchisi topilmadi yoki juda qisqa (kamida 32 belgi bo'lishi kerak). Server to'xtatilmoqda.");
-  process.exit(1);
-}
-if (!process.env.ENCRYPTION_KEY || process.env.ENCRYPTION_KEY.length < 32) {
-  console.error("XATOLIK: ENCRYPTION_KEY muhit o'zgaruvchisi topilmadi yoki juda qisqa. Server to'xtatilmoqda.");
-  process.exit(1);
-}
+const JWT_SECRET = (process.env.JWT_SECRET && process.env.JWT_SECRET.length >= 32)
+  ? process.env.JWT_SECRET
+  : (() => {
+      if (process.env.NODE_ENV === "production") {
+        console.error("XATOLIK: JWT_SECRET muhit o'zgaruvchisi topilmadi yoki juda qisqa (kamida 32 belgi bo'lishi kerak). Server to'xtatilmoqda.");
+        process.exit(1);
+      }
+      console.warn("⚠️ Ogohlantirish: JWT_SECRET topilmadi yoki juda qisqa. Ishlab chiqish muhitida vaqtinchalik kalit ishlatilmoqda.");
+      const fallback = "dev_default_jwt_secret_must_be_at_least_32_characters_long_for_security";
+      process.env.JWT_SECRET = fallback;
+      return fallback;
+    })();
 
-const JWT_SECRET = process.env.JWT_SECRET;
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
+const ENCRYPTION_KEY = (process.env.ENCRYPTION_KEY && process.env.ENCRYPTION_KEY.length >= 32)
+  ? process.env.ENCRYPTION_KEY
+  : (() => {
+      if (process.env.NODE_ENV === "production") {
+        console.error("XATOLIK: ENCRYPTION_KEY muhit o'zgaruvchisi topilmadi yoki juda qisqa. Server to'xtatilmoqda.");
+        process.exit(1);
+      }
+      console.warn("⚠️ Ogohlantirish: ENCRYPTION_KEY topilmadi yoki juda qisqa. Ishlab chiqish muhitida vaqtinchalik kalit ishlatilmoqda.");
+      const fallback = "dev_default_encryption_key_must_be_at_least_32_characters_long_for_security";
+      process.env.ENCRYPTION_KEY = fallback;
+      return fallback;
+    })();
 
 // Coingate production check
 if (process.env.NODE_ENV === "production" && !process.env.COINGATE_API_TOKEN) {
@@ -2315,7 +2332,7 @@ app.post("/api/auth/resend-verification", authenticateToken, async (req: AuthReq
 
 // GET /api/startups - barcha startaplarni olish (filter: kategoriya, status, qidiruv, listingType va sahifalash bo'yicha)
 app.get("/api/startups", async (req: Request, res: Response) => {
-  const { category, status, search, listingType, page, limit, onlyActive } = req.query;
+  const { category, status, search, listingType, page, limit, onlyActive, isTop } = req.query;
 
   try {
     const filter: any = {};
@@ -2324,6 +2341,13 @@ app.get("/api/startups", async (req: Request, res: Response) => {
     if (listingType && listingType !== "All") filter.listingType = listingType as string;
     if (onlyActive === "true") {
       filter.soldStatus = "sotuvda";
+    }
+
+    if (isTop === "true") {
+      filter.isTop = true;
+      filter.topExpiresAt = { gt: new Date() };
+    } else if (isTop === "false") {
+      filter.isTop = false;
     }
 
     if (search) {

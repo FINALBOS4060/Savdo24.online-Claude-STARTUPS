@@ -50,6 +50,7 @@ model Category {
   id       String    @id
   name     String
   icon     String
+  fields   String?
 }
 
 model Startup {
@@ -167,6 +168,8 @@ model RefreshToken {
   token     String   @unique
   userId    Int
   user      User     @relation(fields: [userId], references: [id])
+  userAgent String?
+  ip        String?
   expiresAt DateTime
   createdAt DateTime @default(now())
 }
