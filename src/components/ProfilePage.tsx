@@ -4,7 +4,7 @@ import { apiFetch as fetch } from '../lib/api';
 
 interface ProfilePageProps {
   startups: Startup[];
-  setView: (view: string) => void;
+  setView: (view: string, id?: string) => void;
   setSelectedStartupId: (id: string) => void;
   user: UserProfileData;
   setUser: React.Dispatch<React.SetStateAction<UserProfileData>>;

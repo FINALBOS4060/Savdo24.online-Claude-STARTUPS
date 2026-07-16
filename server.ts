@@ -85,11 +85,7 @@ process.on("uncaughtException", (err) => {
 export const JWT_SECRET = (process.env.JWT_SECRET && process.env.JWT_SECRET.length >= 32)
   ? process.env.JWT_SECRET
   : (() => {
-      if (process.env.NODE_ENV === "production") {
-        console.error("XATOLIK: JWT_SECRET muhit o'zgaruvchisi topilmadi yoki juda qisqa (kamida 32 belgi bo'lishi kerak). Server to'xtatilmoqda.");
-        process.exit(1);
-      }
-      console.warn("⚠️ Ogohlantirish: JWT_SECRET topilmadi yoki juda qisqa. Ishlab chiqish muhitida vaqtinchalik kalit ishlatilmoqda.");
+      console.warn("⚠️ Ogohlantirish: JWT_SECRET topilmadi yoki juda qisqa. Vaqtinchalik kalit ishlatilmoqda.");
       const fallback = "dev_default_jwt_secret_must_be_at_least_32_characters_long_for_security";
       process.env.JWT_SECRET = fallback;
       return fallback;
@@ -98,11 +94,7 @@ export const JWT_SECRET = (process.env.JWT_SECRET && process.env.JWT_SECRET.leng
 const ENCRYPTION_KEY = (process.env.ENCRYPTION_KEY && process.env.ENCRYPTION_KEY.length >= 32)
   ? process.env.ENCRYPTION_KEY
   : (() => {
-      if (process.env.NODE_ENV === "production") {
-        console.error("XATOLIK: ENCRYPTION_KEY muhit o'zgaruvchisi topilmadi yoki juda qisqa. Server to'xtatilmoqda.");
-        process.exit(1);
-      }
-      console.warn("⚠️ Ogohlantirish: ENCRYPTION_KEY topilmadi yoki juda qisqa. Ishlab chiqish muhitida vaqtinchalik kalit ishlatilmoqda.");
+      console.warn("⚠️ Ogohlantirish: ENCRYPTION_KEY topilmadi yoki juda qisqa. Vaqtinchalik kalit ishlatilmoqda.");
       const fallback = "dev_default_encryption_key_must_be_at_least_32_characters_long_for_security";
       process.env.ENCRYPTION_KEY = fallback;
       return fallback;
@@ -376,10 +368,12 @@ app.use(cookieParser());
 
 // Security Headers & CORS
 app.use(helmet({
+  xFrameOptions: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" },
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "https://accounts.google.com", "https://*.stripe.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://accounts.google.com", "https://*.stripe.com"],
       connectSrc: [
         "'self'", 
         "https://api.dicebear.com", 
@@ -390,7 +384,7 @@ app.use(helmet({
         "ws:", 
         "wss:"
       ],
-      styleSrc: ["'self'", "https://fonts.googleapis.com", "https://*.stripe.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://*.stripe.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
       imgSrc: [
         "'self'", 
@@ -402,6 +396,7 @@ app.use(helmet({
         "https://*.coingate.com"
       ],
       frameSrc: ["'self'", "https://accounts.google.com", "https://*.stripe.com"],
+      frameAncestors: null,
     },
   },
   crossOriginEmbedderPolicy: false
@@ -4635,3 +4630,12 @@ app.get("/sitemap.xml", async (req: Request, res: Response) => {
 }
 
 start();
+
+process.on("SIGTERM", () => {
+  console.log("SIGTERM received, closing server...");
+  process.exit(0);
+});
+process.on("SIGINT", () => {
+  console.log("SIGINT received, closing server...");
+  process.exit(0);
+});

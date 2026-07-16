@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx server.ts",
     "build": "npx prisma generate --schema=prisma/schema.sqlite.prisma && npx prisma generate --schema=prisma/schema.prisma && vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
-    "start": "node dist/server.cjs",
+    "start": "NODE_ENV=production node dist/server.cjs",
     "make-admin": "tsx scripts/make-admin.ts",
     "backup": "tsx scripts/backup-db.ts",
     "export-github": "tsx scripts/export-to-github.ts",

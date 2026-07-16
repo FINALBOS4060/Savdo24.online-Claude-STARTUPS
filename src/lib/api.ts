@@ -59,6 +59,6 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
 }
 
 // Intercept window.fetch globally so any standard fetch call uses our credentials and CSRF setup
-window.fetch = apiFetch;
+// window.fetch = apiFetch;
 
 
