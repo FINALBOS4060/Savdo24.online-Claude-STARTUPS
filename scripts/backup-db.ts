@@ -88,7 +88,7 @@ async function runBackup() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   let filename = `backup-${timestamp}.sql`;
   let tempFilePath = path.join('/tmp', filename);
-  let uploadContent: Buffer | string;
+  let uploadContent: Buffer | string = Buffer.alloc(0);
   let contentType = 'application/sql';
 
   let pgDumpSuccess = false;

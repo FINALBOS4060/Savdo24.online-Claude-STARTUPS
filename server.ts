@@ -234,7 +234,7 @@ async function autoReleaseEscrows() {
 
     console.log(`Checking ${escrowsToRelease.length} escrows for auto-release...`);
 
-    const paymentIds = escrowsToRelease.map(e => e.paymentId);
+    const paymentIds = escrowsToRelease.map((e: any) => e.paymentId);
     const activeDisputes = await prisma.dispute.findMany({
       where: {
         paymentId: { in: paymentIds },
@@ -242,7 +242,7 @@ async function autoReleaseEscrows() {
       }
     });
 
-    const disputedPaymentIds = new Set(activeDisputes.map(d => d.paymentId));
+    const disputedPaymentIds = new Set(activeDisputes.map((d: any) => d.paymentId));
 
     for (const escrow of escrowsToRelease) {
       const isDisputed = disputedPaymentIds.has(escrow.paymentId);
@@ -1830,7 +1830,7 @@ app.patch("/api/admin/users/:id/ban", authenticateToken, requireAdmin, async (re
 
     await prisma.auditLog.create({
       data: {
-        adminId: req.user.id,
+        adminId: req.user!.id,
         action: isBanned ? "ban_user" : "unban_user",
         targetId: String(id),
         details: `User ${user.email} was ${isBanned ? 'banned' : 'unbanned'}`
@@ -1910,7 +1910,7 @@ app.patch("/api/admin/users/:id/vip", authenticateToken, requireAdmin, async (re
     });
     await prisma.auditLog.create({
       data: {
-        adminId: req.user.id,
+        adminId: req.user!.id,
         action: "manual_vip_update",
         targetId: String(id),
         details: `User ${user.email} VIP set to ${isVip} until ${vipExpiresAt}`
@@ -1933,7 +1933,7 @@ app.patch("/api/admin/users/:id/role", authenticateToken, requireAdmin, async (r
       return res.status(400).json({ error: "Yaroqsiz rol qiymati. Ruxsat berilgan rollar: Sotuvchi, Xaridor, Admin" });
     }
 
-    if (Number(id) === req.user.id) {
+    if (Number(id) === req.user!.id) {
       return res.status(400).json({ error: "O'z rolingizni o'zgartira olmaysiz." });
     }
 
@@ -1943,7 +1943,7 @@ app.patch("/api/admin/users/:id/role", authenticateToken, requireAdmin, async (r
     });
     await prisma.auditLog.create({
       data: {
-        adminId: req.user.id,
+        adminId: req.user!.id,
         action: "change_user_role",
         targetId: String(id),
         details: `User ${user.email} role changed to ${role}`
@@ -1966,7 +1966,7 @@ app.delete("/api/admin/users/:id", authenticateToken, requireAdmin, async (req: 
 
     await prisma.auditLog.create({
       data: {
-        adminId: req.user.id,
+        adminId: req.user!.id,
         action: "delete_user_account",
         targetId: String(id),
         details: `User ${user.email} account deleted permanently`
@@ -3617,7 +3617,7 @@ app.post("/api/reviews", authenticateToken, async (req: AuthRequest, res: Respon
         rating: ratingInt,
         comment,
         startupId,
-        buyerId: req.user.id,
+        buyerId: req.user!.id,
         sellerId: startup.userId
       }
     });
@@ -3742,7 +3742,7 @@ app.post("/api/disputes", authenticateToken, async (req: AuthRequest, res: Respo
     const dispute = await prisma.dispute.create({
       data: {
         paymentId,
-        buyerId: req.user.id,
+        buyerId: req.user!.id,
         reason,
         description,
         status: "open"
