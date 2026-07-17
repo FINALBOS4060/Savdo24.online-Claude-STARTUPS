@@ -1,4 +1,4 @@
-name: Deploy to Contabo VPS
+name: Deploy to Contabo
 
 on:
   push:
@@ -10,37 +10,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SERVER_PORT || 22 }}
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          # key: ${{ secrets.VPS_SSH_KEY }} # Agar SSH kalit ishlatsangiz, buni yoqing va parolni o'chiring
+          port: 22
           script: |
-            export PATH=$PATH:/home/${{ secrets.SERVER_USER }}/.nvm/versions/node/$(node -v)/bin
-            cd ${{ secrets.DEPLOY_PATH }}
-            
-            echo "--- Pulling latest code ---"
-            git pull origin main
-            
-            echo "--- Installing dependencies ---"
-            npm install
-            
-            echo "--- Generating Prisma clients ---"
-            npx prisma generate --schema=prisma/schema.sqlite.prisma
-            npx prisma generate --schema=prisma/schema.prisma
-            
-            echo "--- Running database migrations ---"
-            npx prisma migrate deploy
-            
-            echo "--- Building application ---"
-            npm run build
-            
-            echo "--- Restarting application with PM2 ---"
-            pm2 restart savdo24 || pm2 start dist/server.cjs --name savdo24
-            
-            echo "--- Deployment successful ---"
+            cd /path/to/your/project # DIQQAT: Bu yerni loyihangiz papkasiga o'zgartiring! (masalan: cd /var/www/savdo24)
+            chmod +x deploy.sh
+            ./deploy.sh
