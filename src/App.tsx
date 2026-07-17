@@ -235,7 +235,7 @@ export default function App() {
       const res = await fetch('/api/startups');
       if (res.ok) {
         const data = await res.json();
-        setStartups(data);
+        setStartups(Array.isArray(data?.startups) ? data.startups : Array.isArray(data) ? data : []);
       } else {
         console.error("Failed to fetch startups from server");
       }
