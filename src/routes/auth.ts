@@ -70,17 +70,15 @@ router.post("/register", authLimiter, async (req: Request, res: Response) => {
   try {
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-      // Return 201 with a generic message to prevent email enumeration, 
-      // though the user won't be logged in. Or just return a generic error.
-      // User requested "Ikkala holatda ham bir xil umumiy javob qaytar"
       return res.status(201).json({ 
-        message: "Ro'yxatdan o'tish so'rovi qabul qilindi. Iltimos, pochtangizni tekshiring." 
-      });
+         message: "Ro'yxatdan o'tish so'rovi qabul qilindi. Iltimos, Telegram orqali tasdiqlang." 
+       });
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
     const userRole = "Xaridor";
-    const verificationToken = crypto.randomBytes(32).toString("hex");
+    const telegramLinkCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const telegramLinkCodeExpires = new Date(Date.now() + 15 * 60 * 1000);
 
     const user = await prisma.user.create({
       data: {
@@ -92,13 +90,9 @@ router.post("/register", authLimiter, async (req: Request, res: Response) => {
         avatarUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(name)}`,
         verified: false,
         emailVerified: false,
-        verificationToken,
+        telegramLinkCode,
+        telegramLinkCodeExpires,
       },
-    });
-
-    // Send verification email in background
-    sendVerificationEmail(user.email, verificationToken, user.name).catch(err => {
-      logger.error({ err }, "Email verification sending failed");
     });
 
     const accessToken = jwt.sign(
@@ -113,6 +107,7 @@ router.post("/register", authLimiter, async (req: Request, res: Response) => {
     logger.info({ userId: user.id }, "User registered successfully");
 
     res.status(201).json({
+      accessToken,
       user: {
         id: user.id,
         name: user.name,
@@ -124,7 +119,9 @@ router.post("/register", authLimiter, async (req: Request, res: Response) => {
         avatarUrl: user.avatarUrl,
         walletConnected: user.walletConnected,
         walletAddress: user.walletAddress,
+        telegramLinkCode
       },
+      message: "Hisob yaratildi. Davom etish uchun Telegram orqali tasdiqlang."
     });
   } catch (err) {
     logger.error({ err }, "Register endpoint error");
@@ -172,6 +169,7 @@ router.post("/login", authLimiter, async (req: Request, res: Response) => {
     logger.info({ userId: user.id }, "User logged in successfully");
 
     res.json({
+      accessToken,
       user: {
         id: user.id,
         name: user.name,
@@ -246,7 +244,15 @@ router.post("/refresh", async (req: Request, res: Response) => {
 
     setAuthCookies(res, accessToken, newRefreshToken);
 
-    res.json({ success: true });
+    res.json({ 
+      accessToken, 
+      user: {
+        id: dbToken.user.id,
+        name: dbToken.user.name,
+        email: dbToken.user.email,
+        role: dbToken.user.role
+      } 
+    });
   } catch (err) {
     logger.error({ err }, "Token refresh endpoint error");
     res.status(500).json({ error: "Tokenni yangilashda xatolik yuz berdi." });
@@ -291,6 +297,7 @@ router.get("/me", async (req: Request, res: Response) => {
     }
 
     res.json({
+      accessToken: token,
       user: {
         id: user.id,
         name: user.name,
@@ -313,31 +320,6 @@ router.get("/me", async (req: Request, res: Response) => {
   }
 });
 
-// 6. POST /api/auth/resend-verification
-router.post("/resend-verification", authenticateToken, async (req: AuthRequest, res: Response) => {
-  try {
-    const user = await prisma.user.findUnique({ where: { id: req.user?.id } });
-    if (!user) {
-      return res.status(404).json({ error: "Foydalanuvchi topilmadi." });
-    }
-
-    if (user.emailVerified) {
-      return res.status(400).json({ error: "Sizning email manzilingiz allaqachon tasdiqlangan." });
-    }
-
-    const token = crypto.randomBytes(32).toString("hex");
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { verificationToken: token }
-    });
-
-    await sendVerificationEmail(user.email, token, user.name);
-    res.json({ success: true, message: "Tasdiqlash xati muvaffaqiyatli qayta yuborildi. Iltimos pochtangizni tekshiring." });
-  } catch (err) {
-    logger.error({ err }, "Resend verification error");
-    res.status(500).json({ error: "Tasdiqlash xatini yuborishda xatolik yuz berdi." });
-  }
-});
 
 // 7. POST /api/auth/forgot-password
 router.post("/forgot-password", passwordResetLimiter, async (req: Request, res: Response) => {

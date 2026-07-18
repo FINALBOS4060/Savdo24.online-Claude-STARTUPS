@@ -214,16 +214,16 @@ export default function SellPage({
         }
       } else {
         // Handle new startup via onAddStartup (which likely uses POST)
-        const newStartup: Startup = {
+        // ID is now generated server-side
+        const newStartup: any = {
           ...payload,
-          id: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
           soldStatus: 'sotuvda',
           status: 'pending',
           proposalsCount: 0,
           gallery: [],
           team: [{ name: 'Siz', role: 'Asoschi', imgUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=You' }],
           milestones: [],
-          techStack: JSON.stringify(payload.techStack) as any,
+          techStack: payload.techStack,
         };
         onAddStartup(newStartup);
       }

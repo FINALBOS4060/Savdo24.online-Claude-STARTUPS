@@ -41,8 +41,9 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
       });
 
       if (refreshResponse.ok) {
+        const refreshData = await refreshResponse.json();
         // Dispatch event to sync react state
-        window.dispatchEvent(new CustomEvent('savdo24_auth_change', { detail: { token: 'cookie_authenticated' } }));
+        window.dispatchEvent(new CustomEvent('savdo24_auth_change', { detail: { token: refreshData.accessToken || 'cookie_authenticated' } }));
 
         // Retry the original request
         response = await originalFetch(input, options);

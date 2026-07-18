@@ -21,7 +21,26 @@ bot.command("start", async (ctx) => {
   }
 
   try {
-    // ... rest of start command remains same
+    // Agar token 6 ta harf-raqam bo'lsa, uni bog'lash kodi sifatida qabul qilamiz
+    if (token.length === 6 && /^[A-Z0-9]+$/i.test(token)) {
+      const linkRes = await fetch(`${process.env.APP_URL}/api/telegram/link`, {
+        method: "POST",
+        headers: { 
+           "Content-Type": "application/json",
+          "x-telegram-bot-secret": process.env.TELEGRAM_BOT_INTERNAL_SECRET || ""
+        },
+        body: JSON.stringify({ code: token.toUpperCase(), telegramUserId: ctx.from?.id })
+      });
+      if (linkRes.ok) {
+        const linkData = await linkRes.json();
+        return ctx.reply(`Tabriklaymiz, ${linkData.name}! Hisobingiz muvaffaqiyatli tasdiqlandi va bog'landi.`);
+      } else {
+        const errData = await linkRes.json();
+        return ctx.reply(errData.error || "Bog'lashda xatolik yuz berdi. Kod muddati tugagan bo'lishi mumkin.");
+      }
+    }
+
+    // Aks holda u fayl olish tokni bo'lishi mumkin
     const res = await fetch(`${process.env.APP_URL}/api/telegram/verify/${token}`);
     if (!res.ok) {
       return ctx.reply("Havola eskirgan yoki noto'g'ri.");
@@ -85,7 +104,8 @@ bot.command("mahsulot", async (ctx) => {
 bot.command("new_listings", async (ctx) => {
   try {
     const res = await fetch(`${process.env.APP_URL}/api/startups?limit=5`);
-    const startups = await res.json();
+    const data = await res.json();
+    const startups = data.startups || data || [];
     
     if (!startups.length) return ctx.reply("Hozircha yangi elonlar yo'q.");
     
@@ -103,7 +123,8 @@ bot.command("new_listings", async (ctx) => {
 bot.command("top_deals", async (ctx) => {
   try {
     const res = await fetch(`${process.env.APP_URL}/api/startups?isTop=true&limit=5`);
-    const startups = await res.json();
+    const data = await res.json();
+    const startups = data.startups || data || [];
     
     if (!startups.length) return ctx.reply("Hozircha TOP elonlar yo'q.");
     

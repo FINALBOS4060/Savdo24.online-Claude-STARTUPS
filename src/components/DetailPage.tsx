@@ -175,12 +175,8 @@ export default function DetailPage({
   };
 
   const checkPurchase = async () => {
-    const token = localStorage.getItem('savdo24_token');
-    if (!token) return;
     try {
-      const res = await fetch('/api/payments/my', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await fetch('/api/payments/my');
       if (res.ok) {
         const data = await res.json();
         const completed = data.payments?.find(
@@ -248,12 +244,10 @@ export default function DetailPage({
     }
     setIsSubmittingReview(true);
     try {
-      const token = localStorage.getItem('savdo24_token');
       const res = await fetch('/api/reviews', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           rating: reviewRating,
@@ -286,12 +280,10 @@ export default function DetailPage({
     }
     setIsSubmittingDispute(true);
     try {
-      const token = localStorage.getItem('savdo24_token');
       const res = await fetch('/api/disputes', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           paymentId,
@@ -344,7 +336,6 @@ export default function DetailPage({
 
     setIsSubmittingIdea(true);
     try {
-      const token = localStorage.getItem('savdo24_token');
       const body: any = {
         content: newIdeaContent,
       };
@@ -352,16 +343,11 @@ export default function DetailPage({
         body.authorName = newIdeaAuthor;
       }
 
-      const headers: any = {
-        'Content-Type': 'application/json',
-      };
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
       const res = await fetch(`/api/startups/${startup.id}/ideas`, {
         method: 'POST',
-        headers,
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(body),
       });
 
@@ -443,12 +429,10 @@ export default function DetailPage({
       return;
     }
     try {
-      const token = localStorage.getItem('savdo24_token');
       const res = await fetch('/api/conversations', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ startupId: startup.id, sellerId: startup.userId })
       });

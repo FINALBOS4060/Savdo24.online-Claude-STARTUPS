@@ -44,17 +44,10 @@ export default function CheckoutPage({
   useEffect(() => {
     const initPayment = async () => {
       try {
-        const token = localStorage.getItem('savdo24_token');
-        if (!token) {
-          onActionToast("Iltimos, avval profil bo'limidan tizimga kiring.");
-          return;
-        }
-
         const res = await fetch('/api/payments/create', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({
             amount,
@@ -94,10 +87,9 @@ export default function CheckoutPage({
         setDiscountData(data);
         onActionToast(`Chegirma qo'llanildi: ${data.discountPercent}% (${data.referrerName} tomonidan)`);
         // We need to re-init payment with referral code
-        const token = localStorage.getItem('savdo24_token');
         const payRes = await fetch('/api/payments/create', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ amount, startupId, referralCode })
         });
         if (payRes.ok) {
@@ -120,12 +112,7 @@ export default function CheckoutPage({
 
     const pollInterval = setInterval(async () => {
       try {
-        const token = localStorage.getItem('savdo24_token');
-        const res = await fetch(`/api/payments/status/${activeOrderId}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
+        const res = await fetch(`/api/payments/status/${activeOrderId}`);
         if (res.ok) {
           const data = await res.json();
           if (data.status === 'completed') {
@@ -180,12 +167,7 @@ export default function CheckoutPage({
     }
     setIsChecking(true);
     try {
-      const token = localStorage.getItem('savdo24_token');
-      const res = await fetch(`/api/payments/status/${activeOrderId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const res = await fetch(`/api/payments/status/${activeOrderId}`);
       if (res.ok) {
         const data = await res.json();
         if (data.status === 'completed') {

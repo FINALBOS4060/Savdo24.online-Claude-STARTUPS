@@ -57,6 +57,8 @@ export interface UserProfileData {
   vipExpiresAt?: string;
   joinDate: string;
   avatarUrl: string;
+  coverUrl?: string;
+  telegramLinkCode?: string;
   averageRating?: number;
   totalReviews?: number;
 }

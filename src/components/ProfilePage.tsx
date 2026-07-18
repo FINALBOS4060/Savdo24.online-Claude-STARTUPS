@@ -135,7 +135,9 @@ export default function ProfilePage({
   const [estimatedPrice, setEstimatedPrice] = useState(0);
   const [vipDays, setVipDays] = useState(30);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const coverInputRef = React.useRef<HTMLInputElement>(null);
 
   const generateLinkCode = async () => {
     try {
@@ -143,9 +145,14 @@ export default function ProfilePage({
       if (res.ok) {
         const data = await res.json();
         setLinkCode(data.code);
+        onActionToast("Telegram bog'lash kodi generatsiya qilindi.");
+      } else {
+        const err = await res.json();
+        onActionToast(err.error || "Kod generatsiya qilishda xatolik yuz berdi.");
       }
     } catch (err) {
       console.error("Generate link code error:", err);
+      onActionToast("Tarmoq xatosi yuz berdi.");
     }
   };
 
@@ -189,6 +196,46 @@ export default function ProfilePage({
     }
   };
 
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingCover(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const patchRes = await fetch('/api/users/me', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ coverUrl: data.url })
+        });
+        if (patchRes.ok) {
+          setUser(prev => ({ ...prev, coverUrl: data.url }));
+          onActionToast("Muqova rasmi muvaffaqiyatli yangilandi!");
+        } else {
+          const errData = await patchRes.json();
+          onActionToast(errData.error || "Rasm manzilini saqlashda xatolik.");
+        }
+      } else {
+        const errData = await res.json();
+        onActionToast(errData.error || "Rasm yuklashda xatolik.");
+      }
+    } catch (err) {
+      console.error("Cover upload error:", err);
+      onActionToast("Tarmoq xatosi yuz berdi.");
+    } finally {
+      setIsUploadingCover(false);
+    }
+  };
+
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -206,19 +253,27 @@ export default function ProfilePage({
 
       if (res.ok) {
         const data = await res.json();
-        setEditAvatar(data.url);
         // Automatically save to profile
-        await fetch('/api/users/me', {
+        const patchRes = await fetch('/api/users/me', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ avatarUrl: data.url })
         });
+        if (patchRes.ok) {
+          setEditAvatar(data.url);
+          setUser(prev => ({ ...prev, avatarUrl: data.url }));
+          onActionToast("Profil rasmi muvaffaqiyatli yangilandi!");
+        } else {
+          const errData = await patchRes.json();
+          onActionToast(errData.error || "Rasm manzilini saqlashda xatolik.");
+        }
       } else {
         const errData = await res.json();
-        alert(errData.error || "Rasm yuklashda xatolik.");
+        onActionToast(errData.error || "Rasm yuklashda xatolik.");
       }
     } catch (err) {
       console.error("Avatar upload error:", err);
+      onActionToast("Tarmoq xatosi yuz berdi.");
     } finally {
       setIsUploadingAvatar(false);
     }
@@ -244,15 +299,30 @@ export default function ProfilePage({
 
   const savedStartups = startups.filter((s) => bookmarkedIds.includes(s.id));
 
-  const handleSaveSettings = (e: React.FormEvent) => {
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    setUser((prev) => ({
-      ...prev,
-      name: editName,
-      role: editRole,
-      avatarUrl: editAvatar,
-    }));
-    onActionToast('Profil sozlamalari muvaffaqiyatli saqlandi!');
+    try {
+      const res = await fetch('/api/users/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editName, role: editRole, avatarUrl: editAvatar }),
+      });
+      if (res.ok) {
+        setUser((prev) => ({
+          ...prev,
+          name: editName,
+          role: editRole,
+          avatarUrl: editAvatar,
+        }));
+        onActionToast('Profil sozlamalari muvaffaqiyatli saqlandi!');
+      } else {
+        const err = await res.json();
+        onActionToast(err.error || "Sozlamalarni saqlashda xatolik yuz berdi.");
+      }
+    } catch (err) {
+      console.error(err);
+      onActionToast("Tarmoq xatosi yuz berdi.");
+    }
   };
 
   const handleCardClick = (id: string) => {
@@ -262,20 +332,54 @@ export default function ProfilePage({
 
   return (
     <div className="space-y-8 animate-fade-in text-left">
+      {!user.emailVerified && user.id && (
+        <div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <span className="material-symbols-outlined text-yellow-400 mt-0.5">warning</span>
+            <div>
+              <h4 className="text-white font-bold text-sm">Hisobingiz tasdiqlanmagan</h4>
+              <p className="text-on-primary-container text-xs mt-1">
+                Hisobingizni tasdiqlash uchun <b>@Savdo24_Official_bot</b> botiga <b>/start {linkCode || user.telegramLinkCode || "kod_olish_uchun_bosing"}</b> deb yozing.
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={generateLinkCode}
+            className="shrink-0 bg-yellow-400 text-black px-4 py-2 rounded-lg text-xs font-bold hover:bg-yellow-300 transition-colors"
+          >
+            Yangi kod olish
+          </button>
+        </div>
+      )}
+
       {/* Profile Header Section */}
       <header className="relative mb-10 bg-primary-container border border-outline-variant/20 rounded-2xl overflow-hidden pb-6">
         <div className="h-48 w-full bg-gradient-to-br from-[#131b2e] to-[#0b1426] relative overflow-hidden flex items-center justify-center">
+          {user.coverUrl ? (
+            <img src={user.coverUrl} alt="Cover" className="absolute inset-0 w-full h-full object-cover" />
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0b1426] to-transparent"></div>
+          )}
           {/* Subtle network connection pattern overlay */}
           <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#fdc338_1px,transparent_1px)] [background-size:16px_16px]"></div>
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0b1426] to-transparent"></div>
+          
+          <input 
+            type="file" 
+            ref={coverInputRef} 
+            onChange={handleCoverUpload} 
+            accept="image/*" 
+            className="hidden" 
+          />
           <button
-            onClick={() => {
-              setIsEditingCover(!isEditingCover);
-              onActionToast('Muqova rasmi dinamik ravishda yangilandi.');
-            }}
-            className="absolute top-4 right-4 bg-black/60 hover:bg-black/80 text-white border border-white/20 text-xs font-bold py-1.5 px-3 rounded-lg flex items-center gap-1.5 transition-all"
+            onClick={() => coverInputRef.current?.click()}
+            disabled={isUploadingCover}
+            className="absolute top-4 right-4 bg-black/60 hover:bg-black/80 text-white border border-white/20 text-xs font-bold py-1.5 px-3 rounded-lg flex items-center gap-1.5 transition-all disabled:opacity-50"
           >
-            <span className="material-symbols-outlined text-sm">photo_camera</span>
+            {isUploadingCover ? (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            ) : (
+              <span className="material-symbols-outlined text-sm">photo_camera</span>
+            )}
             Bannerni tahrirlash
           </button>
         </div>
@@ -1226,6 +1330,28 @@ export default function ProfilePage({
                 accept="image/*" 
                 className="hidden" 
               />
+              
+              <div className="mt-4 pt-4 border-t border-outline-variant/10 w-full space-y-3">
+                <p className="text-[10px] font-bold text-on-primary-container text-center uppercase tracking-widest">Yoki tayyor variantni tanlang</p>
+                <div className="flex justify-center gap-3">
+                  {[
+                    '/default-avatar.jpg',
+                    `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=0D8ABC&color=fff`,
+                    `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`,
+                  ].map((url, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setEditAvatar(url)}
+                      className={`w-10 h-10 rounded-full overflow-hidden border-2 transition-all ${
+                        editAvatar === url ? 'border-secondary-container scale-110 shadow-lg' : 'border-transparent opacity-50 hover:opacity-100'
+                      }`}
+                    >
+                      <img src={url} alt="Avatar variant" className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             <div className="space-y-2">

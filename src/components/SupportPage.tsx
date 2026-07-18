@@ -39,13 +39,30 @@ export default function SupportPage({ setView }: { setView: (view: string) => vo
     setOpenIndex(openIndex === index ? null : index);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (email && subject && message) {
-      setFormSubmitted(true);
-      setEmail('');
-      setSubject('');
-      setMessage('');
+      try {
+        const res = await fetch('/api/support', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ email, subject, message })
+        });
+        
+        if (res.ok) {
+          setFormSubmitted(true);
+          setEmail('');
+          setSubject('');
+          setMessage('');
+        } else {
+          const err = await res.json();
+          alert(err.error || "Xatolik yuz berdi.");
+        }
+      } catch (err) {
+        alert("Server bilan ulanishda xatolik.");
+      }
     }
   };
 

@@ -1,5 +1,6 @@
 import express, { Request, Response, NextFunction } from "express";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import rateLimit from "express-rate-limit";
 import { execSync } from "child_process";
@@ -25,7 +26,7 @@ import dotenv from "dotenv";
 import {
   ideaLimiter,
   upvoteLimiter,
-  reportLimiter,
+  reportLimiter, supportLimiter,
   uploadLimiter,
   paymentStatusLimiter,
   globalLimiter
@@ -82,23 +83,24 @@ process.on("uncaughtException", (err) => {
 });
 
 // Environment variable validation
-export const JWT_SECRET = (process.env.JWT_SECRET && process.env.JWT_SECRET.length >= 32)
-  ? process.env.JWT_SECRET
-  : (() => {
-      console.warn("⚠️ Ogohlantirish: JWT_SECRET topilmadi yoki juda qisqa. Vaqtinchalik kalit ishlatilmoqda.");
-      const fallback = "dev_default_jwt_secret_must_be_at_least_32_characters_long_for_security";
-      process.env.JWT_SECRET = fallback;
-      return fallback;
-    })();
+function getSecret(envVar: string, minLength: number): string {
+  const value = process.env[envVar];
+  if (value && value.length >= minLength) {
+    return value;
+  }
+  if (process.env.NODE_ENV === "production") {
+    console.error(`XATOLIK: ${envVar} muhit o'zgaruvchisi production'da to'g'ri sozlanmagan (kamida ${minLength} belgi bo'lishi shart). Server ishga tushirilmaydi.`);
+    process.exit(1);
+  }
+  console.warn(`⚠️ ${envVar} topilmadi — faqat shu sessiya uchun tasodifiy vaqtinchalik kalit generatsiya qilindi (development rejimi).`);
+  return crypto.randomBytes(32).toString('hex');
+}
 
-const ENCRYPTION_KEY = (process.env.ENCRYPTION_KEY && process.env.ENCRYPTION_KEY.length >= 32)
-  ? process.env.ENCRYPTION_KEY
-  : (() => {
-      console.warn("⚠️ Ogohlantirish: ENCRYPTION_KEY topilmadi yoki juda qisqa. Vaqtinchalik kalit ishlatilmoqda.");
-      const fallback = "dev_default_encryption_key_must_be_at_least_32_characters_long_for_security";
-      process.env.ENCRYPTION_KEY = fallback;
-      return fallback;
-    })();
+export const JWT_SECRET = getSecret("JWT_SECRET", 32);
+const ENCRYPTION_KEY = getSecret("ENCRYPTION_KEY", 32);
+
+// Telegram file URL cache
+const fileUrlCache = new Map<string, { url: string; expiresAt: number }>();
 
 // Coingate production check
 if (process.env.NODE_ENV === "production" && !process.env.COINGATE_API_TOKEN) {
@@ -137,6 +139,12 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
 }
 
 const isPostgres = !!(process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith("postgres"));
+
+if (process.env.NODE_ENV === "production" && !isPostgres) {
+  console.error("XATOLIK: Production muhitida DATABASE_URL to'g'ri PostgreSQL ulanish satri bilan sozlanmagan! Server ishga tushirilmaydi.");
+  process.exit(1);
+}
+
 export const prisma: any = isPostgres 
   ? new PGClient() 
   : new SQLiteClient({
@@ -276,6 +284,25 @@ async function autoReleaseEscrows() {
   }
 }
 
+async function expireTopBoosts() {
+  try {
+    const result = await prisma.startup.updateMany({
+      where: {
+        isTop: true,
+        topExpiresAt: { lt: new Date() }
+      },
+      data: {
+        isTop: false
+      }
+    });
+    if (result.count > 0) {
+      console.log(`[CRON] Expired ${result.count} top boosts.`);
+    }
+  } catch (err) {
+    console.error("Error in expireTopBoosts:", err);
+  }
+}
+
 async function sendWeeklyNewsletter() {
   try {
     const users = await prisma.user.findMany({ where: { emailVerified: true } });
@@ -338,7 +365,17 @@ async function sendWeeklyNewsletter() {
 }
 
 io.use((socket, next) => {
-  const token = socket.handshake.auth.token;
+  let token = socket.handshake.auth.token;
+  
+  if (!token && socket.handshake.headers.cookie) {
+    const cookies = socket.handshake.headers.cookie.split(';').reduce((acc: any, cookie) => {
+      const [name, value] = cookie.trim().split('=');
+      acc[name] = value;
+      return acc;
+    }, {});
+    token = cookies.token;
+  }
+
   if (!token) return next(new Error("Autentifikatsiya xatosi: Token topilmadi"));
   jwt.verify(token, JWT_SECRET, (err: any, decoded: any) => {
     if (err) return next(new Error("Autentifikatsiya xatosi: Yaroqsiz token"));
@@ -358,7 +395,7 @@ const PORT = 3000;
 app.get('/api/health', async (req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    res.json({ status: 'ok', database: 'connected', timestamp: new Date() });
+    res.json({ status: 'ok', database: isPostgres ? 'postgresql' : 'sqlite', timestamp: new Date() });
   } catch {
     res.status(503).json({ status: 'error', database: 'disconnected' });
   }
@@ -810,7 +847,7 @@ async function seedDatabase() {
           image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCBLeM6mAr4LQY7zhSUG4tgZGKWNWY0ZRNIR_XhEKXt1jYMR02ExWAO3uckrzGgmvC4-PI7N-mHd9C8lXG-OAzJKBufMTKlpfMfSnEeJSF8e7heYGRKgRvFIrQkx5yKj_5vOLNyxFsKl_YskqkjY7SejckUabAB1QVAyOiWRo5Ue_LzWhq9IKtABXo9W9YyYvicDRVKj6KibiQpb0KoyemsI9t8PJjPQ3mmag3a-1LFqV51mgBVDlgsXJ1V6a0DitjRFPeVGsZmp5A',
           gallery: JSON.stringify([]),
           team: JSON.stringify([
-            { name: 'Jasur Mavlonov', role: 'Bosh Prompt Injener', imgUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Jasur' }
+            { name: 'Jasur Mavlonov', role: 'Bosh Prompt Injener', imgUrl: '/default-avatar.jpg' }
           ]),
           milestones: JSON.stringify([]),
           contactEmail: 'jasur@marketing-prompts.uz',
@@ -837,7 +874,7 @@ async function seedDatabase() {
           image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCF45geSO_QnC7nqx9b1yE0o1OYJZfrQnJjhANEdEVR8j-Ok2uwdCi8i8krhY_znOddGypsTbhhHierRgRTTKZ8T5krtxryW14MYjVW8LkZOw_oWJQkpETrnyoqvf-qLgl8ghvPsyc8u_IevPYo_bB7N0QDQng-xfzBwPFGAqLC9mU0UHebbsEAylgPdrBrN1e7j3ZoWCnjcJvypu4PUDfCdymvx6ozFz1oGPXG-ahwonvmeg-FPTQr5ecTEGXmM8xrWKatwsrYd38',
           gallery: JSON.stringify([]),
           team: JSON.stringify([
-            { name: 'Diana Smith', role: 'UI/UX & 3D Artist', imgUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Diana' }
+            { name: 'Diana Smith', role: 'UI/UX & 3D Artist', imgUrl: '/default-avatar.jpg' }
           ]),
           milestones: JSON.stringify([]),
           contactEmail: 'diana@creative-kits.com',
@@ -864,7 +901,7 @@ async function seedDatabase() {
           image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCBLeM6mAr4LQY7zhSUG4tgZGKWNWY0ZRNIR_XhEKXt1jYMR02ExWAO3uckrzGgmvC4-PI7N-mHd9C8lXG-OAzJKBufMTKlpfMfSnEeJSF8e7heYGRKgRvFIrQkx5yKj_5vOLNyxFsKl_YskqkjY7SejckUabAB1QVAyOiWRo5Ue_LzWhq9IKtABXo9W9YyYvicDRVKj6KibiQpb0KoyemsI9t8PJjPQ3mmag3a-1LFqV51mgBVDlgsXJ1V6a0DitjRFPeVGsZmp5A',
           gallery: JSON.stringify([]),
           team: JSON.stringify([
-            { name: 'Sardor Rahimov', role: 'AI muhandis', imgUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Sardor' }
+            { name: 'Sardor Rahimov', role: 'AI muhandis', imgUrl: '/default-avatar.jpg' }
           ]),
           milestones: JSON.stringify([]),
           contactEmail: 'sardor@uztranslate.ai',
@@ -891,7 +928,7 @@ async function seedDatabase() {
           image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCF45geSO_QnC7nqx9b1yE0o1OYJZfrQnJjhANEdEVR8j-Ok2uwdCi8i8krhY_znOddGypsTbhhHierRgRTTKZ8T5krtxryW14MYjVW8LkZOw_oWJQkpETrnyoqvf-qLgl8ghvPsyc8u_IevPYo_bB7N0QDQng-xfzBwPFGAqLC9mU0UHebbsEAylgPdrBrN1e7j3ZoWCnjcJvypu4PUDfCdymvx6ozFz1oGPXG-ahwonvmeg-FPTQr5ecTEGXmM8xrWKatwsrYd38',
           gallery: JSON.stringify([]),
           team: JSON.stringify([
-            { name: 'Diana Smith', role: 'Digital Artist & Prompt Expert', imgUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Diana' }
+            { name: 'Diana Smith', role: 'Digital Artist & Prompt Expert', imgUrl: '/default-avatar.jpg' }
           ]),
           milestones: JSON.stringify([]),
           contactEmail: 'diana@creative-prompts.com',
@@ -918,7 +955,7 @@ async function seedDatabase() {
           image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCBLeM6mAr4LQY7zhSUG4tgZGKWNWY0ZRNIR_XhEKXt1jYMR02ExWAO3uckrzGgmvC4-PI7N-mHd9C8lXG-OAzJKBufMTKlpfMfSnEeJSF8e7heYGRKgRvFIrQkx5yKj_5vOLNyxFsKl_YskqkjY7SejckUabAB1QVAyOiWRo5Ue_LzWhq9IKtABXo9W9YyYvicDRVKj6KibiQpb0KoyemsI9t8PJjPQ3mmag3a-1LFqV51mgBVDlgsXJ1V6a0DitjRFPeVGsZmp5A',
           gallery: JSON.stringify([]),
           team: JSON.stringify([
-            { name: 'Abdurahmon G\'ofurov', role: 'No-Code Ishlab Chiquvchi', imgUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Abdu' }
+            { name: 'Abdurahmon G\'ofurov', role: 'No-Code Ishlab Chiquvchi', imgUrl: '/default-avatar.jpg' }
           ]),
           milestones: JSON.stringify([]),
           contactEmail: 'abdu@notion-dev.uz',
@@ -1182,7 +1219,7 @@ app.post("/api/auth/google", async (req: Request, res: Response) => {
           emailVerified: true,
           role: "Xaridor",
           joinDate: new Date().toLocaleDateString("uz-UZ", { year: "numeric", month: "long" }) + "-yil",
-          avatarUrl: payload.picture || `https://api.dicebear.com/7.x/adventurer/svg?seed=${payload.email}`,
+          avatarUrl: payload.picture || `/default-avatar.jpg`,
         },
       });
     } else if (!user.googleId) {
@@ -1210,6 +1247,52 @@ app.post("/api/auth/google", async (req: Request, res: Response) => {
 });
 
 // POST /api/auth/forgot-password and reset-password are handled by authRouter
+
+// PATCH /api/users/me — Profilni tahrirlash
+app.patch("/api/users/me", authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { name, role, avatarUrl, coverUrl } = req.body;
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        name,
+        role,
+        avatarUrl,
+        coverUrl
+      },
+      select: { id: true, name: true, email: true, role: true, avatarUrl: true, coverUrl: true, isVip: true }
+    });
+
+    res.json(updatedUser);
+  } catch (err) {
+    console.error("Update profile error:", err);
+    res.status(500).json({ error: "Profilni saqlashda xatolik yuz berdi." });
+  }
+});
+
+// POST /api/users/me/telegram-link-code — Telegram bilan bog'lash kodini generatsiya qilish
+app.post("/api/users/me/telegram-link-code", authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+    
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        telegramLinkCode: code,
+        telegramLinkCodeExpires: expiresAt
+      }
+    });
+    
+    res.json({ code });
+  } catch (err) {
+    console.error("Generate telegram link code error:", err);
+    res.status(500).json({ error: "Kod generatsiya qilishda xatolik yuz berdi." });
+  }
+});
 
 // GET /api/users/me/earnings — Foydalanuvchining daromadlari
 app.get("/api/users/me/earnings", authenticateToken, async (req: AuthRequest, res: Response) => {
@@ -1368,10 +1451,14 @@ app.post("/api/escrow/release", authenticateToken, async (req: AuthRequest, res:
       return res.status(400).json({ error: "Escrow holati noto'g'ri." });
     }
 
-    await prisma.escrowPayment.update({
-      where: { id: escrow.id },
+    const updated = await prisma.escrowPayment.updateMany({
+      where: { id: escrow.id, status: "held" },
       data: { status: "released", releasedAt: new Date() }
     });
+
+    if (updated.count === 0) {
+      return res.status(409).json({ error: "Bu mablag' allaqachon ozod qilingan yoki holati o'zgargan." });
+    }
 
     // Notify seller
     if (escrow.payment.startup?.userId) {
@@ -2232,7 +2319,6 @@ app.post("/api/vip/create", authenticateToken, async (req: AuthRequest, res: Res
 // POST /api/startups — yangi startap qo'shish
 app.post("/api/startups", authenticateToken, async (req: AuthRequest, res: Response) => {
   const {
-    id,
     name,
     slogan,
     description,
@@ -2253,7 +2339,7 @@ app.post("/api/startups", authenticateToken, async (req: AuthRequest, res: Respo
     deliveryUrl,
   } = req.body;
 
-  if (!id || !name || !description || !category || price === undefined) {
+  if (!name || !description || !category || price === undefined) {
     return res.status(400).json({ error: "Majburiy maydonlar to'ldirilmagan." });
   }
 
@@ -2268,14 +2354,27 @@ app.post("/api/startups", authenticateToken, async (req: AuthRequest, res: Respo
       return res.status(403).json({ error: "Startap e'lon qilish uchun iltimos avval email manzilingizni tasdiqlang." });
     }
 
-    const existing = await prisma.startup.findUnique({ where: { id } });
-    if (existing) {
-      return res.status(400).json({ error: "Ushbu identifikatorli (ID) loyiha allaqachon mavjud." });
+    // Generate unique slug
+    let baseSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    if (!baseSlug) baseSlug = 'startup';
+    
+    let slug = baseSlug;
+    let count = 0;
+    while (true) {
+      const existing = await prisma.startup.findUnique({ where: { id: slug } });
+      if (!existing) break;
+      count++;
+      slug = `${baseSlug}-${Math.random().toString(36).slice(2, 7)}`;
+      // If even with random suffix it exists (unlikely), try again. 
+      // But limit attempts to avoid infinite loop
+      if (count > 5) {
+        return res.status(400).json({ error: "Ushbu nom band, iltimos biroz boshqacharoq nom tanlang." });
+      }
     }
 
     const newStartup = await prisma.startup.create({
       data: {
-        id,
+        id: slug,
         name,
         slogan: slogan || "",
         description,
@@ -2564,7 +2663,7 @@ app.post("/api/startups/:id/ideas", ideaLimiter, async (req: Request, res: Respo
     res.status(201).json(newIdea);
   } catch (err: any) {
     console.error("POST idea error:", err);
-    res.status(500).json({ error: "G'oyani chop etishda xatolik yuz berdi: " + err.message });
+    res.status(500).json({ error: "Xatolik yuz berdi, keyinroq qayta urinib ko'ring." });
   }
 });
 
@@ -2705,7 +2804,7 @@ app.post("/api/upload", authenticateToken, uploadLimiter, upload.single("file"),
     const tgData: any = await tgResponse.json();
     if (!tgData.ok) {
       console.error("Telegram upload error:", tgData);
-      return res.status(500).json({ error: `Telegram'ga yuklashda xatolik: ${tgData.description}` });
+      return res.status(500).json({ error: "Xatolik yuz berdi, keyinroq qayta urinib ko'ring." });
     }
 
     const fileId = tgData.result.document?.file_id || tgData.result.photo?.[tgData.result.photo.length - 1]?.file_id;
@@ -2721,7 +2820,7 @@ app.post("/api/upload", authenticateToken, uploadLimiter, upload.single("file"),
     });
   } catch (err: any) {
     console.error("POST /api/upload error:", err);
-    res.status(500).json({ error: "Rasm yuklashda xatolik yuz berdi: " + err.message });
+    res.status(500).json({ error: "Xatolik yuz berdi, keyinroq qayta urinib ko'ring." });
   }
 });
 
@@ -2729,6 +2828,13 @@ app.post("/api/upload", authenticateToken, uploadLimiter, upload.single("file"),
 app.get("/api/files/:fileId", async (req, res) => {
   try {
     const { fileId } = req.params;
+
+    // Check cache first
+    const cached = fileUrlCache.get(fileId);
+    if (cached && cached.expiresAt > Date.now()) {
+      return res.redirect(cached.url);
+    }
+
     const telegramBotToken = await getSetting("TELEGRAM_BOT_TOKEN");
     
     if (!telegramBotToken) {
@@ -2746,6 +2852,10 @@ app.get("/api/files/:fileId", async (req, res) => {
 
     // 2. Redirect to the actual file URL on Telegram's servers
     const fileUrl = `https://api.telegram.org/file/bot${telegramBotToken}/${pathData.result.file_path}`;
+    
+    // Set cache (expires in 50 minutes)
+    fileUrlCache.set(fileId, { url: fileUrl, expiresAt: Date.now() + 50 * 60 * 1000 });
+    
     res.redirect(fileUrl);
   } catch (err) {
     console.error("GET /api/files/:fileId error:", err);
@@ -3324,6 +3434,51 @@ app.post("/api/payments/webhook", async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error("Webhook processing error:", err);
     res.status(500).json({ error: "Webhook processing failed." });
+  }
+});
+
+// POST /api/telegram/link — User hisobini bot bilan bog'lash
+app.post("/api/telegram/link", async (req: Request, res: Response) => {
+  try {
+    const secret = req.headers["x-telegram-bot-secret"];
+    const internalSecret = await getSetting("TELEGRAM_BOT_INTERNAL_SECRET") || process.env.TELEGRAM_BOT_INTERNAL_SECRET;
+    if (!internalSecret || !secret || typeof secret !== "string" || !safeCompare(secret, internalSecret)) {
+      return res.status(403).json({ error: "Ruxsat etilmagan." });
+    }
+
+    const { code, telegramUserId } = req.body;
+    if (!code || !telegramUserId) {
+      return res.status(400).json({ error: "Kod va telegramUserId majburiy." });
+    }
+
+    const user = await prisma.user.findFirst({
+      where: { telegramLinkCode: code }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "Noto'g'ri kod." });
+    }
+
+    if (user.telegramLinkCodeExpires && new Date() > user.telegramLinkCodeExpires) {
+      return res.status(400).json({ error: "Kodning amal qilish muddati tugagan." });
+    }
+
+    // Foydalanuvchini yangilash
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        telegramUserId: telegramUserId.toString(),
+        telegramLinkCode: null,
+        telegramLinkCodeExpires: null,
+        verified: true,
+        emailVerified: true
+      }
+    });
+
+    res.json({ success: true, name: user.name });
+  } catch (err: any) {
+    console.error("Telegram link error:", err);
+    res.status(500).json({ error: "Hisobni bog'lashda xatolik yuz berdi." });
   }
 });
 
@@ -3928,19 +4083,24 @@ app.get("/api/admin/stats", authenticateToken, requireAdmin, async (req: AuthReq
     const [
       totalUsers,
       totalActiveStartups,
-      completedPayments,
-      monthlyPayments,
+      stats,
+      monthlyStats,
       lastDisputes,
       lastReports
     ] = await Promise.all([
       prisma.user.count(),
       prisma.startup.count({ where: { status: "active", soldStatus: "sotuvda" } }),
-      prisma.payment.findMany({ where: { status: "completed" } }),
-      prisma.payment.findMany({ 
+      prisma.payment.aggregate({
+        where: { status: "completed" },
+        _sum: { amount: true, platformFeeAmount: true },
+        _count: true
+      }),
+      prisma.payment.aggregate({ 
         where: { 
           status: "completed",
           createdAt: { gte: firstDayOfMonth }
-        }
+        },
+        _sum: { platformFeeAmount: true }
       }),
       prisma.dispute.findMany({
         take: 5,
@@ -3953,16 +4113,16 @@ app.get("/api/admin/stats", authenticateToken, requireAdmin, async (req: AuthReq
       })
     ]);
 
-    const totalVolume = completedPayments.reduce((acc: number, p: any) => acc + p.amount, 0);
-    const totalCommission = completedPayments.reduce((acc: number, p: any) => acc + (p.platformFeeAmount || 0), 0);
-    const monthlyCommission = monthlyPayments.reduce((acc: number, p: any) => acc + (p.platformFeeAmount || 0), 0);
+    const totalVolume = stats._sum.amount || 0;
+    const totalCommission = stats._sum.platformFeeAmount || 0;
+    const monthlyCommission = monthlyStats._sum.platformFeeAmount || 0;
 
     const openDisputes = await prisma.dispute.count({ where: { status: "open" } });
 
     res.json({
       totalUsers,
       totalActiveStartups,
-      totalCompletedSales: completedPayments.length,
+      totalCompletedSales: stats._count || 0,
       totalCommission,
       monthlyCommission,
       totalVolume,
@@ -3995,7 +4155,78 @@ app.get("/api/admin/stats", authenticateToken, requireAdmin, async (req: AuthReq
 
 
 // POST /api/reports — Shikoyat qilish (Foydalanuvchi)
-app.post("/api/reports", authenticateToken, reportLimiter, async (req: AuthRequest, res: Response) => {
+
+// POST /api/support
+app.post("/api/support", supportLimiter, async (req, res) => {
+  try {
+    const { email, subject, message } = req.body;
+    if (!email || !subject || !message) {
+      return res.status(400).json({ error: "Barcha maydonlarni to'ldiring." });
+    }
+    
+    const ticket = await prisma.supportTicket.create({
+      data: { email, subject, message }
+    });
+
+    try {
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS
+        }
+      });
+      await transporter.sendMail({
+        from: '"Savdo24 Support" <noreply@savdo24.uz>',
+        to: process.env.EMAIL_USER || "admin@savdo24.uz",
+        subject: `Yangi murojaat: ${subject}`,
+        html: `
+          <h3>Yangi murojaat kelib tushdi</h3>
+          <p><strong>Email:</strong> ${email}</p>
+          <p><strong>Mavzu:</strong> ${subject}</p>
+          <p><strong>Xabar:</strong> ${message}</p>
+        `
+      });
+    } catch (emailErr) {
+      console.error("Support email sending failed:", emailErr);
+    }
+
+    res.status(201).json({ success: true, message: "Murojaatingiz yuborildi." });
+  } catch (err) {
+    console.error("Support POST error:", err);
+    res.status(500).json({ error: "Xatolik yuz berdi." });
+  }
+});
+
+// GET /api/admin/support-tickets
+app.get("/api/admin/support-tickets", authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const tickets = await prisma.supportTicket.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(tickets);
+  } catch (err) {
+    console.error("Get support tickets error:", err);
+    res.status(500).json({ error: "Xatolik yuz berdi." });
+  }
+});
+
+// PATCH /api/admin/support-tickets/:id/status
+app.patch("/api/admin/support-tickets/:id/status", authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { status } = req.body;
+    const ticket = await prisma.supportTicket.update({
+      where: { id: req.params.id },
+      data: { status }
+    });
+    res.json(ticket);
+  } catch (err) {
+    console.error("Update ticket error:", err);
+    res.status(500).json({ error: "Xatolik yuz berdi." });
+  }
+});
+
+app.post("/api/reports", authenticateToken, reportLimiter, supportLimiter, async (req: AuthRequest, res: Response) => {
   const { targetType, targetId, reason, description } = req.body;
 
   if (!targetType || !targetId || !reason) {
@@ -4398,6 +4629,8 @@ async function seedSettings() {
 
 // Initialize Express + Vite Setup
 async function start() {
+  console.log(isPostgres ? "✅ PostgreSQL bazasiga ulanildi (production)" : "⚠️  SQLite (dev.db) ishlatilyapti — bu faqat lokal rivojlantirish uchun!");
+  
   if (isPostgres) {
     try {
       console.log("DATABASE_URL found. Deploying PostgreSQL migrations...");
@@ -4500,10 +4733,23 @@ app.patch("/api/admin/categories/:id", authenticateToken, requireAdmin, async (r
 });
 
 app.delete("/api/admin/categories/:id", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
   try {
-    await prisma.category.delete({ where: { id: req.params.id } });
+    // Check if category is used by any startups
+    const startupCount = await prisma.startup.count({
+      where: { category: id }
+    });
+
+    if (startupCount > 0) {
+      return res.status(400).json({ 
+        error: `Bu kategoriyada ${startupCount} ta e'lon mavjud. Avval ularni boshqa kategoriyaga ko'chiring yoki o'chiring.` 
+      });
+    }
+
+    await prisma.category.delete({ where: { id } });
     res.json({ success: true });
   } catch (err) {
+    console.error("DELETE /api/admin/categories/:id error:", err);
     res.status(500).json({ error: "Kategoriyani o'chirishda xatolik." });
   }
 });
@@ -4593,6 +4839,83 @@ app.get("/sitemap.xml", async (req: Request, res: Response) => {
   }
 });
 
+// Dynamic SEO for Startup Pages
+const botAgents = [
+  "facebookexternalhit",
+  "TelegramBot",
+  "Twitterbot",
+  "slackbot",
+  "LinkedInBot",
+  "WhatsApp",
+  "Googlebot",
+  "Bingbot"
+];
+
+app.get("/startup/:id", async (req, res, next) => {
+  const userAgent = req.headers["user-agent"] || "";
+  const isBot = botAgents.some(bot => userAgent.toLowerCase().includes(bot.toLowerCase()));
+
+  // User instructions mentioned "ayniqsa ijtimoiy tarmoq botlari", 
+  // but it's safer to always serve dynamic tags for shared links even for humans.
+  // However, I will follow the intent: bot check is a good filter to avoid overhead for humans if desired.
+  // But shared links previews ONLY happen via bots.
+  if (!isBot && process.env.NODE_ENV !== "production") {
+    return next();
+  }
+
+  try {
+    const { id } = req.params;
+    const startup = await prisma.startup.findUnique({ where: { id } });
+
+    if (!startup) {
+      return next();
+    }
+
+    const distPath = path.join(process.cwd(), "dist");
+    const indexPath = process.env.NODE_ENV === "production" 
+      ? path.join(distPath, "index.html")
+      : path.join(process.cwd(), "index.html");
+
+    if (!fs.existsSync(indexPath)) {
+      return next();
+    }
+
+    let html = fs.readFileSync(indexPath, "utf8");
+    const appUrl = await getSetting("APP_URL") || "https://savdo24.online";
+
+    const title = `${startup.name} — Savdo24`;
+    const description = startup.description.substring(0, 160).replace(/"/g, "&quot;");
+    let image = startup.image || "https://savdo24.online/og-image.png";
+    if (image.startsWith("/")) {
+      image = `${appUrl}${image}`;
+    }
+    const url = `${appUrl}/startup/${id}`;
+
+    // Replace Title
+    html = html.replace(/<title>.*?<\/title>/g, `<title>${title}</title>`);
+    
+    // Replace Meta Description
+    html = html.replace(/<meta name="description" content=".*?" \/>/g, `<meta name="description" content="${description}" />`);
+    
+    // Replace OG Tags
+    html = html.replace(/<meta property="og:url" content=".*?" \/>/g, `<meta property="og:url" content="${url}" />`);
+    html = html.replace(/<meta property="og:title" content=".*?" \/>/g, `<meta property="og:title" content="${title}" />`);
+    html = html.replace(/<meta property="og:description" content=".*?" \/>/g, `<meta property="og:description" content="${description}" />`);
+    html = html.replace(/<meta property="og:image" content=".*?" \/>/g, `<meta property="og:image" content="${image}" />`);
+
+    // Replace Twitter Tags
+    html = html.replace(/<meta property="twitter:url" content=".*?" \/>/g, `<meta property="twitter:url" content="${url}" />`);
+    html = html.replace(/<meta property="twitter:title" content=".*?" \/>/g, `<meta property="twitter:title" content="${title}" />`);
+    html = html.replace(/<meta property="twitter:description" content=".*?" \/>/g, `<meta property="twitter:description" content="${description}" />`);
+    html = html.replace(/<meta property="twitter:image" content=".*?" \/>/g, `<meta property="twitter:image" content="${image}" />`);
+
+    res.send(html);
+  } catch (err) {
+    console.error("SEO Inject error:", err);
+    next();
+  }
+});
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -4612,11 +4935,86 @@ app.get("/sitemap.xml", async (req: Request, res: Response) => {
     res.status(500).json({ error: "Kutilmagan xatolik yuz berdi. Iltimos qaytadan urinib ko'ring." });
   });
 
+// Support endpoints
+const supportLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 support tickets per window
+  message: { error: "Siz juda ko'p so'rov yubordingiz. Iltimos, bir ozdan keyin qayta urinib ko'ring." }
+});
+
+app.post("/api/support", supportLimiter, async (req: Request, res: Response) => {
+  const { email, subject, message } = req.body;
+
+  if (!email || !subject || !message) {
+    return res.status(400).json({ error: "Barcha maydonlarni to'ldirish shart." });
+  }
+
+  try {
+    const ticket = await prisma.supportTicket.create({
+      data: {
+        email,
+        subject,
+        message,
+        status: "pending"
+      }
+    });
+
+    // Send notification email to admin
+    await sendEmail(
+      "admin@savdo24.uz",
+      `Yangi qo'llab-quvvatlash chiptasi: ${subject}`,
+      `
+      <div style="font-family: sans-serif; padding: 20px;">
+        <h2>Yangi qo'llab-quvvatlash chiptasi</h2>
+        <p><strong>Email:</strong> ${email}</p>
+        <p><strong>Mavzu:</strong> ${subject}</p>
+        <p><strong>Xabar:</strong></p>
+        <div style="background: #f4f4f4; padding: 15px; border-radius: 8px;">
+          ${message.replace(/\n/g, '<br>')}
+        </div>
+        <hr/>
+        <p>ID: ${ticket.id}</p>
+      </div>
+      `
+    );
+
+    res.json({ success: true, message: "Xabaringiz muvaffaqiyatli yuborildi. Tez orada siz bilan bog'lanamiz." });
+  } catch (err: any) {
+    console.error("Support ticket error:", err);
+    res.status(500).json({ error: "Xabarni yuborishda xatolik yuz berdi." });
+  }
+});
+
+// GET /api/support - adminlar uchun (ixtiyoriy, lekin foydali)
+app.get("/api/support", authenticateToken, async (req: Request, res: Response) => {
+  const user = (req as any).user;
+  if (user.role !== "Admin") {
+    return res.status(403).json({ error: "Faqat adminlar uchun ruxsat etilgan." });
+  }
+
+  try {
+    const tickets = await prisma.supportTicket.findMany({
+      orderBy: { createdAt: "desc" }
+    });
+    res.json(tickets);
+  } catch (err) {
+    res.status(500).json({ error: "Chiptalarni yuklashda xatolik." });
+  }
+});
+
   httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
+    // Darhol bir marta tekshirib qo'yamiz
+    expireTopBoosts();
   });
 
   // Scheduled Tasks (Internal Cron)
+  // Har soatda muddati o'tgan Top boostlarni o'chirish
+  cron.schedule("0 * * * *", () => {
+    console.log("[CRON] Running expireTopBoosts...");
+    expireTopBoosts();
+  });
+
   // Har kuni soat 03:00 da escrow to'lovlarini tekshirish
   cron.schedule("0 3 * * *", () => {
     console.log("[CRON] Running autoReleaseEscrows...");
@@ -4627,6 +5025,21 @@ app.get("/sitemap.xml", async (req: Request, res: Response) => {
   cron.schedule("0 9 * * 1", () => {
     console.log("[CRON] Running sendWeeklyNewsletter...");
     sendWeeklyNewsletter();
+  });
+
+  // Har soatda Telegram fayl keshini tozalash
+  cron.schedule("0 * * * *", () => {
+    console.log("[CRON] Cleaning fileUrlCache...");
+    const now = Date.now();
+    for (const [key, value] of fileUrlCache.entries()) {
+      if (value.expiresAt < now) {
+        fileUrlCache.delete(key);
+      }
+    }
+    if (fileUrlCache.size > 5000) {
+      const keysToDelete = Array.from(fileUrlCache.keys()).slice(0, fileUrlCache.size - 5000);
+      keysToDelete.forEach(key => fileUrlCache.delete(key));
+    }
   });
 }
 

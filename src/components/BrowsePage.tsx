@@ -5,26 +5,24 @@ import { apiFetch as fetch } from '../lib/api';
 import { trackEvent } from '../lib/analytics';
 
 interface BrowsePageProps {
-  startups: Startup[];
   setView: (view: string) => void;
   setSelectedStartupId: (id: string) => void;
   searchQuery: string;
   onActionToast: (message: string) => void;
   user: UserProfileData;
   categories: Category[];
-  isLoading?: boolean;
 }
 
 export default function BrowsePage({
-  startups,
   setView,
   setSelectedStartupId,
   searchQuery,
   onActionToast,
   user,
   categories,
-  isLoading = false,
 }: BrowsePageProps) {
+  const [startups, setStartups] = useState<Startup[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [subFilters, setSubFilters] = useState<Record<string, any>>({});
   const [newsletterEmail, setNewsletterEmail] = useState('');
@@ -32,6 +30,22 @@ export default function BrowsePage({
   const [onlyActive, setOnlyActive] = useState<boolean>(true);
   const [listingTypeFilter, setListingTypeFilter] = useState<string>('All');
   const [socialProof, setSocialProof] = useState<any>(null);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [totalPages, setTotalPages] = useState<number>(0);
+  const itemsPerPage = 12;
+
+  // Debounced search
+  const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   useEffect(() => {
     // Social proof fetch
@@ -49,77 +63,43 @@ export default function BrowsePage({
     }
   }, []);
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const itemsPerPage = 12;
+  const fetchFilteredStartups = async () => {
+    setIsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (selectedCategory) params.append('category', selectedCategory);
+      if (debouncedSearch) params.append('search', debouncedSearch);
+      if (listingTypeFilter !== 'All') params.append('listingType', listingTypeFilter);
+      if (onlyActive) params.append('onlyActive', 'true');
+      params.append('page', currentPage.toString());
+      params.append('limit', itemsPerPage.toString());
 
-  // Reset page to 1 when any filter changes
+      // Note: subFilters are tricky to pass as query params if they are dynamic.
+      // For now, let's just use the core filters. 
+      // If we need subfilters, we'd need to JSON stringify them or append individually.
+
+      const res = await fetch(`/api/startups?${params.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        setStartups(data.startups || []);
+        setTotalCount(data.totalCount || 0);
+        setTotalPages(data.totalPages || 0);
+      }
+    } catch (err) {
+      console.error("Fetch filtered startups error:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchFilteredStartups();
+  }, [selectedCategory, debouncedSearch, listingTypeFilter, onlyActive, currentPage]);
+
+  // Reset page to 1 when filters change (except for currentPage itself)
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedCategory, searchQuery, listingTypeFilter, onlyActive, subFilters]);
-
-  // Filter listings based on category selection, sub-filters, AND search query
-  const filteredStartups = startups.filter((startup) => {
-    // Check main category match
-    const matchesCategory = selectedCategory
-      ? startup.category.toLowerCase() === selectedCategory.toLowerCase()
-      : true;
-
-    // Check search query match
-    const matchesSearch = searchQuery
-      ? startup.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        startup.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        startup.category.toLowerCase().includes(searchQuery.toLowerCase())
-      : true;
-
-    // Check dynamic category-specific sub-filters
-    let matchesSubFilters = true;
-    if (selectedCategory && Object.keys(subFilters).length > 0) {
-      let parsedAttrs: Record<string, any> = {};
-      if (startup.attributes) {
-        try {
-          parsedAttrs = JSON.parse(startup.attributes);
-        } catch (e) {
-          console.error("Error parsing attributes:", e);
-        }
-      }
-
-      for (const [key, val] of Object.entries(subFilters)) {
-        if (val !== undefined && val !== null && val !== '') {
-          const itemVal = parsedAttrs[key];
-          if (typeof val === 'boolean') {
-            // Checkbox filter: if active, item must have true/yes value
-            if (val && !itemVal) {
-              matchesSubFilters = false;
-            }
-          } else {
-            // Dropdown filter: direct string match (case-insensitive check)
-            if (String(itemVal || '').toLowerCase() !== String(val).toLowerCase()) {
-              matchesSubFilters = false;
-            }
-          }
-        }
-      }
-    }
-
-    const matchesListingType = listingTypeFilter === 'All'
-      ? true
-      : startup.listingType === listingTypeFilter;
-
-    const matchesOnlyActive = onlyActive
-      ? startup.soldStatus !== 'sotildi'
-      : true;
-
-    return matchesCategory && matchesSearch && matchesSubFilters && matchesListingType && matchesOnlyActive;
-  });
-
-  const totalCount = filteredStartups.length;
-  const totalPages = Math.ceil(totalCount / itemsPerPage);
-  const paginatedStartups = filteredStartups.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-
-  const categoryActiveStartups = selectedCategory
-    ? startups.filter(s => s.category.toLowerCase() === selectedCategory.toLowerCase() && s.soldStatus !== 'sotildi')
-    : [];
+  }, [selectedCategory, debouncedSearch, listingTypeFilter, onlyActive]);
 
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -433,39 +413,41 @@ export default function BrowsePage({
               </div>
             ))}
           </div>
-        ) : selectedCategory && categoryActiveStartups.length === 0 ? (
+        ) : (startups.length === 0) ? (
           <div className="text-center py-16 border border-dashed border-outline-variant/20 rounded-xl bg-white/5 max-w-lg mx-auto flex flex-col items-center p-8">
             <span className="material-symbols-outlined text-5xl text-on-primary-container mb-3">folder_open</span>
-            <p className="text-on-primary-container font-semibold mb-4 text-base">Bu kategoriyada hali e'lonlar yo'q. Birinchi bo'lib siz qo'shing!</p>
-            <button
-              onClick={() => setView('sell')}
-              className="px-6 py-2.5 bg-[#f0b90b] text-black font-extrabold text-sm rounded-xl hover:brightness-110 transition-all active:scale-95 shadow-md flex items-center gap-2"
-            >
-              <span className="material-symbols-outlined text-sm font-bold">add</span>
-              E'lon qo'shish
-            </button>
-          </div>
-        ) : filteredStartups.length === 0 ? (
-          <div className="text-center py-16 border border-dashed border-outline-variant/20 rounded-xl bg-white/5">
-            <span className="material-symbols-outlined text-5xl text-on-primary-container mb-3">folder_open</span>
-            <p className="text-on-primary-container font-semibold">Sizning filtrlaringizga mos keladigan startaplar topilmadi.</p>
-            <button
-              onClick={() => {
-                setSelectedCategory(null);
-                setListingTypeFilter('All');
-                setSubFilters({});
-              }}
-              className="text-secondary-container underline text-sm mt-2 font-bold"
-            >
-              Filtrlarni tozalash
-            </button>
+            <p className="text-on-primary-container font-semibold mb-4 text-base">
+              {selectedCategory 
+                ? "Bu kategoriyada hali e'lonlar yo'q. Birinchi bo'lib siz qo'shing!" 
+                : "Sizning filtrlaringizga mos keladigan startaplar topilmadi."}
+            </p>
+            {selectedCategory ? (
+              <button
+                onClick={() => setView('sell')}
+                className="px-6 py-2.5 bg-[#f0b90b] text-black font-extrabold text-sm rounded-xl hover:brightness-110 transition-all active:scale-95 shadow-md flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-sm font-bold">add</span>
+                E'lon qo'shish
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  setSelectedCategory(null);
+                  setListingTypeFilter('All');
+                  setSubFilters({});
+                }}
+                className="text-secondary-container underline text-sm mt-2 font-bold"
+              >
+                Filtrlarni tozalash
+              </button>
+            )}
           </div>
         ) : (
           <div className={viewMode === 'grid'
             ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in"
             : "flex flex-col gap-4 animate-fade-in"
           }>
-            {paginatedStartups.map((startup) => {
+            {startups.map((startup) => {
               if (viewMode === 'list') {
                 return (
                   <div

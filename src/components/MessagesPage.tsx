@@ -17,11 +17,7 @@ export default function MessagesPage({ user, onActionToast }: MessagesPageProps)
 
   useEffect(() => {
     const token = localStorage.getItem('savdo24_token');
-    if (!token) return;
-
-    const newSocket = io({
-      auth: { token }
-    });
+    const newSocket = io({ auth: { token } });
     setSocket(newSocket);
 
     newSocket.on('new_message', (message: any) => {
@@ -35,8 +31,7 @@ export default function MessagesPage({ user, onActionToast }: MessagesPageProps)
   }, [selectedConversation]);
 
   const fetchConversations = async () => {
-    const token = localStorage.getItem('savdo24_token');
-    const res = await fetch('/api/conversations', { headers: { 'Authorization': `Bearer ${token}` } });
+    const res = await fetch('/api/conversations');
     if(res.ok) setConversations(await res.json());
   };
 
@@ -44,19 +39,17 @@ export default function MessagesPage({ user, onActionToast }: MessagesPageProps)
 
   const selectConversation = async (conv: any) => {
     setSelectedConversation(conv);
-    const token = localStorage.getItem('savdo24_token');
-    const res = await fetch(`/api/conversations/${conv.id}/messages`, { headers: { 'Authorization': `Bearer ${token}` } });
+    const res = await fetch(`/api/conversations/${conv.id}/messages`);
     if(res.ok) setMessages(await res.json());
-    await fetch(`/api/conversations/${conv.id}/read`, { method: 'PATCH', headers: { 'Authorization': `Bearer ${token}` } });
+    await fetch(`/api/conversations/${conv.id}/read`, { method: 'PATCH' });
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if(!newMessage.trim()) return;
-    const token = localStorage.getItem('savdo24_token');
     const res = await fetch(`/api/conversations/${selectedConversation.id}/messages`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: newMessage })
     });
     if(res.ok) {

@@ -18,6 +18,7 @@ model User {
   verified        Boolean   @default(false)
   joinDate        String
   avatarUrl       String
+  coverUrl        String?
   walletConnected Boolean   @default(false)
   walletAddress   String?
   emailVerified   Boolean   @default(false)
@@ -394,3 +395,12 @@ model AnalyticsEvent {
 
 
 
+
+model SupportTicket {
+  id          String   @id @default(uuid())
+  email       String
+  subject     String
+  message     String
+  status      String   @default("pending") // pending, reviewing, resolved, closed
+  createdAt   DateTime @default(now())
+}

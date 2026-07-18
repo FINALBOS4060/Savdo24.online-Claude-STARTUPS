@@ -393,3 +393,12 @@ model AnalyticsEvent {
   createdAt   DateTime @default(now())
 }
 
+
+model SupportTicket {
+  id          String   @id @default(uuid())
+  email       String
+  subject     String
+  message     String
+  status      String   @default("pending") // pending, reviewing, resolved, closed
+  createdAt   DateTime @default(now())
+}

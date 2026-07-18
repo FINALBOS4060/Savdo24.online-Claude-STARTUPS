@@ -37,6 +37,10 @@ export default function AdminPage({
   const [adminNotes, setAdminNotes] = useState<Record<number, string>>({});
 
   // Reports (Shikoyatlar) state
+  
+  const [supportTickets, setSupportTickets] = useState<any[]>([]);
+  const [isLoadingSupport, setIsLoadingSupport] = useState(false);
+
   const [reports, setReports] = useState<any[]>([]);
   const [isLoadingReports, setIsLoadingReports] = useState(true);
 
@@ -55,7 +59,7 @@ export default function AdminPage({
   const [isAddingSponsor, setIsAddingSponsor] = useState(false);
 
   // Active view tab state & Audit Logs state
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'analytics' | 'listings' | 'users' | 'categories' | 'disputes' | 'reports' | 'sponsors' | 'audit' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'analytics' | 'listings' | 'users' | 'categories' | 'disputes' | 'reports' | 'sponsors' | 'audit' | 'settings' | 'support'>('dashboard');
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [isLoadingAudit, setIsLoadingAudit] = useState(true);
 
@@ -95,10 +99,7 @@ export default function AdminPage({
 
   const fetchAdminStats = async () => {
     try {
-      const token = localStorage.getItem('savdo24_token');
-      const res = await fetch('/api/admin/stats', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await fetch('/api/admin/stats');
       if (res.ok) {
         const data = await res.json();
         setStats(data);
@@ -112,10 +113,7 @@ export default function AdminPage({
 
   const fetchDisputes = async () => {
     try {
-      const token = localStorage.getItem('savdo24_token');
-      const res = await fetch('/api/disputes', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await fetch('/api/disputes');
       if (res.ok) {
         const data = await res.json();
         setDisputes(data);
@@ -129,10 +127,7 @@ export default function AdminPage({
 
   const fetchReports = async () => {
     try {
-      const token = localStorage.getItem('savdo24_token');
-      const res = await fetch('/api/reports', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await fetch('/api/reports');
       if (res.ok) {
         const data = await res.json();
         setReports(data);
@@ -146,10 +141,7 @@ export default function AdminPage({
 
   const fetchAuditLogs = async () => {
     try {
-      const token = localStorage.getItem('savdo24_token');
-      const res = await fetch('/api/admin/audit-logs', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await fetch('/api/admin/audit-logs');
       if (res.ok) {
         const data = await res.json();
         setAuditLogs(data);
@@ -163,10 +155,7 @@ export default function AdminPage({
 
   const fetchSponsorChannels = async () => {
     try {
-      const token = localStorage.getItem('savdo24_token');
-      const res = await fetch('/api/admin/sponsor-channels', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await fetch('/api/admin/sponsor-channels');
       if (res.ok) {
         const data = await res.json();
         setSponsorChannels(data);
@@ -180,10 +169,7 @@ export default function AdminPage({
 
   const fetchSettings = async () => {
     try {
-      const token = localStorage.getItem('savdo24_token');
-      const res = await fetch('/api/admin/settings', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await fetch('/api/admin/settings');
       if (res.ok) {
         const data = await res.json();
         setSettings(data);
@@ -204,13 +190,11 @@ export default function AdminPage({
     setSavingKey(key);
     setSettingsStatus(prev => ({ ...prev, [key]: '' }));
     try {
-      const token = localStorage.getItem('savdo24_token');
       const val = settingsValues[key] || '';
       const res = await fetch(`/api/admin/settings/${key}`, {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ value: val })
       });
@@ -237,10 +221,7 @@ export default function AdminPage({
   const fetchAdminUsers = async (page = 1, search = '') => {
     setIsLoadingUsers(true);
     try {
-      const token = localStorage.getItem('savdo24_token');
-      const res = await fetch(`/api/admin/users?page=${page}&search=${search}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await fetch(`/api/admin/users?page=${page}&search=${search}`);
       if (res.ok) {
         const data = await res.json();
         setAdminUsers(data.users);
@@ -256,12 +237,10 @@ export default function AdminPage({
   const handleBanUser = async (userId: number, isBanned: boolean) => {
     setIsBanningId(userId);
     try {
-      const token = localStorage.getItem('savdo24_token');
       const res = await fetch(`/api/admin/users/${userId}/ban`, {
         method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ isBanned })
       });
@@ -368,10 +347,7 @@ export default function AdminPage({
   const fetchAnalytics = async (period: string) => {
     setIsLoadingAnalytics(true);
     try {
-      const token = localStorage.getItem('savdo24_token');
-      const res = await fetch(`/api/admin/analytics?period=${period}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await fetch(`/api/admin/analytics?period=${period}`);
       if (res.ok) {
         const data = await res.json();
         setAnalytics(data);
@@ -407,12 +383,10 @@ export default function AdminPage({
     if (!editingCategory) return;
     setIsSavingCategory(true);
     try {
-      const token = localStorage.getItem('savdo24_token');
-      const res = await fetch(`/api/categories/${editingCategory.id}`, {
+      const res = await fetch(`/api/admin/categories/${editingCategory.id}`, {
         method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           name: editingCategory.name,
@@ -423,9 +397,12 @@ export default function AdminPage({
         onActionToast("Kategoriya yangilandi.");
         setEditingCategory(null);
         fetchCategories();
+      } else {
+        const err = await res.json();
+        onActionToast(err.error || "Kategoriyani saqlashda xatolik yuz berdi.");
       }
     } catch (err) {
-      onActionToast("Xatolik yuz berdi.");
+      onActionToast("Tarmoq xatosi yuz berdi.");
     } finally {
       setIsSavingCategory(false);
     }
@@ -439,12 +416,10 @@ export default function AdminPage({
     }
     setIsSavingCategory(true);
     try {
-      const token = localStorage.getItem('savdo24_token');
-      const res = await fetch('/api/categories', {
+      const res = await fetch('/api/admin/categories', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(newCategory)
       });
@@ -455,10 +430,10 @@ export default function AdminPage({
         fetchCategories();
       } else {
         const data = await res.json();
-        onActionToast(data.error || "Xatolik.");
+        onActionToast(data.error || "Kategoriya qo'shishda xatolik.");
       }
     } catch (err) {
-      onActionToast("Tarmoq xatosi.");
+      onActionToast("Tarmoq xatosi yuz berdi.");
     } finally {
       setIsSavingCategory(false);
     }
@@ -467,27 +442,26 @@ export default function AdminPage({
   const handleDeleteCategory = async (id: string) => {
     if (!window.confirm("Kategoriyani o'chirmoqchimisiz?")) return;
     try {
-      const token = localStorage.getItem('savdo24_token');
-      const res = await fetch(`/api/categories/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
+      const res = await fetch(`/api/admin/categories/${id}`, {
+        method: 'DELETE'
       });
       if (res.ok) {
         onActionToast("Kategoriya o'chirildi.");
         fetchCategories();
+      } else {
+        const err = await res.json();
+        onActionToast(err.error || "Kategoriyani o'chirishda xatolik yuz berdi.");
       }
     } catch (err) {
-      onActionToast("Xatolik.");
+      onActionToast("Tarmoq xatosi yuz berdi.");
     }
   };
   const handleSponsorAction = async (id: number, action: 'toggle' | 'delete', currentIsActive?: boolean) => {
     try {
-      const token = localStorage.getItem('savdo24_token');
       const res = await fetch(`/api/admin/sponsor-channels/${id}`, {
         method: action === 'delete' ? 'DELETE' : 'PATCH',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: action === 'toggle' ? JSON.stringify({ isActive: !currentIsActive }) : undefined
       });
@@ -508,12 +482,10 @@ export default function AdminPage({
     e.preventDefault();
     setIsAddingSponsor(true);
     try {
-      const token = localStorage.getItem('savdo24_token');
       const res = await fetch('/api/admin/sponsor-channels', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(newSponsor)
       });
@@ -543,12 +515,10 @@ export default function AdminPage({
 
   const handleReportStatusChange = async (id: number, status: 'reviewed' | 'dismissed') => {
     try {
-      const token = localStorage.getItem('savdo24_token');
       const res = await fetch(`/api/reports/${id}/status`, {
         method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ status })
       });
@@ -571,14 +541,12 @@ export default function AdminPage({
     }
 
     try {
-      const token = localStorage.getItem('savdo24_token');
       const endpoint = targetType === 'startup' 
         ? `/api/admin/startups/${targetId}` 
         : `/api/admin/ideas/${targetId}`;
 
       const res = await fetch(endpoint, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
+        method: 'DELETE'
       });
 
       if (res.ok) {
@@ -599,12 +567,10 @@ export default function AdminPage({
   const handleDisputeUpdate = async (id: number, status: 'resolved' | 'rejected') => {
     setUpdatingDisputeId(id);
     try {
-      const token = localStorage.getItem('savdo24_token');
       const res = await fetch(`/api/disputes/${id}`, {
         method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           status,
@@ -648,12 +614,10 @@ export default function AdminPage({
   const handleStatusChange = async (id: string, newStatus: 'active' | 'rejected') => {
     setIsUpdating(id);
     try {
-      const token = localStorage.getItem('savdo24_token');
       const res = await fetch(`/api/startups/${id}/status`, {
         method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ status: newStatus }),
       });
@@ -841,7 +805,7 @@ export default function AdminPage({
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-3">
                         <img 
-                          src={u.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&background=random`} 
+                          src={u.avatarUrl || '/default-avatar.jpg'} 
                           className="w-8 h-8 rounded-full border border-white/10" 
                           alt={`${u.name || 'Foydalanuvchi'} profil avatari`}
                           loading="lazy"
@@ -989,6 +953,19 @@ export default function AdminPage({
           <span className="material-symbols-outlined text-sm">history</span>
           Audit
         </button>
+        
+        <button
+          onClick={() => setActiveTab('support')}
+          className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
+            activeTab === 'support'
+              ? 'text-[#f0b90b] border-[#f0b90b]'
+              : 'text-[#8892b0] border-transparent hover:text-white'
+          }`}
+        >
+          <span className="material-symbols-outlined text-sm">support_agent</span>
+          Murojaatlar
+        </button>
+
         <button
           onClick={() => setActiveTab('settings')}
           className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
@@ -1130,7 +1107,7 @@ export default function AdminPage({
                 <div className="bg-[#0b1426] border border-white/5 rounded-3xl p-6 text-center space-y-4">
                   <div className="relative inline-block">
                     <img 
-                      src={selectedUserDetail.user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedUserDetail.user.name)}&background=random`} 
+                      src={selectedUserDetail.user.avatarUrl || '/default-avatar.jpg'} 
                       className="w-24 h-24 rounded-full border-4 border-secondary-container/20 mx-auto object-cover" 
                       alt={`${selectedUserDetail.user.name || 'Foydalanuvchi'} batafsil profil avatari`} 
                       loading="lazy"
@@ -1958,6 +1935,88 @@ export default function AdminPage({
       )}
 
       {/* Settings tab render */}
+      
+      {activeTab === 'support' && (
+        <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4">
+            <span className="material-symbols-outlined text-[#f0b90b]">support_agent</span>
+            Murojaatlar ({supportTickets.length})
+          </h2>
+          {isLoadingSupport ? (
+            <div className="py-12 text-center text-on-primary-container">
+              <span className="animate-spin inline-block w-8 h-8 border-4 border-[#f0b90b] border-t-transparent rounded-full mb-2"></span>
+              <p className="text-sm font-bold">Yuklanmoqda...</p>
+            </div>
+          ) : supportTickets.length === 0 ? (
+            <div className="py-12 text-center text-on-primary-container space-y-2">
+              <span className="material-symbols-outlined text-4xl opacity-40">done_all</span>
+              <p className="text-sm font-bold">Yangi murojaatlar yo'q</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {supportTickets.map(ticket => (
+                <div key={ticket.id} className="bg-[#12161c] border border-white/5 rounded-xl p-4 flex flex-col md:flex-row gap-4 items-start md:items-center">
+                  <div className="flex-grow space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-white font-bold text-sm">{ticket.subject}</span>
+                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${
+                        ticket.status === 'pending' ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' :
+                        ticket.status === 'reviewing' ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20' :
+                        'bg-green-500/10 text-green-500 border border-green-500/20'
+                      }`}>
+                        {ticket.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[#8892b0]">Mijoz: {ticket.email} | Sana: {new Date(ticket.createdAt).toLocaleString()}</p>
+                    <p className="text-sm text-on-primary-container mt-2 bg-white/5 p-3 rounded-lg border border-white/5">{ticket.message}</p>
+                  </div>
+                  <div className="flex flex-col gap-2 shrink-0 w-full md:w-auto mt-4 md:mt-0">
+                    {ticket.status === 'pending' && (
+                      <button
+                        onClick={() => {
+                          fetch(`/api/admin/support-tickets/${ticket.id}/status`, {
+                            method: 'PATCH',
+                            headers: {
+                              'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ status: 'reviewing' })
+                          }).then(() => {
+                            setSupportTickets(supportTickets.map(t => t.id === ticket.id ? { ...t, status: 'reviewing' } : t));
+                            onActionToast('Holat o\'zgartirildi');
+                          });
+                        }}
+                        className="px-4 py-2 bg-blue-500/20 text-blue-400 border border-blue-500/40 rounded-xl font-bold text-xs hover:bg-blue-500/30 transition-all"
+                      >
+                        Ko'rib chiqilmoqda
+                      </button>
+                    )}
+                    {(ticket.status === 'pending' || ticket.status === 'reviewing') && (
+                      <button
+                        onClick={() => {
+                          fetch(`/api/admin/support-tickets/${ticket.id}/status`, {
+                            method: 'PATCH',
+                            headers: {
+                              'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ status: 'resolved' })
+                          }).then(() => {
+                            setSupportTickets(supportTickets.map(t => t.id === ticket.id ? { ...t, status: 'resolved' } : t));
+                            onActionToast('Holat o\'zgartirildi');
+                          });
+                        }}
+                        className="px-4 py-2 bg-green-500/20 text-green-400 border border-green-500/40 rounded-xl font-bold text-xs hover:bg-green-500/30 transition-all"
+                      >
+                        Hal qilindi
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {activeTab === 'settings' && (
         <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-8">
           <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4">

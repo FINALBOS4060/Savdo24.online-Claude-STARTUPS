@@ -55,13 +55,13 @@ export default function App() {
   }, [currentView, initialProfileTab]);
 
   // Auth States
-  const [token, setToken] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [user, setUser] = useState<UserProfileData>({
     name: 'Mehmon',
     role: 'Xaridor',
     verified: false,
     joinDate: 'bugun',
-    avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Guest',
+    avatarUrl: '/default-avatar.jpg',
   });
 
   const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
@@ -116,7 +116,8 @@ export default function App() {
           });
           const data = await res.json();
           if (res.ok) {
-            setToken('cookie_authenticated');
+            localStorage.setItem('savdo24_token', data.accessToken);
+            setIsAuthenticated(true);
             setUser(data.user);
             showToast(`Xush kelibsiz, ${data.user.name}!`);
             setAuthModalOpen(false);
@@ -148,14 +149,18 @@ export default function App() {
   // Sync state with global fetch token updates
   useEffect(() => {
     const handleAuthChange = (e: any) => {
-      setToken(e.detail.token);
+      if (e.detail.token && e.detail.token !== 'cookie_authenticated') {
+        localStorage.setItem('savdo24_token', e.detail.token);
+      }
+      setIsAuthenticated(!!e.detail.token);
       if (e.detail.logout) {
+        localStorage.removeItem('savdo24_token');
         setUser({
           name: 'Mehmon',
           role: 'Xaridor',
           verified: false,
           joinDate: 'bugun',
-          avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Guest',
+          avatarUrl: '/default-avatar.jpg',
         });
         setView('browse');
       }
@@ -171,14 +176,17 @@ export default function App() {
         const res = await fetch('/api/auth/me');
         if (res.ok) {
           const data = await res.json();
+          if (data.accessToken) {
+            localStorage.setItem('savdo24_token', data.accessToken);
+          }
           setUser(data.user);
-          setToken('cookie_authenticated');
+          setIsAuthenticated(true);
         } else {
-          setToken(null);
+          setIsAuthenticated(false);
         }
       } catch (err) {
         console.error("Error fetching current user:", err);
-        setToken(null);
+        setIsAuthenticated(false);
       }
     };
     fetchCurrentUser();
@@ -201,7 +209,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (token && user.id) {
+    if (isAuthenticated && user.id) {
       const fetchNotifications = async () => {
         try {
           const res = await fetch('/api/notifications');
@@ -215,8 +223,9 @@ export default function App() {
       };
       fetchNotifications();
 
-      const socket = io();
-      socket.emit('join', `user:${user.id}`);
+      const token = localStorage.getItem('savdo24_token');
+      const socket = io({ auth: { token } });
+      
       socket.on('new_notification', (notif: Notification) => {
         setNotifications(prev => [notif, ...prev]);
         showToast(`Yangi bildirishnoma: ${notif.title}`);
@@ -226,7 +235,7 @@ export default function App() {
         socket.disconnect();
       };
     }
-  }, [token, user.id]);
+  }, [isAuthenticated, user.id]);
 
   // Fetch Startups from our Real API
   const fetchStartups = async () => {
@@ -253,14 +262,14 @@ export default function App() {
   // Listen to URL pathname changes to support /admin directly!
   useEffect(() => {
     // Initial fetch of notifications if user is logged in
-    if (token && user.id) {
+    if (isAuthenticated && user.id) {
       // Logic handled in another useEffect
     }
-  }, [token, user.id]);
+  }, [isAuthenticated, user.id]);
 
   // Handle addition of newly published startups (connecting to real full-stack API!)
   const handleAddStartup = async (newStartup: Startup) => {
-    if (!token) {
+    if (!isAuthenticated) {
       showToast("Iltimos, startap qo'shish uchun avval tizimga kiring!");
       setAuthModalOpen(true);
       return;
@@ -317,7 +326,8 @@ export default function App() {
 
       if (res.ok) {
         const data = await res.json();
-        setToken('cookie_authenticated');
+        localStorage.setItem('savdo24_token', data.accessToken);
+        setIsAuthenticated(true);
         setUser(data.user);
         showToast(`Xush kelibsiz, ${data.user.name}!`);
         setAuthModalOpen(false);
@@ -350,7 +360,8 @@ export default function App() {
 
       if (res.ok) {
         const data = await res.json();
-        setToken('cookie_authenticated');
+        localStorage.setItem('savdo24_token', data.accessToken);
+        setIsAuthenticated(true);
         setUser(data.user);
         showToast(`Muvaffaqiyatli ro'yxatdan o'tdingiz, ${data.user.name}!`);
         setAuthModalOpen(false);
@@ -376,13 +387,14 @@ export default function App() {
     } catch (err) {
       console.error("Error logging out from server:", err);
     }
-    setToken(null);
+    localStorage.removeItem('savdo24_token');
+    setIsAuthenticated(false);
     setUser({
       name: 'Mehmon',
       role: 'Xaridor',
       verified: false,
       joinDate: 'bugun',
-      avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Guest',
+      avatarUrl: '/default-avatar.jpg',
     });
     showToast("Tizimdan chiqdingiz.");
     setView('browse');
@@ -424,34 +436,17 @@ export default function App() {
               <div className="flex items-start gap-3">
                 <span className="material-symbols-outlined text-yellow-500 text-2xl mt-0.5">warning</span>
                 <div>
-                  <h4 className="text-yellow-500 font-extrabold text-sm">Email manzilingiz tasdiqlanmagan!</h4>
+                  <h4 className="text-yellow-500 font-extrabold text-sm">Hisobingiz tasdiqlanmagan!</h4>
                   <p className="text-xs text-on-primary-container leading-relaxed mt-1">
-                    Loyihalarni sotib olish yoki yangi startap e'lon qilish uchun email manzilingizni tasdiqlashingiz shart. Pochtangizni ({user.email || 'ro\'yxatdan o\'tgan email'}) tekshiring.
+                    Loyihalarni sotib olish yoki yangi startap e'lon qilish uchun hisobingizni tasdiqlashingiz shart. Buning uchun <b>@Savdo24_Official_bot</b> botiga kirib <b>/start {user.telegramLinkCode || "kod"}</b> deb yozing.
                   </p>
                 </div>
               </div>
               <button
-                onClick={async () => {
-                  try {
-                    const token = localStorage.getItem('savdo24_token');
-                    const res = await fetch('/api/auth/resend-verification', {
-                      method: 'POST',
-                      headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    if (res.ok) {
-                      const data = await res.json();
-                      showToast(data.message || "Tasdiqlash xati qayta yuborildi!");
-                    } else {
-                      const err = await res.json();
-                      showToast(err.error || "Xatolik yuz berdi.");
-                    }
-                  } catch (e) {
-                    showToast("Server bilan ulanish xatosi.");
-                  }
-                }}
+                onClick={() => setView('profile')}
                 className="px-4 py-2.5 bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/40 text-yellow-500 font-bold text-xs rounded-xl transition-all whitespace-nowrap active:scale-95 cursor-pointer self-start sm:self-center"
               >
-                Xatni qayta yuborish
+                Kodni olish
               </button>
             </div>
           )}
@@ -466,14 +461,12 @@ export default function App() {
                   transition={{ duration: 0.25, ease: 'easeInOut' }}
                 >
                   <BrowsePage
-                    startups={startups}
                     setView={setView}
                     setSelectedStartupId={setSelectedStartupId}
                     searchQuery={searchQuery}
                     onActionToast={showToast}
                     user={user}
                     categories={categories}
-                    isLoading={isLoadingStartups}
                   />
                 </motion.div>
               } />
@@ -486,7 +479,7 @@ export default function App() {
                   transition={{ duration: 0.25, ease: 'easeInOut' }}
                   className="space-y-6"
                 >
-                  {!token && (
+                  {!isAuthenticated && (
                     <div className="bg-[#f0b90b]/10 border border-[#f0b90b]/30 rounded-2xl p-6 text-left flex flex-col md:flex-row items-center justify-between gap-4">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-full bg-[#f0b90b]/20 flex items-center justify-center text-[#f0b90b]">
@@ -519,7 +512,7 @@ export default function App() {
                     categories={categories}
                   />
 
-                  {token && (
+                  {isAuthenticated && (
                     <div className="text-left pt-4">
                       <button
                         onClick={handleLogout}
