@@ -1,4 +1,4 @@
-import { Bot, Context, session, SessionFlavor } from "grammy";
+import { Bot, Context, session, SessionFlavor, InputFile } from "grammy";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -204,6 +204,8 @@ async function showProduct(ctx: any, id: string) {
 
 bot.callbackQuery(/^buy_(.+)$/, async (ctx) => {
   const startupId = ctx.match[1];
+  await ctx.answerCallbackQuery("To'lov tayyorlanmoqda...");
+
   try {
     const res = await fetch(`${process.env.APP_URL}/api/telegram/create-payment`, {
       method: "POST",
@@ -217,24 +219,36 @@ bot.callbackQuery(/^buy_(.+)$/, async (ctx) => {
       })
     });
 
-    if (res.ok) {
-      const data = await res.json();
-      await ctx.reply("To'lovni yakunlash uchun quyidagi havolaga o'ting:", {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "💰 To'lovni yakunlash", url: data.paymentUrl }]
-          ]
-        }
-      });
-      await ctx.answerCallbackQuery();
-    } else {
-      const data = await res.json();
-      await ctx.reply(data.error || "To'lov yaratishda xatolik.");
-      await ctx.answerCallbackQuery();
+    const data = await res.json();
+
+    if (!res.ok) {
+      return ctx.reply(data.error || "To'lov yaratishda xatolik.");
     }
+
+    // Asosiy post caption'ini yangilash
+    await ctx.editMessageCaption({
+      caption: (ctx.callbackQuery.message?.caption || "") + "\n\n✅ To'lov havolasi tayyor! Quyidagi tugma yoki QR-kod orqali to'lang.",
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "💰 To'lovni yakunlash", url: data.paymentUrl }]
+        ]
+      }
+    });
+
+    // QR-kodni reply sifatida yuborish
+    const qrBuffer = Buffer.from(data.qrCode.split(",")[1], "base64");
+    await ctx.replyWithPhoto(
+      new InputFile(qrBuffer, "qr-payment.png"),
+      {
+        caption: "📱 Kripto hamyoningiz orqali to'lash uchun shu QR-kodni skanerlang.",
+        reply_to_message_id: ctx.callbackQuery.message?.message_id
+      }
+    );
+
   } catch (err) {
-    await ctx.reply("Xatolik yuz berdi.");
-    await ctx.answerCallbackQuery();
+    console.error("Buy callback error:", err);
+    await ctx.reply("Xatolik yuz berdi, iltimos qayta urinib ko'ring.");
   }
 });
 

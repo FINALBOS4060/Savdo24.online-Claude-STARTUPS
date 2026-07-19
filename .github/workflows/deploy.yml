@@ -24,5 +24,7 @@ jobs:
           port: 22
           script: |
             cd /var/www/savdo24
+            echo "📦 Running pre-deploy backup..."
+            npm run backup || echo "⚠️ Backup failed, but continuing deployment..."
             chmod +x deploy.sh
             ./deploy.sh

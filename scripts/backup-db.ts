@@ -5,7 +5,7 @@ import * as path from 'path';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
-import { decryptSecret } from '../src/lib/crypto';
+import { encryptSecret, decryptSecret } from '../src/lib/crypto';
 
 dotenv.config();
 
@@ -17,11 +17,25 @@ async function getSetting(key: string): Promise<string | null> {
     if (dbSetting) {
       const decrypted = decryptSecret(dbSetting.value);
       if (decrypted) return decrypted;
+      return dbSetting.value; // Fallback if not encrypted
     }
   } catch (err) {
     // Suppress if DB table settings doesn't exist yet
   }
   return process.env[key] || null;
+}
+
+async function updateSetting(key: string, value: string) {
+  try {
+    const encryptedValue = encryptSecret(value);
+    await prismaClient.setting.upsert({
+      where: { key },
+      update: { value: encryptedValue },
+      create: { key, value: encryptedValue }
+    });
+  } catch (err) {
+    console.error(`Error updating setting ${key}:`, err);
+  }
 }
 
 async function sendToTelegram(filePath: string, filename: string) {
@@ -31,19 +45,19 @@ async function sendToTelegram(filePath: string, filename: string) {
 
   if (!botToken || !chatId) {
     console.log("[Telegram] Credentials (TELEGRAM_BOT_TOKEN/TELEGRAM_BACKUP_CHAT_ID) are not configured. Skipping Telegram backup.");
-    return;
+    return null;
   }
 
   if (!encryptionKey || encryptionKey.length < 32) {
     console.error("[Telegram] CRITICAL ERROR: ENCRYPTION_KEY is not defined or too short (min 32 chars). Backup will NOT be sent unencrypted.");
-    return;
+    return null;
   }
 
   console.log(`\n[Telegram] Encrypting and sending backup file ${filename} to Telegram chat/channel ${chatId}...`);
   try {
     const fileBuffer = fs.readFileSync(filePath);
     
-    // AES-256-GCM Encryption (Matches src/lib/crypto.ts logic)
+    // AES-256-GCM Encryption
     const key = crypto.createHash('sha256').update(encryptionKey).digest();
     const iv = crypto.randomBytes(12);
     const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
@@ -68,21 +82,39 @@ async function sendToTelegram(filePath: string, filename: string) {
     const result = await response.json() as any;
     if (result.ok) {
       console.log("🎉 [Telegram] Encrypted backup successfully sent via Telegram Bot!");
+      const fileId = result.result.document.file_id;
+      await updateSetting("last_backup_message_id", result.result.message_id.toString());
+      await updateSetting("last_backup_file_id", fileId);
+      await updateSetting("last_backup_date", new Date().toISOString());
+      
+      // Local fallback for auto-restore if DB is wiped
+      try {
+        fs.writeFileSync(path.join(process.cwd(), 'last_backup.json'), JSON.stringify({
+          messageId: result.result.message_id,
+          fileId: fileId,
+          date: new Date().toISOString()
+        }));
+      } catch (e) {
+        console.warn("Failed to write local backup fallback file.");
+      }
+      
+      return result.result.message_id;
     } else {
       console.error("[Telegram] Bot API returned an error:", result);
     }
   } catch (err: any) {
     console.error("[Telegram] Error encrypting or sending backup via Telegram:", err.message);
   }
+  return null;
 }
 
-async function runBackup() {
+export async function runBackup() {
   console.log("=== Savdo24 Database Backup Process ===");
   const dbUrl = process.env.DATABASE_URL;
 
   if (!dbUrl) {
     console.error("DATABASE_URL is not configured in environment variables!");
-    process.exit(1);
+    return;
   }
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -123,6 +155,7 @@ async function runBackup() {
         disputes: await prismaClient.dispute.findMany(),
         refreshTokens: await prismaClient.refreshToken.findMany(),
         reports: await prismaClient.report.findMany(),
+        settings: await prismaClient.setting.findMany(),
         exportedAt: new Date().toISOString(),
       };
 
@@ -133,7 +166,7 @@ async function runBackup() {
       console.log("Local JSON backup generated successfully.");
     } catch (prismaErr) {
       console.error("Prisma Client fallback backup failed:", prismaErr);
-      process.exit(1);
+      return;
     }
   }
 
@@ -159,12 +192,12 @@ async function runBackup() {
     console.log(`\nInitializing S3 Client connecting to ${endpoint}...`);
     const s3 = new S3Client({
       endpoint,
-      region: 'us-east-1', // Default region standard
+      region: 'us-east-1', 
       credentials: {
         accessKeyId,
         secretAccessKey
       },
-      forcePathStyle: true // Crucial for non-AWS S3 providers
+      forcePathStyle: true 
     });
 
     console.log(`Uploading "${filename}" to Contabo bucket "${bucketName}"...`);
@@ -185,10 +218,13 @@ async function runBackup() {
     console.log("Backup process completed successfully.");
   } catch (s3Err) {
     console.error("S3 Upload failed:", s3Err);
-    process.exit(1);
   } finally {
     await prismaClient.$disconnect();
   }
 }
 
-runBackup();
+// CLI execution
+if (require.main === module) {
+  runBackup();
+}
+

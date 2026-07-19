@@ -110,6 +110,7 @@ model Payment {
   startupId          String?
   startup            Startup?  @relation(fields: [startupId], references: [id])
   gateway            String    @default("coingate")
+  source             String    @default("web") // "web" | "telegram"
   referralId         String?
   disputes           Dispute[]
   escrow             EscrowPayment?

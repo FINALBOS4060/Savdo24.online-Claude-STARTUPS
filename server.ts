@@ -1,3 +1,8 @@
+// ESLATMA: Bu avtomatik Telegram-tiklash tizimi faqat ZAXIRA
+// himoya vositasi. Asosiy himoya — PostgreSQL bazasini ilova
+// serveridan alohida, doimiy saqlanadigan joyda ushlab turish.
+// Batafsil: README.md dagi "Ma'lumotlar xavfsizligi" bo'limiga qarang.
+
 import express, { Request, Response, NextFunction } from "express";
 import path from "path";
 import fs from "fs";
@@ -17,6 +22,7 @@ import jwt from "jsonwebtoken";
 import cookieParser from "cookie-parser";
 import multer from "multer";
 import sharp from "sharp";
+import QRCode from "qrcode";
 import crypto from "crypto";
 import { Bot } from "grammy";
 import nodemailer from "nodemailer";
@@ -2863,6 +2869,135 @@ app.get("/api/files/:fileId", async (req, res) => {
   }
 });
 
+// Internal helper to create a payment order (used by web and telegram)
+async function createPaymentOrder(userId: number, startupId: string, referralCode?: string, source: string = "web") {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (user && !user.emailVerified && source === "web") {
+    throw new Error("Xaridni amalga oshirish uchun iltimos avval email manzilingizni tasdiqlang.");
+  }
+
+  const startupRecord = await prisma.startup.findUnique({ where: { id: startupId } });
+  if (!startupRecord || !startupRecord.price) {
+    throw new Error("Loyiha topilmadi yoki narx belgilanmagan.");
+  }
+  if (startupRecord.soldStatus === "sotildi") {
+    throw new Error("Bu loyiha allaqachon sotilgan.");
+  }
+  
+  let realAmount = Number(startupRecord.price);
+  let discountApplied = 0;
+  let referralId = null;
+
+  if (referralCode) {
+    const referral = await prisma.referral.findUnique({
+      where: { code: referralCode, isActive: true }
+    });
+    if (referral && referral.referrerId !== userId) {
+      discountApplied = (realAmount * referral.discountPercent) / 100;
+      realAmount -= discountApplied;
+      referralId = referral.id;
+    }
+  }
+
+  const orderId = "CG-" + crypto.randomBytes(4).toString('hex').toUpperCase();
+  const secureToken = crypto.randomBytes(24).toString('hex');
+
+  await prisma.payment.create({
+    data: {
+      id: orderId,
+      amount: realAmount,
+      status: "pending",
+      currency: "USDT",
+      userId: userId,
+      startupId: startupId,
+      callbackToken: secureToken,
+      gateway: "coingate",
+      source: source,
+      referralId: referralId
+    },
+  });
+
+  let paymentUrl = "";
+  let useStripe = false;
+
+  const coingateToken = await getSetting("COINGATE_API_TOKEN");
+  const appUrlSetting = await getSetting("APP_URL") || "http://localhost:3000";
+
+  if (coingateToken) {
+    try {
+      const response = await fetch("https://api.coingate.com/v2/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Authorization": `Token ${coingateToken}`,
+        },
+        body: new URLSearchParams({
+          order_id: orderId,
+          price_amount: realAmount.toFixed(2),
+          price_currency: "USD",
+          receive_currency: "USDT",
+          callback_url: `${appUrlSetting}/api/payments/webhook?token=${secureToken}`,
+          success_url: `${appUrlSetting}/checkout/success`,
+          cancel_url: `${appUrlSetting}/checkout/cancel`,
+          title: startupRecord.name,
+        }),
+      });
+
+      if (response.ok) {
+        const orderData: any = await response.json();
+        paymentUrl = orderData.payment_url;
+      } else {
+        useStripe = true;
+      }
+    } catch (coinGateErr: any) {
+      useStripe = true;
+    }
+  } else {
+    useStripe = true;
+  }
+
+  if (useStripe) {
+    const stripe = await getStripe();
+    if (stripe) {
+      try {
+        const session = await stripe.checkout.sessions.create({
+          payment_method_types: ["card"],
+          line_items: [{
+            price_data: {
+              currency: "usd",
+              product_data: { name: startupRecord.name },
+              unit_amount: Math.round(realAmount * 100),
+            },
+            quantity: 1,
+          }],
+          mode: "payment",
+          success_url: `${appUrlSetting}/checkout/success?paymentId=${orderId}`,
+          cancel_url: `${appUrlSetting}/checkout/cancel`,
+          metadata: { orderId, secureToken }
+        });
+        
+        paymentUrl = session.url!;
+        await prisma.payment.update({
+          where: { id: orderId },
+          data: { gateway: "stripe", id: session.id }
+        });
+      } catch (stripeErr) {
+        console.error("Stripe fallback error:", stripeErr);
+      }
+    }
+  }
+
+  if (!paymentUrl) {
+    const stripeKey = await getSetting("STRIPE_SECRET_KEY") || process.env.STRIPE_SECRET_KEY;
+    if (!coingateToken && !stripeKey && process.env.NODE_ENV === "production") {
+      throw new Error("To'lov tizimi vaqtincha mavjud emas, keyinroq urinib ko'ring.");
+    }
+    paymentUrl = `${appUrlSetting}/api/payments/coingate-simulator?orderId=${orderId}&token=${secureToken}&amount=${realAmount.toFixed(2)}&title=${encodeURIComponent(startupRecord.name)}`;
+  }
+
+  return { orderId, paymentUrl, amount: realAmount };
+}
+
 // POST /api/payments/create — to'lov buyurtmasi yaratish
 app.post("/api/payments/create", authenticateToken, async (req: AuthRequest, res: Response) => {
   const { startupId, referralCode } = req.body;
@@ -2872,142 +3007,54 @@ app.post("/api/payments/create", authenticateToken, async (req: AuthRequest, res
   }
 
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.user?.id } });
-    if (user && !user.emailVerified) {
-      return res.status(403).json({ error: "Xaridni amalga oshirish uchun iltimos avval email manzilingizni tasdiqlang." });
-    }
-
-    const startupRecord = await prisma.startup.findUnique({ where: { id: startupId } });
-    if (!startupRecord || !startupRecord.price) {
-      return res.status(400).json({ error: "Loyiha topilmadi yoki narx belgilanmagan." });
-    }
-    if (startupRecord.soldStatus === "sotildi") {
-      return res.status(409).json({ error: "Bu loyiha allaqachon sotilgan." });
-    }
-    
-    let realAmount = startupRecord.price;
-    let discountApplied = 0;
-    let referralId = null;
-
-    if (referralCode) {
-      const referral = await prisma.referral.findUnique({
-        where: { code: referralCode, isActive: true }
-      });
-      if (referral && referral.referrerId !== req.user?.id) {
-        discountApplied = (realAmount * referral.discountPercent) / 100;
-        realAmount -= discountApplied;
-        referralId = referral.id;
-      }
-    }
-
-    const orderId = "CG-" + crypto.randomBytes(4).toString('hex').toUpperCase();
-    const secureToken = crypto.randomBytes(24).toString('hex');
-
-    const payment = await prisma.payment.create({
-      data: {
-        id: orderId,
-        amount: realAmount,
-        status: "pending",
-        currency: "USDT",
-        userId: req.user?.id,
-        startupId: startupId,
-        callbackToken: secureToken,
-        gateway: "coingate",
-        referralId: referralId
-      },
-    });
-
-    let paymentUrl = "";
-    let useStripe = false;
-
-    const coingateToken = await getSetting("COINGATE_API_TOKEN");
-    const appUrlSetting = await getSetting("APP_URL") || "http://localhost:3000";
-
-    if (coingateToken) {
-      try {
-        const response = await fetch("https://api.coingate.com/v2/orders", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Authorization": `Token ${coingateToken}`,
-          },
-          body: new URLSearchParams({
-            order_id: orderId,
-            price_amount: realAmount.toFixed(2),
-            price_currency: "USD",
-            receive_currency: "USDT",
-            callback_url: `${appUrlSetting}/api/payments/webhook?token=${secureToken}`,
-            success_url: `${appUrlSetting}/checkout/success`,
-            cancel_url: `${appUrlSetting}/checkout/cancel`,
-            title: startupRecord.name,
-          }),
-        });
-
-        if (response.ok) {
-          const orderData: any = await response.json();
-          paymentUrl = orderData.payment_url;
-        } else {
-          useStripe = true;
-        }
-      } catch (coinGateErr: any) {
-        useStripe = true;
-      }
-    } else {
-      useStripe = true;
-    }
-
-    if (useStripe) {
-      const stripe = await getStripe();
-      if (stripe) {
-        try {
-          const session = await stripe.checkout.sessions.create({
-            payment_method_types: ["card"],
-            line_items: [{
-              price_data: {
-                currency: "usd",
-                product_data: { name: startupRecord.name },
-                unit_amount: Math.round(realAmount * 100),
-              },
-              quantity: 1,
-            }],
-            mode: "payment",
-            success_url: `${appUrlSetting}/checkout/success?paymentId=${orderId}`,
-            cancel_url: `${appUrlSetting}/checkout/cancel`,
-            metadata: { orderId, secureToken }
-          });
-          
-          paymentUrl = session.url!;
-          await prisma.payment.update({
-            where: { id: orderId },
-            data: { gateway: "stripe", id: session.id } // Use session ID as new payment ID for stripe
-          });
-          // Note: If we change ID, we might need to update local variables
-        } catch (stripeErr) {
-          console.error("Stripe fallback error:", stripeErr);
-        }
-      }
-    }
-
-    if (!paymentUrl) {
-      if (process.env.NODE_ENV === "production") {
-        const stripeKey = await getSetting("STRIPE_SECRET_KEY") || process.env.STRIPE_SECRET_KEY;
-        if (!coingateToken && !stripeKey) {
-          return res.status(503).json({ error: "To'lov tizimi vaqtincha mavjud emas, keyinroq urinib ko'ring." });
-        }
-      }
-      paymentUrl = `/api/payments/coingate-simulator?orderId=${orderId}&token=${secureToken}&amount=${realAmount.toFixed(2)}&title=${encodeURIComponent(startupRecord.name)}`;
-    }
+    const { orderId, paymentUrl, amount } = await createPaymentOrder(req.user!.id, startupId, referralCode, "web");
 
     res.status(201).json({
-      id: payment.id,
-      amount: payment.amount,
-      status: payment.status,
-      currency: payment.currency,
+      id: orderId,
+      amount: amount,
+      status: "pending",
+      currency: "USDT",
       paymentUrl
     });
   } catch (err: any) {
     console.error("POST /api/payments/create error:", err);
-    res.status(500).json({ error: "To'lov buyurtmasini yaratib bo'lmadi." });
+    res.status(err.message.includes("tasdiqlang") ? 403 : 400).json({ error: err.message || "To'lov buyurtmasini yaratib bo'lmadi." });
+  }
+});
+
+// Telegram-specific payment endpoint
+app.post("/api/telegram/create-payment", async (req: Request, res: Response) => {
+  // Ichki maxfiy kalitni tekshir (faqat bot chaqira olishi uchun)
+  const secret = req.headers["x-telegram-bot-secret"];
+  const internalSecret = await getSetting("TELEGRAM_BOT_INTERNAL_SECRET") || process.env.TELEGRAM_BOT_INTERNAL_SECRET;
+  
+  if (secret !== internalSecret) {
+    return res.status(403).json({ error: "Ruxsat berilmagan." });
+  }
+
+  const { telegramUserId, startupId } = req.body;
+  if (!telegramUserId || !startupId) {
+    return res.status(400).json({ error: "Majburiy maydonlar to'ldirilmagan." });
+  }
+
+  try {
+    // telegramUserId orqali bog'langan foydalanuvchini top
+    const user = await prisma.user.findFirst({ where: { telegramUserId: telegramUserId.toString() } });
+    if (!user) {
+      return res.status(404).json({
+        error: "Hisobingiz Telegram bilan bog'lanmagan. Avval /bogla {kod} buyrug'ini ishlating."
+      });
+    }
+
+    const { orderId, paymentUrl } = await createPaymentOrder(user.id, startupId, undefined, "telegram");
+
+    // QR-kod yaratish
+    const qrCodeDataUrl = await QRCode.toDataURL(paymentUrl, { width: 400, margin: 2 });
+
+    res.json({ paymentUrl, orderId, qrCode: qrCodeDataUrl });
+  } catch (err: any) {
+    console.error("POST /api/telegram/create-payment error:", err);
+    res.status(400).json({ error: err.message || "To'lov yaratishda xatolik." });
   }
 });
 
@@ -3348,7 +3395,7 @@ app.post("/api/payments/webhook", async (req: Request, res: Response) => {
           if (buyer && buyer.telegramUserId && startup) {
             await sendTelegramMessage(
               buyer.telegramUserId, 
-              `✅ To'lovingiz qabul qilindi! Yetkazib berish havolasi: ${startup.deliveryUrl}`
+              `✅ To'lovingiz muvaffaqiyatli qabul qilindi! "${startup.name}" endi sizniki.`
             );
           }
         }
@@ -4631,6 +4678,28 @@ async function seedSettings() {
 async function start() {
   console.log(isPostgres ? "✅ PostgreSQL bazasiga ulanildi (production)" : "⚠️  SQLite (dev.db) ishlatilyapti — bu faqat lokal rivojlantirish uchun!");
   
+  // Auto-restore if database is empty
+  async function checkAndAutoRestore() {
+    try {
+      const userCount = await prisma.user.count();
+      if (userCount === 0) {
+        console.log("⚠️ Baza bo'sh topildi. Telegram'dan oxirgi zaxirani avtomatik tiklashga urinilmoqda...");
+        try {
+          const { restoreFromLatestBackup } = await import("./scripts/restore-db");
+          await restoreFromLatestBackup();
+          console.log("✅ Ma'lumotlar bazasi Telegram zaxirasidan muvaffaqiyatli tiklandi!");
+        } catch (err) {
+          console.error("❌ Avtomatik tiklash muvaffaqiyatsiz bo'ldi:", err);
+          console.error("Iltimos, qo'lda 'npm run restore' buyrug'ini ishga tushiring yoki backup faylni tekshiring.");
+        }
+      }
+    } catch (err) {
+      console.warn("Could not check user count for auto-restore (likely fresh DB):", err);
+    }
+  }
+
+  await checkAndAutoRestore();
+
   if (isPostgres) {
     try {
       console.log("DATABASE_URL found. Deploying PostgreSQL migrations...");
@@ -5039,6 +5108,18 @@ app.get("/api/support", authenticateToken, async (req: Request, res: Response) =
     if (fileUrlCache.size > 5000) {
       const keysToDelete = Array.from(fileUrlCache.keys()).slice(0, fileUrlCache.size - 5000);
       keysToDelete.forEach(key => fileUrlCache.delete(key));
+    }
+  });
+
+  // Har kuni soat 04:00 da tunda ma'lumotlar bazasini zaxiralash
+  cron.schedule("0 4 * * *", async () => {
+    console.log("[CRON] Running daily database backup...");
+    try {
+      const { runBackup } = await import("./scripts/backup-db");
+      await runBackup();
+      console.log("[CRON] Daily backup completed successfully.");
+    } catch (err) {
+      console.error("[CRON] Daily backup failed:", err);
     }
   });
 }
