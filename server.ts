@@ -29,6 +29,7 @@ import nodemailer from "nodemailer";
 import Stripe from "stripe";
 import cron from "node-cron";
 import dotenv from "dotenv";
+import { z } from "zod";
 import {
   ideaLimiter,
   upvoteLimiter,
@@ -447,7 +448,7 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 
 // Security Headers & CORS
@@ -2385,15 +2386,84 @@ app.post("/api/vip/create", authenticateToken, async (req: AuthRequest, res: Res
   }
 });
 
+// Startups validation schemas
+const techStackPreprocess = z.preprocess((val) => {
+  if (typeof val === 'string') {
+    try { return JSON.parse(val); } catch { return val; }
+  }
+  return val;
+}, z.array(z.string()).max(100, "Texnologiyalar soni juda ko'p").optional().nullable());
+
+const galleryPreprocess = z.preprocess((val) => {
+  if (typeof val === 'string') {
+    try { return JSON.parse(val); } catch { return val; }
+  }
+  return val;
+}, z.array(z.string()).max(10, "Galereya ko'pi bilan 10 ta rasm bo'lishi kerak").optional().nullable());
+
+const teamPreprocess = z.preprocess((val) => {
+  if (typeof val === 'string') {
+    try { return JSON.parse(val); } catch { return val; }
+  }
+  return val;
+}, z.array(z.any()).max(10, "Jamoa a'zolari ko'pi bilan 10 ta bo'lishi kerak").optional().nullable());
+
+const milestonesPreprocess = z.preprocess((val) => {
+  if (typeof val === 'string') {
+    try { return JSON.parse(val); } catch { return val; }
+  }
+  return val;
+}, z.array(z.any()).max(20, "Bosqichlar ko'pi bilan 20 ta bo'lik bo'lishi kerak").optional().nullable());
+
+const createStartupSchema = z.object({
+  name: z.string().min(1, "Nomi kamida 1 ta belgidan iborat bo'lishi kerak").max(150, "Nomi ko'pi bilan 150 ta belgidan iborat bo'lishi kerak"),
+  
+  slogan: z.string().max(200, "Slogan ko'pi bilan 200 ta belgidan iborat bo'lishi kerak").optional().nullable().or(z.literal("")),
+  
+  description: z.string().min(1, "Tavsifi kamida 1 ta belgidan iborat bo'lishi kerak").max(500, "Tavsifi ko'pi bilan 500 ta belgidan iborat bo'lishi kerak"),
+  
+  longDescription: z.string().max(5000, "Batafsil tavsif ko'pi bilan 5000 ta belgidan iborat bo'lishi kerak").optional().nullable().or(z.literal("")),
+  
+  category: z.string().min(1, "Kategoriya kiritilishi shart"),
+  
+  price: z.union([z.number(), z.string()]).refine((val) => {
+    const parsed = parseFloat(String(val));
+    return !isNaN(parsed) && parsed > 0;
+  }, {
+    message: "Narx musbat son bo'lishi shart."
+  }).transform((val) => parseFloat(String(val))),
+  
+  listingType: z.string().optional().nullable(),
+  techStack: techStackPreprocess,
+  demoUrl: z.string().optional().nullable().or(z.literal("")),
+  deliveryUrl: z.string().optional().nullable().or(z.literal("")),
+  githubUrl: z.string().optional().nullable().or(z.literal("")),
+  repoIncluded: z.union([z.boolean(), z.string()]).optional().nullable().transform((val) => val === true || val === "true"),
+  image: z.string().optional().nullable(),
+  gallery: galleryPreprocess,
+  team: teamPreprocess,
+  milestones: milestonesPreprocess,
+  contactEmail: z.string().optional().nullable().or(z.literal("")),
+  contactPhone: z.string().optional().nullable().or(z.literal("")),
+  contactTelegram: z.string().optional().nullable().or(z.literal("")),
+});
+
+const patchStartupSchema = createStartupSchema.partial();
+
 // POST /api/startups — yangi startap qo'shish
 app.post("/api/startups", authenticateToken, async (req: AuthRequest, res: Response) => {
+  const parsed = createStartupSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0].message });
+  }
+
   const {
     name,
     slogan,
     description,
     longDescription,
     category,
-    price,
+    price: parsedPrice,
     listingType,
     techStack,
     demoUrl,
@@ -2406,16 +2476,7 @@ app.post("/api/startups", authenticateToken, async (req: AuthRequest, res: Respo
     contactPhone,
     contactTelegram,
     deliveryUrl,
-  } = req.body;
-
-  if (!name || !description || !category || price === undefined) {
-    return res.status(400).json({ error: "Majburiy maydonlar to'ldirilmagan." });
-  }
-
-  const parsedPrice = parseFloat(price as any);
-  if (isNaN(parsedPrice) || parsedPrice <= 0) {
-    return res.status(400).json({ error: "Narx musbat son bo'lishi shart." });
-  }
+  } = parsed.data;
 
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user?.id } });
@@ -2423,21 +2484,17 @@ app.post("/api/startups", authenticateToken, async (req: AuthRequest, res: Respo
       return res.status(403).json({ error: "Startap e'lon qilish uchun iltimos avval email manzilingizni tasdiqlang." });
     }
 
-    // Generate unique slug
+    // Generate unique slug (optimized high-performance generation)
     let baseSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
     if (!baseSlug) baseSlug = 'startup';
     
     let slug = baseSlug;
-    let count = 0;
-    while (true) {
-      const existing = await prisma.startup.findUnique({ where: { id: slug } });
-      if (!existing) break;
-      count++;
-      slug = `${baseSlug}-${Math.random().toString(36).slice(2, 7)}`;
-      // If even with random suffix it exists (unlikely), try again. 
-      // But limit attempts to avoid infinite loop
-      if (count > 5) {
-        return res.status(400).json({ error: "Ushbu nom band, iltimos biroz boshqacharoq nom tanlang." });
+    const existing = await prisma.startup.findUnique({ where: { id: slug } });
+    if (existing) {
+      slug = `${baseSlug}-${crypto.randomBytes(3).toString('hex')}`;
+      const existingSecond = await prisma.startup.findUnique({ where: { id: slug } });
+      if (existingSecond) {
+        slug = `${baseSlug}-${crypto.randomBytes(4).toString('hex')}`;
       }
     }
 
@@ -2454,7 +2511,7 @@ app.post("/api/startups", authenticateToken, async (req: AuthRequest, res: Respo
         techStack: JSON.stringify(techStack || []),
         demoUrl: demoUrl || "",
         deliveryUrl: deliveryUrl || "",
-        repoIncluded: repoIncluded === true || repoIncluded === "true",
+        repoIncluded: repoIncluded === true,
         soldStatus: "sotuvda",
         status: "pending", // default is pending
         proposalsCount: 0,
@@ -2480,11 +2537,12 @@ app.post("/api/startups", authenticateToken, async (req: AuthRequest, res: Respo
 // PATCH /api/startups/:id — startapni tahrirlash
 app.patch("/api/startups/:id", authenticateToken, async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
-  const { 
-    name, price, description, longDescription, category, 
-    listingType, demoUrl, githubUrl, image, gallery, 
-    techStack, team, milestones, contactEmail, contactPhone, contactTelegram 
-  } = req.body;
+
+  const parsed = patchStartupSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0].message });
+  }
+  const validatedData = parsed.data;
 
   try {
     const startup = await prisma.startup.findUnique({ where: { id } });
@@ -2497,22 +2555,30 @@ app.patch("/api/startups/:id", authenticateToken, async (req: AuthRequest, res: 
     }
 
     const updatedData: any = {};
-    if (name !== undefined) updatedData.name = name;
-    if (price !== undefined) updatedData.price = parseFloat(price);
-    if (description !== undefined) updatedData.description = description;
-    if (longDescription !== undefined) updatedData.longDescription = longDescription;
-    if (category !== undefined) updatedData.category = category;
-    if (listingType !== undefined) updatedData.listingType = listingType;
-    if (demoUrl !== undefined) updatedData.demoUrl = demoUrl;
-    if (githubUrl !== undefined) updatedData.githubUrl = githubUrl;
-    if (image !== undefined) updatedData.image = image;
-    if (gallery !== undefined) updatedData.gallery = typeof gallery === 'string' ? gallery : JSON.stringify(gallery || []);
-    if (techStack !== undefined) updatedData.techStack = typeof techStack === 'string' ? techStack : JSON.stringify(techStack || []);
-    if (team !== undefined) updatedData.team = typeof team === 'string' ? team : JSON.stringify(team || []);
-    if (milestones !== undefined) updatedData.milestones = typeof milestones === 'string' ? milestones : JSON.stringify(milestones || []);
-    if (contactEmail !== undefined) updatedData.contactEmail = contactEmail;
-    if (contactPhone !== undefined) updatedData.contactPhone = contactPhone;
-    if (contactTelegram !== undefined) updatedData.contactTelegram = contactTelegram;
+    if (validatedData.name !== undefined) updatedData.name = validatedData.name;
+    if (validatedData.price !== undefined) updatedData.price = validatedData.price;
+    if (validatedData.description !== undefined) updatedData.description = validatedData.description;
+    if (validatedData.longDescription !== undefined) updatedData.longDescription = validatedData.longDescription;
+    if (validatedData.category !== undefined) updatedData.category = validatedData.category;
+    if (validatedData.listingType !== undefined) updatedData.listingType = validatedData.listingType;
+    if (validatedData.demoUrl !== undefined) updatedData.demoUrl = validatedData.demoUrl;
+    if (validatedData.image !== undefined) updatedData.image = validatedData.image;
+    if (validatedData.gallery !== undefined) {
+      updatedData.gallery = JSON.stringify(validatedData.gallery || []);
+    }
+    if (validatedData.techStack !== undefined) {
+      updatedData.techStack = JSON.stringify(validatedData.techStack || []);
+    }
+    if (validatedData.team !== undefined) {
+      updatedData.team = JSON.stringify(validatedData.team || []);
+    }
+    if (validatedData.milestones !== undefined) {
+      updatedData.milestones = JSON.stringify(validatedData.milestones || []);
+    }
+    if (validatedData.contactEmail !== undefined) updatedData.contactEmail = validatedData.contactEmail;
+    if (validatedData.contactPhone !== undefined) updatedData.contactPhone = validatedData.contactPhone;
+    if (validatedData.contactTelegram !== undefined) updatedData.contactTelegram = validatedData.contactTelegram;
+    if (validatedData.deliveryUrl !== undefined) updatedData.deliveryUrl = validatedData.deliveryUrl;
     
     // Agar faol bo'lsa, moderatsiyaga qaytarsin (Xavfsizlik)
     if (startup.status === "active") {
@@ -3779,7 +3845,16 @@ app.get("/api/conversations/:id/messages", authenticateToken, async (req: AuthRe
 app.post("/api/conversations/:id/messages", authenticateToken, rateLimit({ windowMs: 60 * 1000, max: 20 }), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { content } = req.body;
+    
+    const messageSchema = z.object({
+      content: z.string().trim().min(1, "Xabar matni bo'sh bo'lishi mumkin emas").max(3000, "Xabar matni 3000 ta belgidan oshmasligi kerak")
+    });
+
+    const parsed = messageSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.issues[0].message });
+    }
+    const { content } = parsed.data;
     const senderId = req.user!.id;
     
     const conversation = await prisma.conversation.findUnique({ where: { id }, include: { buyer: true, seller: true } });
