@@ -10,7 +10,6 @@ import {
   prisma,
   JWT_SECRET,
   generateRefreshToken,
-  sendVerificationEmail,
   sendEmail,
   authenticateToken,
   getSetting,
@@ -79,6 +78,8 @@ router.post("/register", authLimiter, async (req: Request, res: Response) => {
     const userRole = "Xaridor";
     const telegramLinkCode = Math.random().toString(36).substring(2, 8).toUpperCase();
     const telegramLinkCodeExpires = new Date(Date.now() + 15 * 60 * 1000);
+    // 10-MUAMMO: Email-tasdiqlash kodini (verificationToken) generatsiya qilib foydalanishga kiritish (Variant 2 tanlandi)
+    const verificationToken = crypto.randomBytes(32).toString("hex");
 
     const user = await prisma.user.create({
       data: {
@@ -92,8 +93,11 @@ router.post("/register", authLimiter, async (req: Request, res: Response) => {
         emailVerified: false,
         telegramLinkCode,
         telegramLinkCodeExpires,
+        verificationToken,
       },
     });
+
+    // 10-MUAMMO: Ro'yxatdan o'tishda tasdiqlash emaili yuborish o'chirilgan (Telegram va Google orqali tasdiqlash ishlatiladi)
 
     const accessToken = jwt.sign(
       { id: user.id, email: user.email, name: user.name, role: user.role },

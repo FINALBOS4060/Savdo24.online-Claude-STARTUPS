@@ -220,13 +220,11 @@ app.get("/api/admin/cron/escrow-release", authenticateToken, requireAdmin, async
 
 async function autoReleaseEscrows() {
   try {
-    const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
-    
-    // Find escrows held for more than 14 days
+    // 11-MUAMMO: holdEndDate maydoni bo'yicha haqiqiy muddati tugagan escrowlarni ozod qilish
     const escrowsToRelease = await prisma.escrowPayment.findMany({
       where: {
         status: "held",
-        createdAt: { lt: fourteenDaysAgo }
+        holdEndDate: { lt: new Date() }
       },
       include: {
         payment: {
@@ -411,12 +409,17 @@ app.use(express.json());
 app.use(cookieParser());
 
 // Security Headers & CORS
+const isProd = process.env.NODE_ENV === "production";
 app.use(helmet({
-  xFrameOptions: false,
   crossOriginResourcePolicy: { policy: "cross-origin" },
+  // 3-MUAMMO: Clickjacking himoyasini kuchaytirish
+  // Ishlab chiqish (dev) muhitida Google AI Studio iframe'i ishlashi uchun ruxsat beramiz, 
+  // lekin production'da qat'iy clickjacking himoyasini o'rnatamiz (xFrameOptions defaultga, ya'ni SAMEORIGIN ga qaytadi).
+  ...(isProd ? {} : { xFrameOptions: false }),
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
+      // TODO: inline script/eval'larni nonce/tashqi faylga ko'chirib, keyin unsafe-inline/unsafe-eval'ni olib tashlash kerak
       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://accounts.google.com", "https://*.stripe.com"],
       connectSrc: [
         "'self'", 
@@ -440,7 +443,9 @@ app.use(helmet({
         "https://*.coingate.com"
       ],
       frameSrc: ["'self'", "https://accounts.google.com", "https://*.stripe.com"],
-      frameAncestors: null,
+      frameAncestors: isProd 
+        ? ["'self'"] 
+        : ["'self'", "https://*.google.com", "https://*.run.app", "https://*.googleusercontent.com"],
     },
   },
   crossOriginEmbedderPolicy: false
@@ -1069,6 +1074,11 @@ export async function authenticateToken(req: AuthRequest, res: Response, next: N
 
 // TOP narxini talabga qarab hisoblash (dinamik narx)
 async function calculateTopPrice(days: number) {
+  // 6-MUAMMO: "days" parametrining ichki xavfsizlik tekshiruvi (musbat butun son va 1-365 chegarasida ekanligi)
+  if (!Number.isInteger(days) || days < 1 || days > 365) {
+    throw new Error("Kunlar soni 1 dan 365 gacha butun son bo'lishi kerak.");
+  }
+
   const basePrice = parseFloat(await getSetting("TOP_BASE_PRICE_PER_DAY") || "1");
   const maxSlots = parseInt(await getSetting("TOP_MAX_CONCURRENT_SLOTS") || "20");
   const activeCount = await prisma.startup.count({ 
@@ -1106,62 +1116,6 @@ app.post("/api/newsletter/subscribe", async (req: Request, res: Response) => {
   }
 });
 
-// Email Verification Helper Function
-export async function sendVerificationEmail(email: string, token: string, name: string) {
-  const appUrl = await getSetting("APP_URL") || "http://localhost:3000";
-  const verifyUrl = `${appUrl}/api/auth/verify-email?token=${token}`;
-  console.log("==================================================");
-  console.log(`VERIFICATION EMAIL TO ${email} [${name}]:`);
-  console.log(`Link: ${verifyUrl}`);
-  console.log("==================================================");
-
-  // SMTP Settings
-  const smtpHost = await getSetting("SMTP_HOST");
-  const rawSmtpPort = await getSetting("SMTP_PORT");
-  const smtpPort = rawSmtpPort ? parseInt(rawSmtpPort) : 587;
-  const smtpUser = await getSetting("SMTP_USER");
-  const smtpPass = await getSetting("SMTP_PASS");
-
-  if (smtpHost && smtpUser && smtpPass) {
-    try {
-      const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: smtpPort,
-        secure: smtpPort === 465,
-        auth: {
-          user: smtpUser,
-          pass: smtpPass,
-        },
-      });
-
-      await transporter.sendMail({
-        from: `"Savdo24 Support" <${smtpUser}>`,
-        to: email,
-        subject: "Savdo24 — Email manzilingizni tasdiqlang",
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px; background-color: #0d131a; color: #ffffff;">
-            <h2 style="color: #10b981; text-align: center;">Savdo24-ga xush kelibsiz!</h2>
-            <p>Salom <strong>${name}</strong>,</p>
-            <p>Savdo24 platformasida muvaffaqiyatli ro'yxatdan o'tganingiz uchun rahmat. Hisobingizni faollashtirish va barcha imkoniyatlardan foydalanish uchun quyidagi havola orqali email manzilingizni tasdiqlang:</p>
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${verifyUrl}" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Emailni tasdiqlash</a>
-            </div>
-            <p style="font-size: 12px; color: #8892b0;">Agar tugma ishlamasa, ushbu havolani brauzeringizga nusxalab joylashtiring:</p>
-            <p style="font-size: 12px; color: #10b981; word-break: break-all;">${verifyUrl}</p>
-            <hr style="border: none; border-top: 1px solid #18202c; margin: 20px 0;" />
-            <p style="font-size: 11px; color: #8892b0; text-align: center;">Savdo24 — Startaplar, AI va raqamli mahsulotlar bozori</p>
-          </div>
-        `,
-      });
-      console.log(`Email successfully sent to ${email}`);
-    } catch (err: any) {
-      console.error("Failed to send email via SMTP:", err.message);
-    }
-  } else {
-    console.log("SMTP not configured in env variables, verification email printed to console.");
-  }
-}
-
 // Refresh Token Helper
 export async function generateRefreshToken(userId: number, req: Request): Promise<string> {
   const tokenValue = `${crypto.randomBytes(40).toString("hex")}-${userId}`;
@@ -1193,6 +1147,22 @@ app.get("/api/auth/google-client-id", async (req: Request, res: Response) => {
     res.status(500).json({ error: "Google client ID yuklashda xatolik." });
   }
 });
+
+// 9-MUAMMO: Google orqali kirishda refreshToken xavfsiz saqlash uchun cookie o'rnatish helper funktsiyasi
+function setAuthCookiesLocal(res: Response, accessToken: string, refreshToken: string) {
+  res.cookie("token", accessToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: 15 * 60 * 1000 // 15 minutes
+  });
+  res.cookie("refreshToken", refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+  });
+}
 
 app.post("/api/auth/google", async (req: Request, res: Response) => {
   const { credential } = req.body;
@@ -1238,14 +1208,10 @@ app.post("/api/auth/google", async (req: Request, res: Response) => {
     const accessToken = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: "15m" });
     const refreshToken = await generateRefreshToken(user.id, req);
 
-    res.cookie("token", accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 15 * 60 * 1000 // 15 minutes
-    });
+    // 9-MUAMMO: Google orqali kirishda refreshToken xavfsiz saqlash uchun setAuthCookiesLocal chaqirildi, refreshToken javob body-sidan olib tashlandi.
+    setAuthCookiesLocal(res, accessToken, refreshToken);
 
-    res.json({ accessToken, refreshToken, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+    res.json({ accessToken, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
   } catch (err) {
     console.error("Google auth error:", err);
     res.status(401).json({ error: "Google orqali kirish muvaffaqiyatsiz bo'ldi." });
@@ -1509,13 +1475,17 @@ app.post("/api/escrow/dispute", authenticateToken, async (req: AuthRequest, res:
       })
     ]);
 
-    await createNotification(
-      1, // Admin notification (assuming ID 1 is main admin)
-      "SYSTEM",
-      "Yangi Escrow Nizosi",
-      `To'lov #${paymentId} bo'yicha nizo ochildi.`,
-      `/admin/disputes`
-    );
+    // 5-MUAMMO: Hardcoded admin ID (1) o'rniga barcha haqiqiy adminlarni topib, ularga bildirishnoma yuborish
+    const admins = await prisma.user.findMany({ where: { role: "Admin" } });
+    for (const admin of admins) {
+      await createNotification(
+        admin.id,
+        "SYSTEM",
+        "Yangi Escrow Nizosi",
+        `To'lov #${paymentId} bo'yicha nizo ochildi.`,
+        `/admin/disputes`
+      );
+    }
 
     res.json({ success: true, message: "Nizo qabul qilindi. Admin ko'rib chiqadi." });
   } catch (err) {
@@ -1538,13 +1508,17 @@ app.post("/api/b2b/onboard", authenticateToken, async (req: AuthRequest, res: Re
       }
     });
 
-    await createNotification(
-      1,
-      "SYSTEM",
-      "Yangi B2B So'rov",
-      `"${companyName}" kompaniyasi B2B hisob uchun so'rov yubordi.`,
-      `/admin/b2b`
-    );
+    // 5-MUAMMO: Hardcoded admin ID (1) o'rniga barcha haqiqiy adminlarni topib, ularga bildirishnoma yuborish
+    const admins = await prisma.user.findMany({ where: { role: "Admin" } });
+    for (const admin of admins) {
+      await createNotification(
+        admin.id,
+        "SYSTEM",
+        "Yangi B2B So'rov",
+        `"${companyName}" kompaniyasi B2B hisob uchun so'rov yubordi.`,
+        `/admin/b2b`
+      );
+    }
 
     res.json(b2b);
   } catch (err) {
@@ -2174,7 +2148,14 @@ app.get("/api/startups/:id", async (req: Request, res: Response) => {
 app.get("/api/top-boost/price", async (req: Request, res: Response) => {
   const { days } = req.query;
   if (!days) return res.status(400).json({ error: "Kunlar soni ko'rsatilmadi." });
-  const price = await calculateTopPrice(parseInt(days as string));
+
+  // 6-MUAMMO: "days" parametrini validatsiya qilish (1 dan 365 gacha butun son bo'lishi kerak)
+  const daysNum = parseInt(days as string, 10);
+  if (!Number.isInteger(daysNum) || daysNum < 1 || daysNum > 365) {
+    return res.status(400).json({ error: "Kunlar soni 1 dan 365 gacha butun son bo'lishi kerak." });
+  }
+
+  const price = await calculateTopPrice(daysNum);
   res.json({ price });
 });
 
@@ -2183,12 +2164,27 @@ app.post("/api/top-boost/create", authenticateToken, async (req: AuthRequest, re
   const { startupId, days } = req.body;
   if (!startupId || !days) return res.status(400).json({ error: "StartupId va kunlar soni ko'rsatilmadi." });
 
+  // 6-MUAMMO: "days" parametrini validatsiya qilish (1 dan 365 gacha butun son bo'lishi kerak)
+  const daysNum = parseInt(days as string, 10);
+  if (!Number.isInteger(daysNum) || daysNum < 1 || daysNum > 365) {
+    return res.status(400).json({ error: "Kunlar soni 1 dan 365 gacha butun son bo'lishi kerak." });
+  }
+
   try {
     const startup = await prisma.startup.findUnique({ where: { id: startupId } });
     if (!startup) return res.status(404).json({ error: "Startap topilmadi." });
 
-    const price = await calculateTopPrice(parseInt(days as string));
-    const orderId = `TOP-${days}-` + crypto.randomBytes(4).toString('hex').toUpperCase();
+    const coingateToken = await getSetting("COINGATE_API_TOKEN");
+    const appUrlSetting = await getSetting("APP_URL") || "http://localhost:3000";
+
+    // 7-MUAMMO: COINGATE_API_TOKEN sozlanmagan bo'lsa va production bo'lsa, oldindan xatolik qaytarish (muvaffaqiyatsiz to'lov simulyatoriga tushib qolmaslik uchun)
+    if (process.env.NODE_ENV === "production" && !coingateToken) {
+      console.error("COINGATE_API_TOKEN sozlanmagan (production)");
+      return res.status(503).json({ error: "To'lov tizimi vaqtincha mavjud emas." });
+    }
+
+    const price = await calculateTopPrice(daysNum);
+    const orderId = `TOP-${daysNum}-` + crypto.randomBytes(4).toString('hex').toUpperCase();
     const secureToken = crypto.randomBytes(24).toString('hex');
 
     await prisma.payment.create({
@@ -2207,8 +2203,6 @@ app.post("/api/top-boost/create", authenticateToken, async (req: AuthRequest, re
     });
 
     let paymentUrl = "";
-    const coingateToken = await getSetting("COINGATE_API_TOKEN");
-    const appUrlSetting = await getSetting("APP_URL") || "http://localhost:3000";
 
     if (coingateToken) {
       try {
@@ -2226,7 +2220,7 @@ app.post("/api/top-boost/create", authenticateToken, async (req: AuthRequest, re
             callback_url: `${appUrlSetting}/api/payments/webhook?token=${secureToken}`,
             success_url: `${appUrlSetting}/checkout/success`,
             cancel_url: `${appUrlSetting}/checkout/cancel`,
-            title: `TOP Boost: ${startup.name} (${days} kun)`,
+            title: `TOP Boost: ${startup.name} (${daysNum} kun)`,
           }),
         });
 
@@ -2255,13 +2249,28 @@ app.post("/api/vip/create", authenticateToken, async (req: AuthRequest, res: Res
   const { days } = req.body;
   if (!days) return res.status(400).json({ error: "Kunlar soni ko'rsatilmadi." });
 
+  // 6-MUAMMO: "days" parametrini validatsiya qilish (1 dan 365 gacha butun son bo'lishi kerak)
+  const daysNum = parseInt(days as string, 10);
+  if (!Number.isInteger(daysNum) || daysNum < 1 || daysNum > 365) {
+    return res.status(400).json({ error: "Kunlar soni 1 dan 365 gacha butun son bo'lishi kerak." });
+  }
+
   try {
     const basePricePerDay = parseFloat(await getSetting("VIP_PRICE_PER_DAY") || "0.5");
     const discountPercent = parseFloat(await getSetting("VIP_DISCOUNT_PERCENT") || "40");
-    const totalBasePrice = basePricePerDay * parseInt(days as string);
+    const totalBasePrice = basePricePerDay * daysNum;
     const price = Math.round(totalBasePrice * (1 - discountPercent / 100) * 100) / 100;
 
-    const orderId = `VIP-${days}-` + crypto.randomBytes(4).toString('hex').toUpperCase();
+    const coingateToken = await getSetting("COINGATE_API_TOKEN");
+    const appUrlSetting = await getSetting("APP_URL") || "http://localhost:3000";
+
+    // 7-MUAMMO: COINGATE_API_TOKEN sozlanmagan bo'lsa va production bo'lsa, oldindan xatolik qaytarish (muvaffaqiyatsiz to'lov simulyatoriga tushib qolmaslik uchun)
+    if (process.env.NODE_ENV === "production" && !coingateToken) {
+      console.error("COINGATE_API_TOKEN sozlanmagan (production)");
+      return res.status(503).json({ error: "To'lov tizimi vaqtincha mavjud emas." });
+    }
+
+    const orderId = `VIP-${daysNum}-` + crypto.randomBytes(4).toString('hex').toUpperCase();
     const secureToken = crypto.randomBytes(24).toString('hex');
 
     await prisma.payment.create({
@@ -2279,8 +2288,6 @@ app.post("/api/vip/create", authenticateToken, async (req: AuthRequest, res: Res
     });
 
     let paymentUrl = "";
-    const coingateToken = await getSetting("COINGATE_API_TOKEN");
-    const appUrlSetting = await getSetting("APP_URL") || "http://localhost:3000";
 
     if (coingateToken) {
       try {
@@ -2298,7 +2305,7 @@ app.post("/api/vip/create", authenticateToken, async (req: AuthRequest, res: Res
             callback_url: `${appUrlSetting}/api/payments/webhook?token=${secureToken}`,
             success_url: `${appUrlSetting}/checkout/success`,
             cancel_url: `${appUrlSetting}/checkout/cancel`,
-            title: `VIP Subscription (${days} kun)`,
+            title: `VIP Subscription (${daysNum} kun)`,
           }),
         });
 
@@ -2768,13 +2775,27 @@ app.post("/api/upload", authenticateToken, uploadLimiter, upload.single("file"),
     let finalContentType = req.file.mimetype;
     let finalExt = path.extname(req.file.originalname) || ".jpg";
 
+    // 8-MUAMMO: sharp yordamida haqiqiy rasm turi (magic bytes) va butunligini tekshirish
+    let metadata: any;
+    try {
+      metadata = await sharp(req.file.buffer).metadata();
+    } catch (err) {
+      console.error("Fayl tarkibini tekshirishda xatolik (Sharp metadata):", err);
+      return res.status(400).json({ error: "Fayl formati noto'g'ri yoki buzilgan." });
+    }
+
+    const allowedFormats = ["jpeg", "png", "webp", "gif", "jpg"];
+    if (!metadata || !metadata.format || !allowedFormats.includes(metadata.format)) {
+      return res.status(400).json({ error: "Faqat rasm fayllari (JPEG, PNG, WEBP, GIF) qabul qilinadi." });
+    }
+
     // Compress images using sharp
-    if (req.file.mimetype === "image/gif") {
+    if (metadata.format === "gif") {
       // Preserve GIF animation
       finalBuffer = req.file.buffer;
       finalContentType = "image/gif";
       finalExt = ".gif";
-    } else if (req.file.mimetype.startsWith("image/")) {
+    } else {
       try {
         finalBuffer = await sharp(req.file.buffer)
           .resize(1600, 1600, { fit: "inside", withoutEnlargement: true })
@@ -2783,7 +2804,9 @@ app.post("/api/upload", authenticateToken, uploadLimiter, upload.single("file"),
         finalContentType = "image/jpeg";
         finalExt = ".jpg";
       } catch (err) {
+        // 8-MUAMMO: Agar sharp siqishda xato bersa, faylni baribir yuklamasdan xato qaytarish
         console.error("Sharp compression error:", err);
+        return res.status(400).json({ error: "Fayl formati noto'g'ri yoki buzilgan." });
       }
     }
 
@@ -3786,64 +3809,6 @@ app.get("/api/payments/status/:id", authenticateToken, paymentStatusLimiter, asy
   }
 });
 
-// GET /api/auth/verify-email — Emailni tasdiqlash havolasi
-app.get("/api/auth/verify-email", async (req: Request, res: Response) => {
-  const { token } = req.query;
-
-  if (!token) {
-    return res.status(400).send(`
-      <div style="font-family: Arial, sans-serif; text-align: center; margin-top: 100px; background-color: #0d131a; color: white; padding: 40px; border-radius: 10px; max-width: 500px; margin-left: auto; margin-right: auto; border: 1px solid #ef4444;">
-        <h1 style="color: #ef4444;">Tasdiqlash kodi topilmadi</h1>
-        <p>Iltimos, email manzilingizdagi havolani qayta tekshiring.</p>
-        <a href="/" style="background-color: #10b981; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; margin-top: 15px;">Bosh sahifaga qaytish</a>
-      </div>
-    `);
-  }
-
-  try {
-    const user = await prisma.user.findFirst({
-      where: { verificationToken: token as string }
-    });
-
-    if (!user) {
-      return res.status(404).send(`
-        <div style="font-family: Arial, sans-serif; text-align: center; margin-top: 100px; background-color: #0d131a; color: white; padding: 40px; border-radius: 10px; max-width: 500px; margin-left: auto; margin-right: auto; border: 1px solid #ef4444;">
-          <h1 style="color: #ef4444;">Yaroqsiz yoki eskirgan tasdiqlash kodi</h1>
-          <p>Ushbu tasdiqlash kodi yaroqsiz yoki allaqachon ishlatilgan.</p>
-          <a href="/" style="background-color: #10b981; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; margin-top: 15px;">Bosh sahifaga qaytish</a>
-        </div>
-      `);
-    }
-
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        emailVerified: true,
-        verificationToken: null // Clear token after use
-      }
-    });
-
-    res.send(`
-      <div style="font-family: Arial, sans-serif; text-align: center; margin-top: 100px; background-color: #0d131a; color: white; padding: 40px; border-radius: 10px; max-width: 500px; margin-left: auto; margin-right: auto; border: 1px solid #10b981;">
-        <h1 style="color: #10b981;">Email muvaffaqiyatli tasdiqlandi! 🎉</h1>
-        <p>Sizning email manzilingiz muvaffaqiyatli tasdiqlandi. Endi platformadagi barcha xizmatlardan to'liq foydalana olasiz.</p>
-        <p style="color: #8892b0; font-size: 14px;">Ushbu sahifani yopishingiz va Savdo24 platformasini yangilashingiz (refresh) mumkin.</p>
-        <div style="margin-top: 30px;">
-          <a href="/" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Savdo24-ga o'tish</a>
-        </div>
-      </div>
-    `);
-  } catch (err: any) {
-    console.error("Email verification error:", err);
-    res.status(500).send(`
-      <div style="font-family: Arial, sans-serif; text-align: center; margin-top: 100px; background-color: #0d131a; color: white; padding: 40px; border-radius: 10px; max-width: 500px; margin-left: auto; margin-right: auto; border: 1px solid #ef4444;">
-        <h1 style="color: #ef4444;">Serverda xatolik yuz berdi</h1>
-        <p>Iltimos qayta urinib ko'ring.</p>
-      </div>
-    `);
-  }
-});
-
 // POST /api/reviews — Sharh qoldirish
 app.post("/api/reviews", authenticateToken, async (req: AuthRequest, res: Response) => {
   const { rating, comment, startupId } = req.body;
@@ -4203,45 +4168,63 @@ app.get("/api/admin/stats", authenticateToken, requireAdmin, async (req: AuthReq
 
 // POST /api/reports — Shikoyat qilish (Foydalanuvchi)
 
-// POST /api/support
-app.post("/api/support", supportLimiter, async (req, res) => {
+// Support endpoints (moved higher to ensure they are handled before catch-all and properly organized)
+app.post("/api/support", supportLimiter, async (req: Request, res: Response) => {
+  const { email, subject, message } = req.body;
+
+  if (!email || !subject || !message) {
+    return res.status(400).json({ error: "Barcha maydonlarni to'ldirish shart." });
+  }
+
   try {
-    const { email, subject, message } = req.body;
-    if (!email || !subject || !message) {
-      return res.status(400).json({ error: "Barcha maydonlarni to'ldiring." });
-    }
-    
     const ticket = await prisma.supportTicket.create({
-      data: { email, subject, message }
+      data: {
+        email,
+        subject,
+        message,
+        status: "pending"
+      }
     });
 
-    try {
-      const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS
-        }
-      });
-      await transporter.sendMail({
-        from: '"Savdo24 Support" <noreply@savdo24.uz>',
-        to: process.env.EMAIL_USER || "admin@savdo24.uz",
-        subject: `Yangi murojaat: ${subject}`,
-        html: `
-          <h3>Yangi murojaat kelib tushdi</h3>
-          <p><strong>Email:</strong> ${email}</p>
-          <p><strong>Mavzu:</strong> ${subject}</p>
-          <p><strong>Xabar:</strong> ${message}</p>
-        `
-      });
-    } catch (emailErr) {
-      console.error("Support email sending failed:", emailErr);
-    }
+    // Send notification email to admin using the common sendEmail utility (no Gmail-specific env vars)
+    await sendEmail(
+      "admin@savdo24.uz",
+      `Yangi qo'llab-quvvatlash chiptasi: ${subject}`,
+      `
+      <div style="font-family: sans-serif; padding: 20px;">
+        <h2>Yangi qo'llab-quvvatlash chiptasi</h2>
+        <p><strong>Email:</strong> ${email}</p>
+        <p><strong>Mavzu:</strong> ${subject}</p>
+        <p><strong>Xabar:</strong></p>
+        <div style="background: #f4f4f4; padding: 15px; border-radius: 8px;">
+          ${message.replace(/\n/g, '<br>')}
+        </div>
+        <hr/>
+        <p>ID: ${ticket.id}</p>
+      </div>
+      `
+    );
 
-    res.status(201).json({ success: true, message: "Murojaatingiz yuborildi." });
+    res.json({ success: true, message: "Xabaringiz muvaffaqiyatli yuborildi. Tez orada siz bilan bog'lanamiz." });
+  } catch (err: any) {
+    console.error("Support ticket error:", err);
+    res.status(500).json({ error: "Xabarni yuborishda xatolik yuz berdi." });
+  }
+});
+
+app.get("/api/support", authenticateToken, async (req: Request, res: Response) => {
+  const user = (req as any).user;
+  if (user.role !== "Admin") {
+    return res.status(403).json({ error: "Faqat adminlar uchun ruxsat etilgan." });
+  }
+
+  try {
+    const tickets = await prisma.supportTicket.findMany({
+      orderBy: { createdAt: "desc" }
+    });
+    res.json(tickets);
   } catch (err) {
-    console.error("Support POST error:", err);
-    res.status(500).json({ error: "Xatolik yuz berdi." });
+    res.status(500).json({ error: "Chiptalarni yuklashda xatolik." });
   }
 });
 
@@ -5003,73 +4986,6 @@ app.get("/startup/:id", async (req, res, next) => {
     console.error("Kutilmagan server xatosi:", err);
     res.status(500).json({ error: "Kutilmagan xatolik yuz berdi. Iltimos qaytadan urinib ko'ring." });
   });
-
-// Support endpoints
-const supportLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 support tickets per window
-  message: { error: "Siz juda ko'p so'rov yubordingiz. Iltimos, bir ozdan keyin qayta urinib ko'ring." }
-});
-
-app.post("/api/support", supportLimiter, async (req: Request, res: Response) => {
-  const { email, subject, message } = req.body;
-
-  if (!email || !subject || !message) {
-    return res.status(400).json({ error: "Barcha maydonlarni to'ldirish shart." });
-  }
-
-  try {
-    const ticket = await prisma.supportTicket.create({
-      data: {
-        email,
-        subject,
-        message,
-        status: "pending"
-      }
-    });
-
-    // Send notification email to admin
-    await sendEmail(
-      "admin@savdo24.uz",
-      `Yangi qo'llab-quvvatlash chiptasi: ${subject}`,
-      `
-      <div style="font-family: sans-serif; padding: 20px;">
-        <h2>Yangi qo'llab-quvvatlash chiptasi</h2>
-        <p><strong>Email:</strong> ${email}</p>
-        <p><strong>Mavzu:</strong> ${subject}</p>
-        <p><strong>Xabar:</strong></p>
-        <div style="background: #f4f4f4; padding: 15px; border-radius: 8px;">
-          ${message.replace(/\n/g, '<br>')}
-        </div>
-        <hr/>
-        <p>ID: ${ticket.id}</p>
-      </div>
-      `
-    );
-
-    res.json({ success: true, message: "Xabaringiz muvaffaqiyatli yuborildi. Tez orada siz bilan bog'lanamiz." });
-  } catch (err: any) {
-    console.error("Support ticket error:", err);
-    res.status(500).json({ error: "Xabarni yuborishda xatolik yuz berdi." });
-  }
-});
-
-// GET /api/support - adminlar uchun (ixtiyoriy, lekin foydali)
-app.get("/api/support", authenticateToken, async (req: Request, res: Response) => {
-  const user = (req as any).user;
-  if (user.role !== "Admin") {
-    return res.status(403).json({ error: "Faqat adminlar uchun ruxsat etilgan." });
-  }
-
-  try {
-    const tickets = await prisma.supportTicket.findMany({
-      orderBy: { createdAt: "desc" }
-    });
-    res.json(tickets);
-  } catch (err) {
-    res.status(500).json({ error: "Chiptalarni yuklashda xatolik." });
-  }
-});
 
   httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
