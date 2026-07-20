@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import { encryptSecret, decryptSecret } from '../src/lib/crypto';
+import { fileURLToPath } from 'url';
 
 dotenv.config();
 
@@ -15,9 +16,12 @@ async function getSetting(key: string): Promise<string | null> {
   try {
     const dbSetting = await prismaClient.setting.findUnique({ where: { key } });
     if (dbSetting) {
-      const decrypted = decryptSecret(dbSetting.value);
-      if (decrypted) return decrypted;
-      return dbSetting.value; // Fallback if not encrypted
+      try {
+        const decrypted = decryptSecret(dbSetting.value);
+        return decrypted;
+      } catch (decryptErr) {
+        return dbSetting.value; // Fallback if not encrypted
+      }
     }
   } catch (err) {
     // Suppress if DB table settings doesn't exist yet
@@ -224,7 +228,9 @@ export async function runBackup() {
 }
 
 // CLI execution
-if (require.main === module) {
+const nodePath = process.argv[1] ? path.resolve(process.argv[1]) : '';
+const modulePath = fileURLToPath(import.meta.url);
+if (nodePath === modulePath) {
   runBackup();
 }
 

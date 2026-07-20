@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import { decryptSecret } from '../src/lib/crypto';
 import { execSync } from 'child_process';
+import { fileURLToPath } from 'url';
 
 dotenv.config();
 
@@ -14,9 +15,12 @@ async function getSetting(key: string): Promise<string | null> {
   try {
     const dbSetting = await prismaClient.setting.findUnique({ where: { key } });
     if (dbSetting) {
-      const decrypted = decryptSecret(dbSetting.value);
-      if (decrypted) return decrypted;
-      return dbSetting.value;
+      try {
+        const decrypted = decryptSecret(dbSetting.value);
+        return decrypted;
+      } catch (decryptErr) {
+        return dbSetting.value; // Fallback if not encrypted
+      }
     }
   } catch (err) {
     // Suppress
@@ -197,7 +201,9 @@ export async function restoreFromLatestBackup(manualFileId?: string) {
 }
 
 // CLI execution
-if (require.main === module) {
+const nodePath = process.argv[1] ? path.resolve(process.argv[1]) : '';
+const modulePath = fileURLToPath(import.meta.url);
+if (nodePath === modulePath) {
   const args = process.argv.slice(2);
   const manualFileId = args[0];
   restoreFromLatestBackup(manualFileId).then(() => prismaClient.$disconnect());

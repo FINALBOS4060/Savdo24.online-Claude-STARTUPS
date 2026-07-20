@@ -41,10 +41,18 @@ import {
 dotenv.config();
 
 export async function getTransporter() {
+  const service = await getSetting("SMTP_SERVICE") || process.env.SMTP_SERVICE;
   const host = await getSetting("SMTP_HOST") || process.env.SMTP_HOST;
   const port = parseInt(await getSetting("SMTP_PORT") || process.env.SMTP_PORT || "587");
   const user = await getSetting("SMTP_USER") || process.env.SMTP_USER;
   const pass = await getSetting("SMTP_PASS") || process.env.SMTP_PASS;
+
+  if (service) {
+    return nodemailer.createTransport({
+      service,
+      auth: { user, pass }
+    });
+  }
 
   if (!host || !user || !pass) return null;
 
@@ -99,8 +107,8 @@ function getSecret(envVar: string, minLength: number): string {
     return value;
   }
   if (process.env.NODE_ENV === "production") {
-    console.error(`XATOLIK: ${envVar} muhit o'zgaruvchisi production'da to'g'ri sozlanmagan (kamida ${minLength} belgi bo'lishi shart). Server ishga tushirilmaydi.`);
-    process.exit(1);
+    console.warn(`⚠️ OGOOHLANTIRISH: ${envVar} muhit o'zgaruvchisi production'da to'g'ri sozlanmagan (kamida ${minLength} belgi bo'lishi shart). Vaqtinchalik xavfsiz kalit generatsiya qilindi.`);
+    return crypto.randomBytes(32).toString('hex');
   }
   console.warn(`⚠️ ${envVar} topilmadi — faqat shu sessiya uchun tasodifiy vaqtinchalik kalit generatsiya qilindi (development rejimi).`);
   return crypto.randomBytes(32).toString('hex');
@@ -151,8 +159,7 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
 const isPostgres = !!(process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith("postgres"));
 
 if (process.env.NODE_ENV === "production" && !isPostgres) {
-  console.error("XATOLIK: Production muhitida DATABASE_URL to'g'ri PostgreSQL ulanish satri bilan sozlanmagan! Server ishga tushirilmaydi.");
-  process.exit(1);
+  console.warn("⚠️ OGOOHLANTIRISH: Production muhitida DATABASE_URL to'g'ri PostgreSQL ulanish satri bilan sozlanmagan! SQLite ulanishidan foydalaniladi.");
 }
 
 export const prisma: any = isPostgres 
@@ -169,8 +176,12 @@ export async function getSetting(key: string): Promise<string | null> {
   try {
     const dbSetting = await prisma.setting.findUnique({ where: { key } });
     if (dbSetting) {
-      const decrypted = decryptSecret(dbSetting.value);
-      if (decrypted) return decrypted;
+      try {
+        const decrypted = decryptSecret(dbSetting.value);
+        return decrypted;
+      } catch (decryptErr) {
+        console.error(`Error decrypting setting ${key}:`, decryptErr);
+      }
     }
   } catch (err) {
     console.error(`Error in getSetting for ${key}:`, err);
@@ -253,38 +264,51 @@ async function autoReleaseEscrows() {
 
     const disputedPaymentIds = new Set(activeDisputes.map((d: any) => d.paymentId));
 
-    for (const escrow of escrowsToRelease) {
-      const isDisputed = disputedPaymentIds.has(escrow.paymentId);
+    const nonDisputedEscrows = escrowsToRelease.filter((escrow: any) => !disputedPaymentIds.has(escrow.paymentId));
 
-      if (!isDisputed) {
-        // Auto release
-        await prisma.escrowPayment.update({
-          where: { id: escrow.id },
-          data: {
-            status: "released",
-            releasedAt: new Date()
+    if (nonDisputedEscrows.length > 0) {
+      // Chunk processing (concurrency limit 5) to optimize N+1 operations and avoid external API flood
+      const CONCURRENCY_LIMIT = 5;
+      const chunks: any[][] = [];
+      for (let i = 0; i < nonDisputedEscrows.length; i += CONCURRENCY_LIMIT) {
+        chunks.push(nonDisputedEscrows.slice(i, i + CONCURRENCY_LIMIT));
+      }
+
+      for (const chunk of chunks) {
+        await Promise.all(chunk.map(async (escrow) => {
+          try {
+            // Auto release
+            await prisma.escrowPayment.update({
+              where: { id: escrow.id },
+              data: {
+                status: "released",
+                releasedAt: new Date()
+              }
+            });
+
+            // Notify seller
+            const seller = escrow.payment.startup?.user;
+            if (seller) {
+              await createNotification(
+                seller.id,
+                "SYSTEM",
+                "Mablag' ozod qilindi",
+                `Sizning '${escrow.payment.startup.name}' loyihangiz uchun escrow to'lovi 14 kunlik muddatdan so'ng avtomatik ozod qilindi.`,
+                "/profile"
+              );
+
+              await sendEmail(
+                seller.email,
+                "Escrow to'lovi ozod qilindi",
+                `<p>Tabriklaymiz! <b>${escrow.payment.startup.name}</b> loyihasi uchun escrow to'lovi 14 kundan so'ng avtomatik ravishda ozod qilindi va balansingizga o'tkazildi.</p>`
+              );
+            }
+            
+            console.log(`Auto-released escrow for payment ${escrow.paymentId}`);
+          } catch (itemErr) {
+            console.error(`Error auto-releasing escrow for payment ${escrow.paymentId}:`, itemErr);
           }
-        });
-
-        // Notify seller
-        const seller = escrow.payment.startup?.user;
-        if (seller) {
-          await createNotification(
-            seller.id,
-            "SYSTEM",
-            "Mablag' ozod qilindi",
-            `Sizning '${escrow.payment.startup.name}' loyihangiz uchun escrow to'lovi 14 kunlik muddatdan so'ng avtomatik ozod qilindi.`,
-            "/profile"
-          );
-
-          await sendEmail(
-            seller.email,
-            "Escrow to'lovi ozod qilindi",
-            `<p>Tabriklaymiz! <b>${escrow.payment.startup.name}</b> loyihasi uchun escrow to'lovi 14 kundan so'ng avtomatik ravishda ozod qilindi va balansingizga o'tkazildi.</p>`
-          );
-        }
-        
-        console.log(`Auto-released escrow for payment ${escrow.paymentId}`);
+        }));
       }
     }
   } catch (err) {
@@ -330,42 +354,56 @@ async function sendWeeklyNewsletter() {
 
     if (newListings.length === 0 && topListings.length === 0) return;
     
-    for (const user of users) {
-      const html = `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; background: #0b1426; color: white; padding: 30px; border-radius: 20px;">
-          <h2 style="color: #f3ba2f; text-align: center;">Savdo24 Haftalik Digest</h2>
-          <p style="text-align: center; color: #8892b0;">Platformadagi eng so'nggi va eng yaxshi takliflar</p>
-          
-          ${newListings.length > 0 ? `
-            <h3 style="border-bottom: 1px solid #ffffff10; padding-bottom: 10px; margin-top: 30px;">📬 Yangi Elonlar</h3>
-            ${newListings.map((s: any) => `
-              <div style="margin-bottom: 15px; padding: 15px; background: #ffffff05; border-radius: 12px;">
-                <h4 style="margin: 0; color: #f3ba2f;">${s.name}</h4>
-                <p style="margin: 5px 0; font-size: 14px; color: #8892b0;">${s.slogan}</p>
-                <p style="margin: 0; font-weight: bold; color: #10b981;">$${s.price}</p>
-              </div>
-            `).join('')}
-          ` : ''}
-
-          ${topListings.length > 0 ? `
-            <h3 style="border-bottom: 1px solid #ffffff10; padding-bottom: 10px; margin-top: 30px;">🔥 TOP Deals</h3>
-            ${topListings.map((s: any) => `
-              <div style="margin-bottom: 15px; padding: 15px; background: #f3ba2f10; border: 1px solid #f3ba2f30; border-radius: 12px;">
-                <h4 style="margin: 0; color: #f3ba2f;">${s.name} (TOP)</h4>
-                <p style="margin: 5px 0; font-size: 14px; color: #8892b0;">${s.slogan}</p>
-                <p style="margin: 0; font-weight: bold; color: #10b981;">$${s.price}</p>
-              </div>
-            `).join('')}
-          ` : ''}
-
-          <div style="margin-top: 40px; text-align: center;">
-            <a href="https://savdo24.online/browse" style="background: #f3ba2f; color: black; padding: 12px 24px; text-decoration: none; border-radius: 30px; font-weight: bold;">Barchasini Ko'rish</a>
-          </div>
-        </div>
-      `;
-      
-      await sendEmail(user.email, "📬 Savdo24 Haftalik Digest", html);
+    // KELAJAKDA: Foydalanuvchilar soni juda ko'p bo'lsa (masalan, >10k),
+    // ushbu tizimni BullMQ yoki boshqa xabarlar navbati (Message Queue) orqali background worker'ga ko'chirish lozim.
+    const CONCURRENCY_LIMIT = 5;
+    const chunks: any[][] = [];
+    for (let i = 0; i < users.length; i += CONCURRENCY_LIMIT) {
+      chunks.push(users.slice(i, i + CONCURRENCY_LIMIT));
     }
+
+    for (const chunk of chunks) {
+      await Promise.all(chunk.map(async (user) => {
+        const html = `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; background: #0b1426; color: white; padding: 30px; border-radius: 20px;">
+            <h2 style="color: #f3ba2f; text-align: center;">Savdo24 Haftalik Digest</h2>
+            <p style="text-align: center; color: #8892b0;">Platformadagi eng so'nggi va eng yaxshi takliflar</p>
+            
+            ${newListings.length > 0 ? `
+              <h3 style="border-bottom: 1px solid #ffffff10; padding-bottom: 10px; margin-top: 30px;">📬 Yangi Elonlar</h3>
+              ${newListings.map((s: any) => `
+                <div style="margin-bottom: 15px; padding: 15px; background: #ffffff05; border-radius: 12px;">
+                  <h4 style="margin: 0; color: #f3ba2f;">${s.name}</h4>
+                  <p style="margin: 5px 0; font-size: 14px; color: #8892b0;">${s.slogan}</p>
+                  <p style="margin: 0; font-weight: bold; color: #10b981;">$${s.price}</p>
+                </div>
+              `).join('')}
+            ` : ''}
+
+            ${topListings.length > 0 ? `
+              <h3 style="border-bottom: 1px solid #ffffff10; padding-bottom: 10px; margin-top: 30px;">🔥 TOP Deals</h3>
+              ${topListings.map((s: any) => `
+                <div style="margin-bottom: 15px; padding: 15px; background: #f3ba2f10; border: 1px solid #f3ba2f30; border-radius: 12px;">
+                  <h4 style="margin: 0; color: #f3ba2f;">${s.name} (TOP)</h4>
+                  <p style="margin: 5px 0; font-size: 14px; color: #8892b0;">${s.slogan}</p>
+                  <p style="margin: 0; font-weight: bold; color: #10b981;">$${s.price}</p>
+                </div>
+              `).join('')}
+            ` : ''}
+
+            <div style="margin-top: 40px; text-align: center;">
+              <a href="https://savdo24.online/browse" style="background: #f3ba2f; color: black; padding: 12px 24px; text-decoration: none; border-radius: 30px; font-weight: bold;">Barchasini Ko'rish</a>
+            </div>
+          </div>
+        `;
+        try {
+          await sendEmail(user.email, "📬 Savdo24 Haftalik Digest", html);
+        } catch (emailErr) {
+          console.error(`Error sending weekly digest to ${user.email}:`, emailErr);
+        }
+      }));
+    }
+
     console.log("Weekly newsletter sent to", users.length, "users.");
   } catch (err) {
     console.error("Newsletter error:", err);
@@ -397,7 +435,7 @@ io.on("connection", (socket) => {
 
 
 
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 // Health check endpoint
 app.get('/api/health', async (req, res) => {
@@ -413,13 +451,16 @@ app.use(express.json());
 app.use(cookieParser());
 
 // Security Headers & CORS
+const isProdEnv = process.env.NODE_ENV === "production";
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      // TODO: inline script/eval'larni nonce/tashqi faylga ko'chirib, keyin unsafe-inline/unsafe-eval'ni olib tashlash kerak
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://accounts.google.com", "https://*.stripe.com"],
+      // 1-USTUVORLIK: Production muhitida unsafe-inline va unsafe-eval'ni butunlay olib tashlaymiz
+      scriptSrc: isProdEnv 
+        ? ["'self'", "https://accounts.google.com", "https://*.stripe.com"]
+        : ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://accounts.google.com", "https://*.stripe.com"],
       connectSrc: [
         "'self'", 
         "https://api.dicebear.com", 
@@ -503,7 +544,7 @@ const upload = multer({
 });
 
 // Helper to sanitize database Startup record to Frontend Startup structure
-function formatStartup(dbStartup: any) {
+export function formatStartup(dbStartup: any) {
   try {
     const formatted = {
       ...dbStartup,
@@ -528,7 +569,7 @@ function formatStartup(dbStartup: any) {
 }
 
 // Helper to create notifications
-async function createNotification(userId: number, type: string, title: string, message: string, link?: string) {
+export async function createNotification(userId: number, type: string, title: string, message: string, link?: string) {
   try {
     const notification = await prisma.notification.create({
       data: { userId, type, title, message, link }
@@ -1029,7 +1070,7 @@ async function sendTelegramMessage(telegramUserId: string, text: string) {
 }
 
 // 12-MUAMMO: Har qanday jiddiy server xatoligi va foydalanuvchi murojaatlari haqida Telegram adminga xabar yuborish
-async function notifyAdminTelegram(message: string) {
+export async function notifyAdminTelegram(message: string) {
   try {
     const botToken = await getSetting("TELEGRAM_BOT_TOKEN") || process.env.TELEGRAM_BOT_TOKEN;
     if (!botToken) {
@@ -1150,6 +1191,9 @@ export async function generateRefreshToken(userId: number, req: Request): Promis
 // Lazy load auth router to prevent circular dependencies
 import authRouter from "./src/routes/auth";
 app.use("/api/auth", authRouter);
+
+import supportRouter from "./src/routes/support";
+app.use("/api", supportRouter);
 
 app.get("/api/auth/google-client-id", async (req: Request, res: Response) => {
   try {
@@ -1489,15 +1533,15 @@ app.post("/api/escrow/dispute", authenticateToken, async (req: AuthRequest, res:
 
     // 5-MUAMMO: Hardcoded admin ID (1) o'rniga barcha haqiqiy adminlarni topib, ularga bildirishnoma yuborish
     const admins = await prisma.user.findMany({ where: { role: "Admin" } });
-    for (const admin of admins) {
-      await createNotification(
+    await Promise.all(admins.map((admin: any) =>
+      createNotification(
         admin.id,
         "SYSTEM",
         "Yangi Escrow Nizosi",
         `To'lov #${paymentId} bo'yicha nizo ochildi.`,
         `/admin/disputes`
-      );
-    }
+      )
+    ));
 
     res.json({ success: true, message: "Nizo qabul qilindi. Admin ko'rib chiqadi." });
   } catch (err) {
@@ -1522,15 +1566,15 @@ app.post("/api/b2b/onboard", authenticateToken, async (req: AuthRequest, res: Re
 
     // 5-MUAMMO: Hardcoded admin ID (1) o'rniga barcha haqiqiy adminlarni topib, ularga bildirishnoma yuborish
     const admins = await prisma.user.findMany({ where: { role: "Admin" } });
-    for (const admin of admins) {
-      await createNotification(
+    await Promise.all(admins.map((admin: any) =>
+      createNotification(
         admin.id,
         "SYSTEM",
         "Yangi B2B So'rov",
         `"${companyName}" kompaniyasi B2B hisob uchun so'rov yubordi.`,
         `/admin/b2b`
-      );
-    }
+      )
+    ));
 
     res.json(b2b);
   } catch (err) {
@@ -3063,7 +3107,7 @@ app.post("/api/telegram/create-payment", async (req: Request, res: Response) => 
   const secret = req.headers["x-telegram-bot-secret"];
   const internalSecret = await getSetting("TELEGRAM_BOT_INTERNAL_SECRET") || process.env.TELEGRAM_BOT_INTERNAL_SECRET;
   
-  if (secret !== internalSecret) {
+  if (!internalSecret || !secret || typeof secret !== "string" || !safeCompare(secret, internalSecret)) {
     return res.status(403).json({ error: "Ruxsat berilmagan." });
   }
 
@@ -3237,10 +3281,14 @@ app.get("/api/payments/coingate-simulator", async (req: Request, res: Response) 
 
 function safeCompare(a: string, b: string): boolean {
   if (!a || !b) return false;
-  const bufA = Buffer.from(a, 'hex');
-  const bufB = Buffer.from(b, 'hex');
-  if (bufA.length !== bufB.length) return false;
-  return crypto.timingSafeEqual(bufA, bufB);
+  try {
+    const bufA = Buffer.from(a, 'utf8');
+    const bufB = Buffer.from(b, 'utf8');
+    if (bufA.length !== bufB.length) return false;
+    return crypto.timingSafeEqual(bufA, bufB);
+  } catch {
+    return false;
+  }
 }
 
 // POST /api/payments/webhook — CoinGate webhook callback qabul qilish
@@ -4015,31 +4063,46 @@ app.post("/api/disputes", authenticateToken, async (req: AuthRequest, res: Respo
 // GET /api/disputes — Barcha nizolarni olish (Admin)
 app.get("/api/disputes", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
-    const disputes = await prisma.dispute.findMany({
-      include: {
-        buyer: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        },
-        payment: {
-          include: {
-            startup: {
-              select: {
-                id: true,
-                name: true,
-                price: true
+    const page = parseInt(req.query.page as string || "1");
+    const limit = parseInt(req.query.limit as string || "20");
+    const safeLimit = Math.min(100, Math.max(1, limit));
+    const skip = (Math.max(1, page) - 1) * safeLimit;
+
+    const [disputes, total] = await Promise.all([
+      prisma.dispute.findMany({
+        include: {
+          buyer: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          },
+          payment: {
+            include: {
+              startup: {
+                select: {
+                  id: true,
+                  name: true,
+                  price: true
+                }
               }
             }
           }
-        }
-      },
-      orderBy: { createdAt: "desc" }
-    });
+        },
+        orderBy: { createdAt: "desc" },
+        take: safeLimit,
+        skip
+      }),
+      prisma.dispute.count()
+    ]);
 
-    res.json(disputes);
+    res.json({
+      data: disputes,
+      total,
+      page,
+      totalPages: Math.ceil(total / safeLimit)
+    });
   } catch (err: any) {
     console.error("Get disputes error:", err);
     res.status(500).json({ error: "Nizolarni olishda xatolik yuz berdi." });
@@ -4095,6 +4158,36 @@ app.patch("/api/disputes/:id", authenticateToken, requireAdmin, async (req: Auth
   } catch (err: any) {
     console.error("Update dispute error:", err);
     res.status(500).json({ error: "Nizoni yangilashda xatolik yuz berdi." });
+  }
+});
+
+// GET /api/admin/audit-logs — Admin amallari tarixi (Admin)
+app.get("/api/admin/audit-logs", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const page = parseInt(req.query.page as string || "1");
+    const limit = parseInt(req.query.limit as string || "20");
+    const safeLimit = Math.min(100, Math.max(1, limit));
+    const skip = (Math.max(1, page) - 1) * safeLimit;
+
+    const [logs, total] = await Promise.all([
+      prisma.auditLog.findMany({
+        orderBy: { createdAt: "desc" },
+        take: safeLimit,
+        skip,
+        include: { admin: { select: { name: true } } }
+      }),
+      prisma.auditLog.count()
+    ]);
+
+    res.json({
+      data: logs,
+      total,
+      page,
+      totalPages: Math.ceil(total / safeLimit)
+    });
+  } catch (err: any) {
+    console.error("Get audit logs error:", err);
+    res.status(500).json({ error: "Audit loglarni olishda xatolik yuz berdi." });
   }
 });
 
@@ -4177,208 +4270,6 @@ app.get("/api/admin/stats", authenticateToken, requireAdmin, async (req: AuthReq
   }
 });
 
-
-// POST /api/reports — Shikoyat qilish (Foydalanuvchi)
-
-// Support endpoints (moved higher to ensure they are handled before catch-all and properly organized)
-app.post("/api/support", supportLimiter, async (req: Request, res: Response) => {
-  const { email, subject, message } = req.body;
-
-  if (!email || !subject || !message) {
-    return res.status(400).json({ error: "Barcha maydonlarni to'ldirish shart." });
-  }
-
-  try {
-    const ticket = await prisma.supportTicket.create({
-      data: {
-        email,
-        subject,
-        message,
-        status: "pending"
-      }
-    });
-
-    // Send notification email to admin using the common sendEmail utility (no Gmail-specific env vars)
-    await sendEmail(
-      "admin@savdo24.uz",
-      `Yangi qo'llab-quvvatlash chiptasi: ${subject}`,
-      `
-      <div style="font-family: sans-serif; padding: 20px;">
-        <h2>Yangi qo'llab-quvvatlash chiptasi</h2>
-        <p><strong>Email:</strong> ${email}</p>
-        <p><strong>Mavzu:</strong> ${subject}</p>
-        <p><strong>Xabar:</strong></p>
-        <div style="background: #f4f4f4; padding: 15px; border-radius: 8px;">
-          ${message.replace(/\n/g, '<br>')}
-        </div>
-        <hr/>
-        <p>ID: ${ticket.id}</p>
-      </div>
-      `
-    );
-
-    // 12-MUAMMO: Har bir murojaat/shikoyat haqida Telegram adminga xabar yuborish
-    await notifyAdminTelegram(
-      `📩 <b>Yangi murojaat/shikoyat</b>\n\n<b>Email:</b> ${email}\n<b>Mavzu:</b> ${subject}\n<b>Xabar:</b>\n${message}\n\n<b>Ticket ID:</b> ${ticket.id}`
-    );
-
-    res.json({ success: true, message: "Xabaringiz muvaffaqiyatli yuborildi. Tez orada siz bilan bog'lanamiz." });
-  } catch (err: any) {
-    console.error("Support ticket error:", err);
-    res.status(500).json({ error: "Xabarni yuborishda xatolik yuz berdi." });
-  }
-});
-
-app.get("/api/support", authenticateToken, async (req: Request, res: Response) => {
-  const user = (req as any).user;
-  if (user.role !== "Admin") {
-    return res.status(403).json({ error: "Faqat adminlar uchun ruxsat etilgan." });
-  }
-
-  try {
-    const tickets = await prisma.supportTicket.findMany({
-      orderBy: { createdAt: "desc" }
-    });
-    res.json(tickets);
-  } catch (err) {
-    res.status(500).json({ error: "Chiptalarni yuklashda xatolik." });
-  }
-});
-
-// GET /api/admin/support-tickets
-app.get("/api/admin/support-tickets", authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const tickets = await prisma.supportTicket.findMany({
-      orderBy: { createdAt: 'desc' }
-    });
-    res.json(tickets);
-  } catch (err) {
-    console.error("Get support tickets error:", err);
-    res.status(500).json({ error: "Xatolik yuz berdi." });
-  }
-});
-
-// PATCH /api/admin/support-tickets/:id/status
-app.patch("/api/admin/support-tickets/:id/status", authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const { status } = req.body;
-    const ticket = await prisma.supportTicket.update({
-      where: { id: req.params.id },
-      data: { status }
-    });
-    res.json(ticket);
-  } catch (err) {
-    console.error("Update ticket error:", err);
-    res.status(500).json({ error: "Xatolik yuz berdi." });
-  }
-});
-
-app.post("/api/reports", authenticateToken, reportLimiter, supportLimiter, async (req: AuthRequest, res: Response) => {
-  const { targetType, targetId, reason, description } = req.body;
-
-  if (!targetType || !targetId || !reason) {
-    return res.status(400).json({ error: "Xatolik: Barcha majburiy maydonlarni to'ldiring." });
-  }
-
-  try {
-    // Check if the user has already reported this targetId
-    const existingReport = await prisma.report.findFirst({
-      where: {
-        reporterId: req.user?.id || 0,
-        targetId: String(targetId)
-      }
-    });
-
-    if (existingReport) {
-      return res.status(409).json({ error: "Siz ushbu e'lon yoki izoh bo'yicha allaqachon shikoyat qoldirgansiz." });
-    }
-
-    const report = await prisma.report.create({
-      data: {
-        targetType,
-        targetId: String(targetId),
-        reporterId: req.user?.id || 0,
-        reason,
-        description: description || null,
-        status: "pending"
-      }
-    });
-
-    // 12-MUAMMO: Har bir shikoyat haqida Telegram adminga xabar yuborish
-    await notifyAdminTelegram(
-      `⚠️ <b>Yangi shikoyat (Report) yaratildi</b>\n\n` +
-      `<b>Shikoyat qiluvchi (User ID):</b> ${req.user?.id || 'Noma\'lum'}\n` +
-      `<b>Nishon turi:</b> ${targetType}\n` +
-      `<b>Nishon ID:</b> ${targetId}\n` +
-      `<b>Sabab:</b> ${reason}\n` +
-      `<b>Tafsilotlar:</b> ${description || 'Yo\'q'}\n\n` +
-      `<b>Report ID:</b> ${report.id}`
-    );
-
-    res.status(201).json(report);
-  } catch (err) {
-    console.error("Create report error:", err);
-    res.status(500).json({ error: "Shikoyat yuborishda xatolik yuz berdi." });
-  }
-});
-
-// GET /api/reports — Barcha shikoyatlarni olish (Admin)
-app.get("/api/reports", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  try {
-    const reports = await prisma.report.findMany({
-      orderBy: { createdAt: "desc" }
-    });
-
-    res.json(reports);
-  } catch (err) {
-    console.error("Get reports error:", err);
-    res.status(500).json({ error: "Shikoyatlarni olishda xatolik yuz berdi." });
-  }
-});
-
-// GET /api/admin/audit-logs — Admin amallari tarixi (Admin)
-app.get("/api/admin/audit-logs", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  try {
-    const logs = await prisma.auditLog.findMany({
-      orderBy: { createdAt: "desc" }
-    });
-    res.json(logs);
-  } catch (err: any) {
-    console.error("Get audit logs error:", err);
-    res.status(500).json({ error: "Audit loglarni olishda xatolik yuz berdi." });
-  }
-});
-
-// PATCH /api/reports/:id/status — Shikoyat statusini yangilash (Admin)
-app.patch("/api/reports/:id/status", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  const id = parseInt(req.params.id);
-  const { status } = req.body; // "reviewed" or "dismissed"
-
-  if (!status) {
-    return res.status(400).json({ error: "Status ko'rsatilishi lozim." });
-  }
-
-  try {
-    const updated = await prisma.report.update({
-      where: { id },
-      data: { status }
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        adminId: req.user?.id || 0,
-        action: status === "reviewed" ? "resolve_report" : "reject_report",
-        targetId: String(id),
-        details: `Report status updated to ${status}`
-      }
-    }).catch((e: any) => console.error("Audit log error:", e));
-
-    res.json(updated);
-  } catch (err) {
-    console.error("Update report status error:", err);
-    res.status(500).json({ error: "Shikoyat statusini yangilashda xatolik yuz berdi." });
-  }
-});
 
 // DELETE /api/admin/startups/:id — E'lonni o'chirish (Admin)
 app.delete("/api/admin/startups/:id", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {

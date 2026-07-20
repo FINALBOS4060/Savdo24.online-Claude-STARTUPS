@@ -1,7 +1,11 @@
 import { Bot, Context, session, SessionFlavor, InputFile } from "grammy";
 import dotenv from "dotenv";
+import path from "path";
 
+// Load environment variables from process.cwd() or root .env
 dotenv.config();
+dotenv.config({ path: path.resolve(process.cwd(), ".env") });
+dotenv.config({ path: path.resolve(process.cwd(), "../.env") });
 
 interface SessionData {
   token: string;
@@ -10,7 +14,8 @@ interface SessionData {
 
 type MyContext = Context & SessionFlavor<SessionData>;
 
-const bot = new Bot<MyContext>(process.env.TELEGRAM_BOT_API_TOKEN || "");
+const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.TELEGRAM_BOT_API_TOKEN || "";
+const bot = new Bot<MyContext>(botToken);
 
 bot.use(session({ initial: () => ({ token: "", startupId: "" }) }));
 

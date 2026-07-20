@@ -3,6 +3,7 @@ module.exports = {
     {
       name: 'savdo24',
       script: 'dist/server.cjs',
+      cwd: __dirname,
       env: {
         NODE_ENV: 'production',
         PORT: 3000
@@ -15,6 +16,7 @@ module.exports = {
     {
       name: 'telegram-bot',
       script: 'telegram-bot/index.ts',
+      cwd: __dirname,
       interpreter: './node_modules/.bin/tsx',
       env: {
         NODE_ENV: 'production'

@@ -14,8 +14,12 @@ async function getSetting(key: string): Promise<string | null> {
   try {
     const dbSetting = await prisma.setting.findUnique({ where: { key } });
     if (dbSetting) {
-      const decrypted = decryptSecret(dbSetting.value);
-      if (decrypted) return decrypted;
+      try {
+        const decrypted = decryptSecret(dbSetting.value);
+        return decrypted;
+      } catch (decryptErr) {
+        return dbSetting.value; // Fallback if not encrypted
+      }
     }
   } catch (err) {
     // Suppress if Setting table doesn't exist yet

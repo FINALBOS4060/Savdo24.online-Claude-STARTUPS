@@ -19,14 +19,16 @@ export function encryptSecret(text: string): string {
     return `${iv.toString('hex')}:${encrypted}:${tag}`;
   } catch (err) {
     console.error("Encryption failed:", err);
-    return '';
+    throw new Error(`Encryption failed: ${(err as Error).message}`);
   }
 }
 
 export function decryptSecret(encryptedText: string): string {
   try {
     const parts = encryptedText.split(':');
-    if (parts.length !== 3) return '';
+    if (parts.length !== 3) {
+      throw new Error("Invalid encrypted format. Expected iv:encrypted:tag");
+    }
     const [ivHex, encryptedHex, tagHex] = parts;
     const key = getEncryptionKey();
     const iv = Buffer.from(ivHex, 'hex');
@@ -38,6 +40,6 @@ export function decryptSecret(encryptedText: string): string {
     return decrypted;
   } catch (err) {
     console.error("Decryption failed:", err);
-    return '';
+    throw new Error(`Decryption failed: ${(err as Error).message}`);
   }
 }

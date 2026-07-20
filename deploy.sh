@@ -19,7 +19,7 @@ npm run build
 echo "🗄️ Generating Prisma client..."
 npx prisma generate --schema=prisma/schema.prisma
 echo "🗄️ Applying database migrations..."
-npx prisma db push --schema=prisma/schema.prisma --accept-data-loss || npx prisma migrate deploy
+npx prisma migrate deploy --schema=prisma/schema.prisma
 
 # 5. Restart PM2 process
 echo "🔄 Restarting application via PM2..."

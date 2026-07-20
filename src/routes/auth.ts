@@ -341,7 +341,8 @@ router.post("/forgot-password", passwordResetLimiter, async (req: Request, res: 
     }
 
     if (user.isBanned) {
-      return res.status(403).json({ error: "Sizning hisobingiz bloklangan. Parolni tiklash imkoniyati cheklangan." });
+      console.log(`[Forgot Password] Banned user attempted password reset: ${email}`);
+      return res.json({ success: true, message: genericMessage });
     }
 
     const token = crypto.randomBytes(32).toString("hex");

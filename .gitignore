@@ -8,3 +8,5 @@ coverage/
 !.env.example
 prisma/dev.db
 src/generated/
+server.pid
+*.pid

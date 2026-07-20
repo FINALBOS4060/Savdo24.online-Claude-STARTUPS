@@ -81,6 +81,14 @@ export default function AdminPage({
   const [isUpdatingUser, setIsUpdatingUser] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  // Pagination states for disputes, reports, and audit logs
+  const [disputesPage, setDisputesPage] = useState(1);
+  const [disputesTotalPages, setDisputesTotalPages] = useState(1);
+  const [reportsPage, setReportsPage] = useState(1);
+  const [reportsTotalPages, setReportsTotalPages] = useState(1);
+  const [auditLogsPage, setAuditLogsPage] = useState(1);
+  const [auditLogsTotalPages, setAuditLogsTotalPages] = useState(1);
+
   // Settings tab states
   const [settings, setSettings] = useState<any[]>([]);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
@@ -111,12 +119,19 @@ export default function AdminPage({
     }
   };
 
-  const fetchDisputes = async () => {
+  const fetchDisputes = async (page = 1) => {
     try {
-      const res = await fetch('/api/disputes');
+      setIsLoadingDisputes(true);
+      const res = await fetch(`/api/disputes?page=${page}&limit=20`);
       if (res.ok) {
         const data = await res.json();
-        setDisputes(data);
+        if (data && data.data) {
+          setDisputes(data.data);
+          setDisputesTotalPages(data.totalPages || 1);
+          setDisputesPage(data.page || 1);
+        } else {
+          setDisputes(data);
+        }
       }
     } catch (err) {
       console.error("Fetch disputes error:", err);
@@ -125,12 +140,19 @@ export default function AdminPage({
     }
   };
 
-  const fetchReports = async () => {
+  const fetchReports = async (page = 1) => {
     try {
-      const res = await fetch('/api/reports');
+      setIsLoadingReports(true);
+      const res = await fetch(`/api/reports?page=${page}&limit=20`);
       if (res.ok) {
         const data = await res.json();
-        setReports(data);
+        if (data && data.data) {
+          setReports(data.data);
+          setReportsTotalPages(data.totalPages || 1);
+          setReportsPage(data.page || 1);
+        } else {
+          setReports(data);
+        }
       }
     } catch (err) {
       console.error("Fetch reports error:", err);
@@ -139,18 +161,50 @@ export default function AdminPage({
     }
   };
 
-  const fetchAuditLogs = async () => {
+  const fetchAuditLogs = async (page = 1) => {
     try {
-      const res = await fetch('/api/admin/audit-logs');
+      setIsLoadingAudit(true);
+      const res = await fetch(`/api/admin/audit-logs?page=${page}&limit=20`);
       if (res.ok) {
         const data = await res.json();
-        setAuditLogs(data);
+        if (data && data.data) {
+          setAuditLogs(data.data);
+          setAuditLogsTotalPages(data.totalPages || 1);
+          setAuditLogsPage(data.page || 1);
+        } else {
+          setAuditLogs(data);
+        }
       }
     } catch (err) {
       console.error("Fetch audit logs error:", err);
     } finally {
       setIsLoadingAudit(false);
     }
+  };
+
+  const renderPagination = (currentPage: number, totalPages: number, onPageChange: (page: number) => void) => {
+    if (totalPages <= 1) return null;
+    return (
+      <div className="flex items-center justify-center gap-2 pt-6 border-t border-white/5">
+        <button
+          disabled={currentPage <= 1}
+          onClick={() => onPageChange(currentPage - 1)}
+          className="p-2 bg-white/5 hover:bg-white/10 disabled:opacity-40 text-white rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed"
+        >
+          <span className="material-symbols-outlined text-sm block">chevron_left</span>
+        </button>
+        <span className="text-xs text-on-primary-container font-medium px-2">
+          {currentPage} / {totalPages}
+        </span>
+        <button
+          disabled={currentPage >= totalPages}
+          onClick={() => onPageChange(currentPage + 1)}
+          className="p-2 bg-white/5 hover:bg-white/10 disabled:opacity-40 text-white rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed"
+        >
+          <span className="material-symbols-outlined text-sm block">chevron_right</span>
+        </button>
+      </div>
+    );
   };
 
   const fetchSponsorChannels = async () => {
@@ -1608,6 +1662,7 @@ export default function AdminPage({
                   )}
                 </div>
               ))}
+              {renderPagination(disputesPage, disputesTotalPages, fetchDisputes)}
             </div>
           )}
         </div>
@@ -1715,6 +1770,7 @@ export default function AdminPage({
                   </div>
                 );
               })}
+              {renderPagination(reportsPage, reportsTotalPages, fetchReports)}
             </div>
           )}
         </div>
@@ -1929,6 +1985,7 @@ export default function AdminPage({
                   ))}
                 </tbody>
               </table>
+              {renderPagination(auditLogsPage, auditLogsTotalPages, fetchAuditLogs)}
             </div>
           )}
         </div>
