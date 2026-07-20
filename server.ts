@@ -81,11 +81,15 @@ export async function getStripe() {
 import { encryptSecret, decryptSecret } from "./src/lib/crypto";
 import { OAuth2Client } from "google-auth-library";
 
+// 12-MUAMMO: Kutilmagan unhandledRejection xatolarini Telegram orqali adminga yuborish va serverni saqlab qolish
 process.on("unhandledRejection", (reason) => {
   console.error("Ushlanmagan promise xatosi:", reason);
+  notifyAdminTelegram(`🔴 <b>KUTILMAGAN SERVER XATOSI (unhandledRejection)</b>\n\n<code>${String(reason).slice(0, 3500)}</code>`);
 });
+// 12-MUAMMO: Kutilmagan uncaughtException xatolarini Telegram orqali adminga yuborish va serverni saqlab qolish
 process.on("uncaughtException", (err) => {
   console.error("Ushlanmagan istisno:", err);
+  notifyAdminTelegram(`🔴 <b>KUTILMAGAN SERVER XATOSI (uncaughtException)</b>\n\n<code>${(err?.stack || String(err)).slice(0, 3500)}</code>`);
 });
 
 // Environment variable validation
@@ -409,13 +413,8 @@ app.use(express.json());
 app.use(cookieParser());
 
 // Security Headers & CORS
-const isProd = process.env.NODE_ENV === "production";
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
-  // 3-MUAMMO: Clickjacking himoyasini kuchaytirish
-  // Ishlab chiqish (dev) muhitida Google AI Studio iframe'i ishlashi uchun ruxsat beramiz, 
-  // lekin production'da qat'iy clickjacking himoyasini o'rnatamiz (xFrameOptions defaultga, ya'ni SAMEORIGIN ga qaytadi).
-  ...(isProd ? {} : { xFrameOptions: false }),
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
@@ -443,9 +442,7 @@ app.use(helmet({
         "https://*.coingate.com"
       ],
       frameSrc: ["'self'", "https://accounts.google.com", "https://*.stripe.com"],
-      frameAncestors: isProd 
-        ? ["'self'"] 
-        : ["'self'", "https://*.google.com", "https://*.run.app", "https://*.googleusercontent.com"],
+      frameAncestors: ["'self'"],
     },
   },
   crossOriginEmbedderPolicy: false
@@ -1028,6 +1025,21 @@ async function sendTelegramMessage(telegramUserId: string, text: string) {
     await bot.api.sendMessage(telegramUserId, text, { parse_mode: "HTML" });
   } catch (err) {
     console.error("Error sending Telegram message:", err);
+  }
+}
+
+// 12-MUAMMO: Har qanday jiddiy server xatoligi va foydalanuvchi murojaatlari haqida Telegram adminga xabar yuborish
+async function notifyAdminTelegram(message: string) {
+  try {
+    const botToken = await getSetting("TELEGRAM_BOT_TOKEN") || process.env.TELEGRAM_BOT_TOKEN;
+    if (!botToken) {
+      console.warn("TELEGRAM_BOT_TOKEN sozlanmagan, admin ogohlantirishini yuborib bo'lmadi.");
+      return;
+    }
+    const bot = new Bot(botToken);
+    await bot.api.sendMessage("8780300373", message, { parse_mode: "HTML" });
+  } catch (err) {
+    console.error("Admin Telegram ogohlantirishini yuborishda xatolik:", err);
   }
 }
 
@@ -4205,6 +4217,11 @@ app.post("/api/support", supportLimiter, async (req: Request, res: Response) => 
       `
     );
 
+    // 12-MUAMMO: Har bir murojaat/shikoyat haqida Telegram adminga xabar yuborish
+    await notifyAdminTelegram(
+      `📩 <b>Yangi murojaat/shikoyat</b>\n\n<b>Email:</b> ${email}\n<b>Mavzu:</b> ${subject}\n<b>Xabar:</b>\n${message}\n\n<b>Ticket ID:</b> ${ticket.id}`
+    );
+
     res.json({ success: true, message: "Xabaringiz muvaffaqiyatli yuborildi. Tez orada siz bilan bog'lanamiz." });
   } catch (err: any) {
     console.error("Support ticket error:", err);
@@ -4286,6 +4303,17 @@ app.post("/api/reports", authenticateToken, reportLimiter, supportLimiter, async
         status: "pending"
       }
     });
+
+    // 12-MUAMMO: Har bir shikoyat haqida Telegram adminga xabar yuborish
+    await notifyAdminTelegram(
+      `⚠️ <b>Yangi shikoyat (Report) yaratildi</b>\n\n` +
+      `<b>Shikoyat qiluvchi (User ID):</b> ${req.user?.id || 'Noma\'lum'}\n` +
+      `<b>Nishon turi:</b> ${targetType}\n` +
+      `<b>Nishon ID:</b> ${targetId}\n` +
+      `<b>Sabab:</b> ${reason}\n` +
+      `<b>Tafsilotlar:</b> ${description || 'Yo\'q'}\n\n` +
+      `<b>Report ID:</b> ${report.id}`
+    );
 
     res.status(201).json(report);
   } catch (err) {
@@ -4982,8 +5010,10 @@ app.get("/startup/:id", async (req, res, next) => {
     });
   }
 
+  // 12-MUAMMO: Global API xatolarini Telegram orqali adminga yuborish
   app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     console.error("Kutilmagan server xatosi:", err);
+    notifyAdminTelegram(`🔴 <b>API XATOSI</b>\n\n<b>Yo'l:</b> ${req.method} ${req.originalUrl}\n<b>Xato:</b> <code>${(err?.stack || String(err)).slice(0, 3000)}</code>`);
     res.status(500).json({ error: "Kutilmagan xatolik yuz berdi. Iltimos qaytadan urinib ko'ring." });
   });
 
