@@ -42,7 +42,13 @@ export default function CheckoutPage({
 
   // Automatic CoinGate Order Creation on Mount
   useEffect(() => {
+    let isMounted = true;
+    let initiated = false;
+
     const initPayment = async () => {
+      if (initiated) return;
+      initiated = true;
+
       try {
         const res = await fetch('/api/payments/create', {
           method: 'POST',
@@ -55,6 +61,8 @@ export default function CheckoutPage({
           }),
         });
 
+        if (!isMounted) return;
+
         if (res.ok) {
           trackEvent('checkout_start', startupId, 'checkout_page', { amount });
           const data = await res.json();
@@ -63,20 +71,28 @@ export default function CheckoutPage({
             setPaymentUrl(data.paymentUrl);
             // Auto redirect to CoinGate secure checkout after a short delay
             setTimeout(() => {
-              window.location.href = data.paymentUrl;
-            }, 1000);
+              if (isMounted) {
+                window.location.href = data.paymentUrl;
+              }
+            }, 1500);
           }
           if (data.api_keys_missing) setApiKeysMissing(true);
         } else {
           onActionToast("To'lov buyurtmasini yaratib bo'lmadi.");
         }
       } catch (err) {
-        console.error("Init payment error:", err);
+        if (isMounted) {
+          console.error("Init payment error:", err);
+        }
       }
     };
 
     initPayment();
-  }, [amount, startupId]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [startupId]);
 
   const applyReferralCode = async () => {
     if (!referralCode) return;

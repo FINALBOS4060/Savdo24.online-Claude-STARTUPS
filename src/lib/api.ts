@@ -33,26 +33,42 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
 
   let response = await originalFetch(input, options);
 
-  if (response.status === 401 && !String(input).includes('/api/auth/refresh') && !String(input).includes('/api/auth/login')) {
-    try {
-      const refreshResponse = await originalFetch('/api/auth/refresh', {
-        method: 'POST',
-        credentials: 'include'
-      });
+  let retryCount = 0;
+  const MAX_RETRIES = 1;
 
-      if (refreshResponse.ok) {
-        const refreshData = await refreshResponse.json();
-        // Dispatch event to sync react state
-        window.dispatchEvent(new CustomEvent('savdo24_auth_change', { detail: { token: refreshData.accessToken || 'cookie_authenticated' } }));
+  if (response.status === 401 && retryCount < MAX_RETRIES) {
+    retryCount++;
+    
+    if (!String(input).includes('/api/auth/refresh') && !String(input).includes('/api/auth/login')) {
+      try {
+        // Wait before retry (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+        
+        const refreshResponse = await originalFetch('/api/auth/refresh', {
+          method: 'POST',
+          credentials: 'include'
+        });
 
-        // Retry the original request
-        response = await originalFetch(input, options);
-      } else {
-        // Refresh failed, notify logout
-        window.dispatchEvent(new CustomEvent('savdo24_auth_change', { detail: { token: null, logout: true } }));
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json();
+          window.dispatchEvent(new CustomEvent('savdo24_auth_change', {
+            detail: { token: refreshData.accessToken || 'cookie_authenticated' }
+          }));
+          
+          // Retry original request
+          response = await originalFetch(input, options);
+        } else {
+          // Refresh failed - logout
+          window.dispatchEvent(new CustomEvent('savdo24_auth_change', {
+            detail: { token: null, logout: true }
+          }));
+        }
+      } catch (err) {
+        console.error("Token refresh failed:", err);
+        window.dispatchEvent(new CustomEvent('savdo24_auth_change', {
+          detail: { token: null, logout: true }
+        }));
       }
-    } catch (err) {
-      console.error("Token refresh failed:", err);
     }
   }
 

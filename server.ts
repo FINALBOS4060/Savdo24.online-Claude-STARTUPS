@@ -572,13 +572,16 @@ export function formatStartup(dbStartup: any) {
 // Helper to create notifications
 export async function createNotification(userId: number, type: string, title: string, message: string, link?: string) {
   try {
+    // 1. Save to database first
     const notification = await prisma.notification.create({
       data: { userId, type, title, message, link }
     });
+    // 2. Only emit AFTER database confirms
     io.to(`user:${userId}`).emit("new_notification", notification);
     return notification;
   } catch (err) {
     console.error("Error creating notification:", err);
+    return null;
   }
 }
 
@@ -1078,8 +1081,17 @@ export async function notifyAdminTelegram(message: string) {
       console.warn("TELEGRAM_BOT_TOKEN sozlanmagan, admin ogohlantirishini yuborib bo'lmadi.");
       return;
     }
+    const adminChatId = await getSetting("TELEGRAM_ADMIN_CHAT_ID") || process.env.TELEGRAM_ADMIN_CHAT_ID || "8780300373";
+    if (!adminChatId) {
+      console.warn("TELEGRAM_ADMIN_CHAT_ID sozlanmagan, admin ogohlantirishini yuborib bo'lmadi.");
+      return;
+    }
     const bot = new Bot(botToken);
-    await bot.api.sendMessage("8780300373", message, { parse_mode: "HTML" });
+    
+    // Truncate message to avoid Telegram API limit
+    const truncatedMessage = message.substring(0, 4096);
+    
+    await bot.api.sendMessage(adminChatId, truncatedMessage, { parse_mode: "HTML" });
   } catch (err) {
     console.error("Admin Telegram ogohlantirishini yuborishda xatolik:", err);
   }
@@ -1207,17 +1219,25 @@ app.get("/api/auth/google-client-id", async (req: Request, res: Response) => {
 
 // 9-MUAMMO: Google orqali kirishda refreshToken xavfsiz saqlash uchun cookie o'rnatish helper funktsiyasi
 function setAuthCookiesLocal(res: Response, accessToken: string, refreshToken: string) {
+  const isSameSiteLax = process.env.NODE_ENV === "development";
+  const domain = process.env.NODE_ENV === "production" ? ".savdo24.online" : undefined;
+
   res.cookie("token", accessToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    maxAge: 15 * 60 * 1000 // 15 minutes
+    secure: true, // ALWAYS true (we are on HTTPS in both dev/prod)
+    sameSite: isSameSiteLax ? "lax" : "strict",
+    maxAge: 15 * 60 * 1000, // 15 minutes
+    path: "/",
+    domain: domain
   });
+
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    secure: true, // ALWAYS true
+    sameSite: isSameSiteLax ? "lax" : "strict",
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: "/",
+    domain: domain
   });
 }
 
@@ -2121,14 +2141,22 @@ app.get("/api/startups", async (req: Request, res: Response) => {
       filter.isTop = false;
     }
 
-    if (search) {
-      const searchStr = search as string;
-      const mode = isPostgres ? "insensitive" : undefined;
-      filter.OR = [
-        { name: { contains: searchStr, mode } },
-        { description: { contains: searchStr, mode } },
-        { category: { contains: searchStr, mode } },
-      ];
+    if (search && typeof search === 'string' && search.trim().length > 0) {
+      // 1. Limit length for performance and DOS prevention
+      const rawSearch = search.trim().substring(0, 100);
+      
+      // 2. Sanitize XSS/injection characters (keep only alphanumeric, spaces, hyphens, Uzbek/Cyrillic letters)
+      const sanitized = rawSearch.replace(/[^a-zA-Z0-9\s\-\u0400-\u04FFʻʼ'’]/g, '').trim();
+      
+      // 3. Prevent tiny empty string or whitespace queries
+      if (sanitized.length >= 2) {
+        const mode = isPostgres ? "insensitive" : undefined;
+        filter.OR = [
+          { name: { contains: sanitized, mode } },
+          { description: { contains: sanitized, mode } },
+          { category: { contains: sanitized, mode } },
+        ];
+      }
     }
 
     const pageNum = page ? parseInt(page as string) : 1;
@@ -2911,7 +2939,7 @@ app.post("/api/upload", authenticateToken, uploadLimiter, upload.single("file"),
       return res.status(400).json({ error: "Faqat rasm fayllari (JPEG, PNG, WEBP, GIF) qabul qilinadi." });
     }
 
-    // Compress images using sharp
+    // Compress images using sharp, strip EXIF metadata, and auto-rotate
     if (metadata.format === "gif") {
       // Preserve GIF animation
       finalBuffer = req.file.buffer;
@@ -2920,14 +2948,14 @@ app.post("/api/upload", authenticateToken, uploadLimiter, upload.single("file"),
     } else {
       try {
         finalBuffer = await sharp(req.file.buffer)
+          .rotate() // Auto-rotate from EXIF orientation
           .resize(1600, 1600, { fit: "inside", withoutEnlargement: true })
-          .jpeg({ quality: 80 })
+          .jpeg({ quality: 85, mozjpeg: true, progressive: true })
           .toBuffer();
         finalContentType = "image/jpeg";
         finalExt = ".jpg";
       } catch (err) {
-        // 8-MUAMMO: Agar sharp siqishda xato bersa, faylni baribir yuklamasdan xato qaytarish
-        console.error("Sharp compression error:", err);
+        console.error("Sharp processing error:", err);
         return res.status(400).json({ error: "Fayl formati noto'g'ri yoki buzilgan." });
       }
     }
@@ -2939,13 +2967,14 @@ app.post("/api/upload", authenticateToken, uploadLimiter, upload.single("file"),
       return res.status(500).json({ error: "Telegram storage sozlamalari (TOKEN yoki CHANNEL_ID) kiritilmagan." });
     }
 
-    // Telegram'ga fayl yuborish
+    // Telegram'ga fayl yuborish with secured/generic filename
     const formData = new FormData();
     formData.append('chat_id', storageChannelId);
     
-    // Create Blob for FormData
+    // Create Blob for FormData with unique randomized filename
+    const genericFilename = `file_${Date.now()}_${Math.random().toString(36).substring(2, 9)}${finalExt}`;
     const blob = new Blob([finalBuffer], { type: finalContentType });
-    formData.append('document', blob, `file_${Date.now()}${finalExt}`);
+    formData.append('document', blob, genericFilename);
 
     const tgResponse = await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendDocument`, {
       method: 'POST',
@@ -3035,13 +3064,42 @@ async function createPaymentOrder(userId: number, startupId: string, referralCod
 
   if (referralCode) {
     const referral = await prisma.referral.findUnique({
-      where: { code: referralCode, isActive: true }
+      where: { code: referralCode.trim().toUpperCase(), isActive: true }
     });
-    if (referral && referral.referrerId !== userId) {
-      discountApplied = (realAmount * referral.discountPercent) / 100;
-      realAmount -= discountApplied;
-      referralId = referral.id;
+    
+    if (!referral) {
+      throw new Error("Referral code topilmadi yoki faol emas.");
     }
+    
+    // Prevent self-referral
+    if (referral.referrerId === userId) {
+      throw new Error("O'zingizning referral kodingizdan foydalana olmaysiz.");
+    }
+    
+    // Prevent repeat use
+    const alreadyUsed = await prisma.referral.findFirst({
+      where: { 
+        code: referralCode.trim().toUpperCase(),
+        refereeId: userId 
+      }
+    });
+    
+    if (alreadyUsed) {
+      throw new Error("Siz bu referral koddan allaqachon foydalangansiz.");
+    }
+    
+    // Check referrer is not banned
+    const referrer = await prisma.user.findUnique({
+      where: { id: referral.referrerId }
+    });
+    
+    if (!referrer || referrer.isBanned) {
+      throw new Error("Ushbu referral kodning egasi faol emas.");
+    }
+    
+    discountApplied = (realAmount * referral.discountPercent) / 100;
+    realAmount -= discountApplied;
+    referralId = referral.id;
   }
 
   const orderId = "CG-" + crypto.randomBytes(4).toString('hex').toUpperCase();
@@ -4349,29 +4407,64 @@ app.get("/api/admin/stats", authenticateToken, requireAdmin, async (req: AuthReq
 // DELETE /api/admin/startups/:id — E'lonni o'chirish (Admin)
 app.delete("/api/admin/startups/:id", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
+  
   try {
-    await prisma.review.deleteMany({ where: { startupId: id } });
-    await prisma.idea.deleteMany({ where: { startupId: id } });
+    // Use transaction for atomic deletion of all cascading relations
+    await prisma.$transaction(async (tx: any) => {
+      // 1. Delete reviews
+      await tx.review.deleteMany({ where: { startupId: id } });
+      
+      // 2. Delete ideas and their votes
+      const ideas = await tx.idea.findMany({ where: { startupId: id } });
+      const ideaIds = ideas.map((i: any) => i.id);
+      await tx.ideaVote.deleteMany({ where: { ideaId: { in: ideaIds } } });
+      await tx.idea.deleteMany({ where: { startupId: id } });
+      
+      // 3. Get all payments for this startup
+      const payments = await tx.payment.findMany({ where: { startupId: id } });
+      const paymentIds = payments.map((p: any) => p.id);
+      
+      // 4. Delete disputes
+      await tx.dispute.deleteMany({ where: { paymentId: { in: paymentIds } } });
+      
+      // 5. Delete escrow payments
+      await tx.escrowPayment.deleteMany({ where: { paymentId: { in: paymentIds } } });
+      
+      // 6. Delete messages in conversations
+      const conversations = await tx.conversation.findMany({ where: { startupId: id } });
+      for (const conv of conversations) {
+        await tx.message.deleteMany({ where: { conversationId: conv.id } });
+      }
+      
+      // 7. Delete conversations
+      await tx.conversation.deleteMany({ where: { startupId: id } });
+      
+      // 8. Delete listing subscriptions
+      await tx.listingSubscription.deleteMany({ where: { startupId: id } });
+      
+      // 9. Delete top boosts
+      await tx.topBoost.deleteMany({ where: { startupId: id } });
+      
+      // 10. Delete payments
+      await tx.payment.deleteMany({ where: { startupId: id } });
+      
+      // 11. Finally delete startup
+      await tx.startup.delete({ where: { id } });
+    });
     
-    const payments = await prisma.payment.findMany({ where: { startupId: id } });
-    const paymentIds = payments.map((p: any) => p.id);
-    await prisma.dispute.deleteMany({ where: { paymentId: { in: paymentIds } } });
-    await prisma.payment.deleteMany({ where: { startupId: id } });
-
-    await prisma.startup.delete({ where: { id } });
-
+    // Audit log
     await prisma.auditLog.create({
       data: {
         adminId: req.user?.id || 0,
         action: "delete_startup",
         targetId: id,
-        details: `Startup ${id} and all its relations deleted`
+        details: `Startup and all related records deleted`
       }
     }).catch((e: any) => console.error("Audit log error:", e));
-
-    res.json({ success: true, message: "E'lon muvaffaqiyatli o'chirildi." });
-  } catch (err) {
-    console.error("Admin delete startup error:", err);
+    
+    res.json({ success: true, message: "Loyiha va unga tegishli barcha ma'lumotlar muvaffaqiyatli o'chirildi." });
+  } catch (err: any) {
+    console.error("Delete startup error:", err);
     res.status(500).json({ error: "E'lonni o'chirishda xatolik yuz berdi." });
   }
 });
@@ -4630,7 +4723,9 @@ async function seedSettings() {
     { key: "TOP_MAX_CONCURRENT_SLOTS", value: "20" },
     { key: "VIP_PRICE_PER_DAY", value: "0.5" },
     { key: "VIP_DISCOUNT_PERCENT", value: "40" },
-    { key: "TELEGRAM_STORAGE_CHANNEL_ID", value: "" }
+    { key: "TELEGRAM_STORAGE_CHANNEL_ID", value: "" },
+    { key: "TELEGRAM_ADMIN_CHAT_ID", value: "" },
+    { key: "TELEGRAM_BOT_INTERNAL_SECRET", value: "" }
   ];
 
   for (const s of defaults) {
@@ -4655,23 +4750,49 @@ async function seedSettings() {
 async function start() {
   console.log(isPostgres ? "✅ PostgreSQL bazasiga ulanildi (production)" : "⚠️  SQLite (dev.db) ishlatilyapti — bu faqat lokal rivojlantirish uchun!");
   
-  // Auto-restore if database is empty
+  // Auto-restore if database is empty with critical error handling
   async function checkAndAutoRestore() {
     try {
       const userCount = await prisma.user.count();
       if (userCount === 0) {
-        console.log("⚠️ Baza bo'sh topildi. Telegram'dan oxirgi zaxirani avtomatik tiklashga urinilmoqda...");
+        console.warn("⚠️ Database is empty - attempting auto-restore from backup...");
+        
+        const lastBackupFileId = await getSetting("last_backup_file_id");
+        const fallbackPath = path.join(process.cwd(), 'last_backup.json');
+        const hasFallback = fs.existsSync(fallbackPath);
+        
+        if (!lastBackupFileId && !hasFallback) {
+          console.log("ℹ️ No previous backup file ID found in settings or fallback. This is a clean installation. Proceeding with clean database.");
+          return;
+        }
+
         try {
           const { restoreFromLatestBackup } = await import("./scripts/restore-db");
           await restoreFromLatestBackup();
-          console.log("✅ Ma'lumotlar bazasi Telegram zaxirasidan muvaffaqiyatli tiklandi!");
-        } catch (err) {
-          console.error("❌ Avtomatik tiklash muvaffaqiyatsiz bo'ldi:", err);
-          console.error("Iltimos, qo'lda 'npm run restore' buyrug'ini ishga tushiring yoki backup faylni tekshiring.");
+          
+          // Verify restore
+          const verifyCount = await prisma.user.count();
+          if (verifyCount === 0) {
+            throw new Error("Restore completed but database is still empty");
+          }
+          console.log("✅ Database restored successfully from backup!");
+        } catch (restoreErr: any) {
+          const errorMsg = `🔴 CRITICAL: Database restore FAILED\n${restoreErr?.message || String(restoreErr)}`;
+          console.error(errorMsg);
+          
+          try {
+            await notifyAdminTelegram(errorMsg);
+          } catch (notifyErr) {
+            console.error("Also failed to notify admin:", notifyErr);
+          }
+          
+          console.error("❌ Server will not start with empty/broken database when backup is available.");
+          process.exit(1);
         }
       }
-    } catch (err) {
-      console.warn("Could not check user count for auto-restore (likely fresh DB):", err);
+    } catch (checkErr: any) {
+      console.error("❌ Database check failed:", checkErr);
+      process.exit(1);
     }
   }
 

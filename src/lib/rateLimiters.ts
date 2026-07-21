@@ -37,9 +37,10 @@ export const passwordResetLimiter = rateLimit({
 });
 
 export const paymentStatusLimiter = rateLimit({
-  validate: { xForwardedForHeader: false, default: true }, windowMs: 15 * 60 * 1000,
-  max: 30,
-  message: { error: "To'lov holatini tekshirish limiti tugadi. Iltimos, 15 daqiqadan so'ng qayta urinib ko'ring." }
+  validate: { xForwardedForHeader: false, default: true },
+  windowMs: 5 * 60 * 1000, // 5 minute window
+  max: 3, // Max 3 attempts
+  message: { error: "Juda ko'p to'lov holatini tekshirish so'rovlari. Iltimos biroz kuting." }
 });
 
 export const globalLimiter = rateLimit({
