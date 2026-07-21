@@ -87,6 +87,20 @@ export default function SellPage({
 
   // Handle Dynamic Image Uploading to Backend
   const uploadImageFile = async (file: File) => {
+    // File size validation (MAX 5MB)
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    if (file.size > MAX_FILE_SIZE) {
+      onActionToast("Fayl hajmi 5MB dan kam bo'lishi kerak.");
+      return;
+    }
+
+    // File type validation
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'];
+    if (!allowedTypes.includes(file.type)) {
+      onActionToast("Faqat JPG, PNG, WebP, yoki SVG formatini qo'llab-quvvatlaydi.");
+      return;
+    }
+
     setIsUploading(true);
     onActionToast(`Rasm yuklanmoqda...`);
     try {
@@ -102,14 +116,14 @@ export default function SellPage({
         const data = await res.json();
         setImageUrl(data.url);
         setImageFile(file);
-        onActionToast(`Rasm muvaffaqiyatli serverga yuklandi: ${file.name}`);
+        onActionToast(`Rasm muvaffaqiyatli yuklandi!`);
       } else {
         const err = await res.json();
-        onActionToast(err.error || "Rasm yuklashda xatolik yuz berdi.");
+        onActionToast(err.error || "Rasm yuklashda xatolik.");
       }
     } catch (err: any) {
       console.error(err);
-      onActionToast("Rasm yuklashda tarmoq xatosi yuz berdi.");
+      onActionToast("Rasm yuklashda xatolik.");
     } finally {
       setIsUploading(false);
     }
@@ -205,6 +219,21 @@ export default function SellPage({
         });
 
         if (res.ok) {
+          // Clear form
+          setName('');
+          setSlogan('');
+          setDescription('');
+          setPrice('');
+          setImageUrl('');
+          setImageFile(null);
+          setSelectedTechs(['React', 'TypeScript', 'Node.js']);
+          setDemoUrl('');
+          setDeliveryUrl('');
+          setEmail('');
+          setPhone('');
+          setTelegram('');
+          setDynamicAttributes({});
+
           onActionToast(`${name} muvaffaqiyatli tahrirlandi.`);
           if (fetchStartups) fetchStartups();
           navigate('/profile');
@@ -375,18 +404,40 @@ export default function SellPage({
                 <button
                   type="button"
                   onClick={async () => {
-                    if (!category) return onActionToast("Iltimos, avval kategoriyani tanlang.");
+                    if (!category) {
+                      onActionToast("Iltimos, avval kategoriyani tanlang.");
+                      return;
+                    }
+
                     onActionToast("AI narxni hisoblamoqda...");
                     try {
-                      const features = selectedTechs;
-                      const res = await fetch(`/api/ai/price-suggestion?category=${category}&features=${JSON.stringify(features)}`);
-                      if (res.ok) {
-                        const data = await res.json();
-                        setPrice(data.suggestedPrice.toString());
-                        onActionToast(`AI taklif qilgan narx: $${data.suggestedPrice} (O'rtacha diapazon: $${data.range.min} - $${data.range.max})`);
+                      const params = new URLSearchParams({
+                        category,
+                        features: JSON.stringify(selectedTechs),
+                      });
+
+                      const res = await fetch(`/api/ai/price-suggestion?${params.toString()}`);
+
+                      if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        onActionToast(err.error || "AI narx tavsiyasi hozircha mavjud emas.");
+                        return;
                       }
+
+                      const data = await res.json();
+                      
+                      if (!data.suggestedPrice || isNaN(data.suggestedPrice)) {
+                        onActionToast("AI taklif qilgan narx noto'g'ri.");
+                        return;
+                      }
+
+                      setPrice(Math.max(50, data.suggestedPrice).toString());
+                      onActionToast(
+                        `AI taklif: $${data.suggestedPrice} (${data.range?.min || 'N/A'} - ${data.range?.max || 'N/A'})`
+                      );
                     } catch (err) {
-                      onActionToast("AI narxni hisoblashda xatolik yuz berdi.");
+                      console.error("Price suggestion error:", err);
+                      onActionToast("AI tavsiya xizmatida xatolik yuz berdi.");
                     }
                   }}
                   className="text-[10px] bg-secondary-container/10 text-secondary-container px-2 py-1 rounded border border-secondary-container/20 font-bold hover:bg-secondary-container/20 transition-all flex items-center gap-1"
@@ -530,7 +581,15 @@ export default function SellPage({
                 className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
                 placeholder="Masalan: https://github.com/loyiha/manba-kodi yoki Google Drive linki"
                 value={deliveryUrl}
-                onChange={(e) => setDeliveryUrl(e.target.value)}
+                onChange={(e) => {
+                  const url = e.target.value;
+                  // Basic URL validation
+                  if (url && !url.match(/^https?:\/\/.+/)) {
+                    onActionToast("Iltimos, HTTPS bilan boshlangan to'g'ri URL kiriting.");
+                    return;
+                  }
+                  setDeliveryUrl(url);
+                }}
               />
             </div>
 

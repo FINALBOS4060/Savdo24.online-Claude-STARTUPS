@@ -14,6 +14,7 @@ interface NavbarProps {
   toggleTheme: () => void;
   notifications: Notification[];
   setNotifications: React.Dispatch<React.SetStateAction<Notification[]>>;
+  setSelectedStartupId?: (id: string) => void;
 }
 
 export default function Navbar({
@@ -27,6 +28,7 @@ export default function Navbar({
   toggleTheme,
   notifications,
   setNotifications,
+  setSelectedStartupId,
 }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
@@ -41,7 +43,7 @@ export default function Navbar({
   useEffect(() => {
     const handler = setTimeout(() => {
       setSearchQuery(localSearch);
-    }, 500);
+    }, 300);
     return () => clearTimeout(handler);
   }, [localSearch, setSearchQuery]);
 
@@ -186,13 +188,19 @@ export default function Navbar({
                     notifications.map((notif) => (
                       <div
                         key={notif.id}
-                        onClick={() => {
-                          if (!notif.isRead) markAsRead(notif.id);
+                        onClick={async () => {
+                          if (!notif.isRead) await markAsRead(notif.id);
+                          
                           if (notif.link) {
+                            setNotifDropdownOpen(false);
+                            
                             if (notif.link.startsWith('/startup/')) {
-                              // We don't have direct routing, so we use views
-                              // This is a bit hacky given the current architecture
-                              // In a real app we'd use a router
+                              const startupId = notif.link.split('/')[2];
+                              if (setSelectedStartupId) setSelectedStartupId(startupId);
+                              setView('detail');
+                            } else {
+                              const path = notif.link.replace(/^\//, '');
+                              setView(path);
                             }
                           }
                         }}

@@ -498,6 +498,7 @@ export default function App() {
         toggleTheme={() => setIsDark(!isDark)}
         notifications={notifications}
         setNotifications={setNotifications}
+        setSelectedStartupId={setSelectedStartupId}
       />
 
       <div className="flex">
@@ -551,6 +552,7 @@ export default function App() {
                     onActionToast={showToast}
                     user={user}
                     categories={categories}
+                    isLoading={isLoadingStartups}
                   />
                 </motion.div>
               } />

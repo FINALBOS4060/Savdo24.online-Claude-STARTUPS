@@ -11,6 +11,7 @@ interface BrowsePageProps {
   onActionToast: (message: string) => void;
   user: UserProfileData;
   categories: Category[];
+  isLoading: boolean;
 }
 
 export default function BrowsePage({
@@ -20,9 +21,10 @@ export default function BrowsePage({
   onActionToast,
   user,
   categories,
+  isLoading,
 }: BrowsePageProps) {
   const [startups, setStartups] = useState<Startup[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [localIsLoading, setLocalIsLoading] = useState<boolean>(true);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [subFilters, setSubFilters] = useState<Record<string, any>>({});
   const [newsletterEmail, setNewsletterEmail] = useState('');
@@ -83,7 +85,7 @@ export default function BrowsePage({
   }, []);
 
   const fetchFilteredStartups = async () => {
-    setIsLoading(true);
+    setLocalIsLoading(true);
     try {
       const params = new URLSearchParams();
       if (selectedCategory) params.append('category', selectedCategory);
@@ -107,7 +109,7 @@ export default function BrowsePage({
     } catch (err) {
       console.error("Fetch filtered startups error:", err);
     } finally {
-      setIsLoading(false);
+      setLocalIsLoading(false);
     }
   };
 
@@ -435,7 +437,7 @@ export default function BrowsePage({
           </div>
         </div>
 
-        {isLoading ? (
+        {(localIsLoading || isLoading) ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div key={i} className="bg-white dark:bg-primary-container/40 border border-outline-variant/20 rounded-2xl overflow-hidden p-6 space-y-4 animate-pulse">

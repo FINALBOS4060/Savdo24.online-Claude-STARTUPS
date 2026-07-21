@@ -31,17 +31,33 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
     }
   }
 
-  let response = await originalFetch(input, options);
+  let response: Response;
+  
+  try {
+    response = await originalFetch(input, options);
+  } catch (err) {
+    // Network error occurred
+    console.error("Fetch network error:", err);
+    // Return 0 status to indicate network error
+    return new Response(
+      JSON.stringify({ error: "Tarmoq xatosi" }),
+      { status: 0, statusText: 'Network Error' }
+    );
+  }
 
   // Check if this is a retry attempt
   const isRefreshEndpoint = String(input).includes('/api/auth/refresh');
   const isLoginEndpoint = String(input).includes('/api/auth/login');
   const isRetryAttempt = (options as any)._retryAttempt || 0;
 
-  // Only retry if: 401, not auth endpoint, and haven't retried yet
-  if (response.status === 401 && isRetryAttempt < 1 && !isRefreshEndpoint && !isLoginEndpoint) {
+  // Retry on 401 or 5xx errors (but not network errors)
+  if (
+    (response.status === 401 || response.status >= 500) &&
+    isRetryAttempt < 1 &&
+    !isRefreshEndpoint &&
+    !isLoginEndpoint
+  ) {
     try {
-      // Exponential backoff
       await new Promise(resolve => setTimeout(resolve, 1000 * (isRetryAttempt + 1)));
 
       const refreshResponse = await originalFetch('/api/auth/refresh', {
@@ -55,23 +71,24 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
           detail: { token: refreshData.accessToken || 'cookie_authenticated' }
         }));
 
-        // Retry original request with marked attempt
         const retryOptions = {
           ...options,
           _retryAttempt: isRetryAttempt + 1
         };
-        response = await originalFetch(input, retryOptions);
-      } else {
-        // Refresh failed - logout
+        
+        try {
+          response = await originalFetch(input, retryOptions);
+        } catch (retryErr) {
+          console.error("Retry fetch failed:", retryErr);
+          return response; // Return original error response
+        }
+      } else if (response.status === 401) {
         window.dispatchEvent(new CustomEvent('savdo24_auth_change', {
           detail: { token: null, logout: true }
         }));
       }
     } catch (err) {
       console.error("Token refresh failed:", err);
-      window.dispatchEvent(new CustomEvent('savdo24_auth_change', {
-        detail: { token: null, logout: true }
-      }));
     }
   }
 
