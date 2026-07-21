@@ -48,27 +48,44 @@ export default function DetailPage({
 
   // Update SEO Meta Tags
   useEffect(() => {
-    document.title = `${startup.name} | Savdo24`;
-    
-    const setMetaTag = (property: string, content: string) => {
-      let element = document.querySelector(`meta[property="${property}"]`);
+    if (!startup) return;
+
+    // Set title
+    document.title = `${startup.name} — Savdo24`;
+
+    // Helper to set meta tag
+    const setMetaTag = (property: string, content: string, isName = false) => {
+      const selector = isName ? `meta[name="${property}"]` : `meta[property="${property}"]`;
+      let element = document.querySelector(selector);
+      
       if (!element) {
         element = document.createElement('meta');
-        element.setAttribute('property', property);
+        if (isName) {
+          element.setAttribute('name', property);
+        } else {
+          element.setAttribute('property', property);
+        }
         document.head.appendChild(element);
       }
       element.setAttribute('content', content);
     };
 
-    setMetaTag('og:title', `${startup.name} - ${startup.slogan}`);
-    setMetaTag('og:description', startup.description);
-    setMetaTag('og:image', startup.image);
+    // Set Open Graph tags
+    setMetaTag('og:title', `${startup.name} - ${startup.slogan || 'Startap'}`);
+    setMetaTag('og:description', startup.description || '');
+    setMetaTag('og:image', startup.image || '');
     setMetaTag('og:type', 'website');
     
-    // Cleanup function when component unmounts
+    // Set standard meta tags
+    setMetaTag('description', startup.slogan || startup.description || `${startup.name} sotiladi.`, true);
+
+    // Cleanup when leaving
     return () => {
-      document.title = 'Savdo24 | Startaplar bozori';
-      // Ideally remove or reset the meta tags, but leaving them is generally harmless for SPAs
+      document.title = "Savdo24 — Startaplar va raqamli loyihalar bozori";
+      const metaDescription = document.querySelector('meta[name="description"]');
+      if (metaDescription) {
+        metaDescription.setAttribute('content', "O'zbekistondagi eng yirik startaplar, loyihalar va raqamli bizneslar savdo maydonchasi.");
+      }
     };
   }, [startup]);
 
@@ -210,31 +227,7 @@ export default function DetailPage({
     fetchSellerReviews();
   }, [startup.id, startup.userId]);
 
-  // Dynamically update document title and meta description for SEO
-  useEffect(() => {
-    if (startup) {
-      document.title = `${startup.name} — Savdo24`;
-      
-      const metaDescription = document.querySelector('meta[name="description"]');
-      if (metaDescription) {
-        metaDescription.setAttribute('content', startup.slogan || startup.description || `${startup.name} sotiladi.`);
-      } else {
-        const meta = document.createElement('meta');
-        meta.name = "description";
-        meta.content = startup.slogan || startup.description || `${startup.name} sotiladi.`;
-        document.head.appendChild(meta);
-      }
-    }
-    
-    // Clean up to restore default values when leaving DetailPage
-    return () => {
-      document.title = "Savdo24 — Startaplar va raqamli loyihalar bozori";
-      const metaDescription = document.querySelector('meta[name="description"]');
-      if (metaDescription) {
-        metaDescription.setAttribute('content', "O'zbekistondagi eng yirik startaplar, loyihalar va raqamli bizneslar savdo maydonchasi.");
-      }
-    };
-  }, [startup]);
+
 
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -370,7 +363,7 @@ export default function DetailPage({
 
   const handleUpvoteIdea = async (ideaId: number) => {
     const storageKey = `savdo24_upvoted_${ideaId}`;
-    if (sessionStorage.getItem(storageKey)) {
+    if (localStorage.getItem(storageKey)) {
       onActionToast("Siz ushbu g'oyaga allaqachon ovoz bergansiz.");
       return;
     }
@@ -380,7 +373,7 @@ export default function DetailPage({
         method: 'POST',
       });
       if (res.ok) {
-        sessionStorage.setItem(storageKey, 'true');
+        localStorage.setItem(storageKey, 'true');
         onActionToast("Ovoz berildi!");
         setIdeas((prev) =>
           prev
@@ -393,7 +386,7 @@ export default function DetailPage({
         const errData = await res.json().catch(() => ({}));
         onActionToast(errData.error || "Ovoz berishda xatolik yuz berdi.");
         if (res.status === 409) {
-          sessionStorage.setItem(storageKey, 'true');
+          localStorage.setItem(storageKey, 'true');
         }
       }
     } catch (err) {

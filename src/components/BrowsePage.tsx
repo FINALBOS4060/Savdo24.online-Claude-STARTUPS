@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Startup, UserProfileData, Category } from '../types';
 import { CATEGORY_FIELDS } from '../categoryFields';
 import { apiFetch as fetch } from '../lib/api';
@@ -48,11 +48,30 @@ export default function BrowsePage({
   }, [searchQuery]);
 
   useEffect(() => {
-    // Social proof fetch
-    fetch('/api/social-proof')
-      .then(res => res.json())
-      .then(data => setSocialProof(data))
-      .catch(console.error);
+    // Check cache first for social proof
+    const cached = localStorage.getItem('savdo24_social_proof');
+    const cacheTime = localStorage.getItem('savdo24_social_proof_time');
+    const now = Date.now();
+    
+    // Cache for 5 minutes
+    if (cached && cacheTime && now - parseInt(cacheTime) < 5 * 60 * 1000) {
+      try {
+        setSocialProof(JSON.parse(cached));
+      } catch (e) {
+        localStorage.removeItem('savdo24_social_proof');
+        localStorage.removeItem('savdo24_social_proof_time');
+      }
+    } else {
+      // Fetch fresh data
+      fetch('/api/social-proof')
+        .then(res => res.json())
+        .then(data => {
+          setSocialProof(data);
+          localStorage.setItem('savdo24_social_proof', JSON.stringify(data));
+          localStorage.setItem('savdo24_social_proof_time', now.toString());
+        })
+        .catch(console.error);
+    }
 
     // Referral code handling from URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -96,9 +115,27 @@ export default function BrowsePage({
     fetchFilteredStartups();
   }, [selectedCategory, debouncedSearch, listingTypeFilter, onlyActive, currentPage]);
 
-  // Reset page to 1 when filters change (except for currentPage itself)
+  const scrollPositionRef = useRef<number>(0);
+
+  // Save scroll position before filter change
+  useEffect(() => {
+    return () => {
+      scrollPositionRef.current = window.scrollY;
+    };
+  }, []);
+
+  // Reset page to 1 when filters change (except for currentPage itself) and scroll smoothly
   useEffect(() => {
     setCurrentPage(1);
+
+    const timer = setTimeout(() => {
+      const listingsElement = document.getElementById('listings-title');
+      if (listingsElement) {
+        listingsElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [selectedCategory, debouncedSearch, listingTypeFilter, onlyActive]);
 
   const handleSubscribe = async (e: React.FormEvent) => {

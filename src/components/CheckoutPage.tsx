@@ -41,12 +41,15 @@ export default function CheckoutPage({
   };
   const [deliveryData, setDeliveryData] = useState<DeliveryData>({});
 
-  // Automatic CoinGate Order Creation on Mount
+  // Automatic CoinGate Order Creation on Mount with duplicate protection
   useEffect(() => {
     let isMounted = true;
+    let redirectTimer: any = null;
 
     const initPayment = async () => {
       try {
+        if (activeOrderId) return;
+
         const res = await fetch('/api/payments/create', {
           method: 'POST',
           headers: {
@@ -66,8 +69,8 @@ export default function CheckoutPage({
           setActiveOrderId(data.id);
           if (data.paymentUrl) {
             setPaymentUrl(data.paymentUrl);
-            // Auto redirect to CoinGate secure checkout after a short delay
-            setTimeout(() => {
+            // Only auto-redirect ONCE
+            redirectTimer = setTimeout(() => {
               if (isMounted) {
                 window.location.href = data.paymentUrl;
               }
@@ -91,15 +94,28 @@ export default function CheckoutPage({
 
     return () => {
       isMounted = false;
+      if (redirectTimer) clearTimeout(redirectTimer);
     };
-  }, [startupId, amount]);
+  }, [startupId, amount, activeOrderId]);
 
   const applyReferralCode = async () => {
-    if (!referralCode || isApplyingReferral) return;
+    if (!referralCode || referralCode.trim().length === 0) {
+      onActionToast("Iltimos, referral kodini kiriting.");
+      return;
+    }
+    
+    if (isApplyingReferral) return;
+
+    // Client-side validation
+    if (referralCode.length > 10 || !/^[A-Z0-9]+$/.test(referralCode.trim().toUpperCase())) {
+      onActionToast("Referral kod noto'g'ri formatda.");
+      return;
+    }
 
     setIsApplyingReferral(true);
     try {
       const res = await fetch(`/api/referrals/apply?code=${referralCode.trim().toUpperCase()}`);
+
       if (res.ok) {
         const data = await res.json();
         setDiscountData(data);
@@ -116,9 +132,11 @@ export default function CheckoutPage({
           setActiveOrderId(payData.id);
           if (payData.paymentUrl) setPaymentUrl(payData.paymentUrl);
         }
+      } else if (res.status === 429) {
+        onActionToast("Juda ko'p harakat. 5 daqiqa kuting.");
       } else {
         const data = await res.json();
-        onActionToast(data.error || "Referral kod xato.");
+        onActionToast(data.error || "Referral kod xato yoki tugagan.");
       }
     } catch (err) {
       console.error("Referral error:", err);
@@ -412,22 +430,48 @@ export default function CheckoutPage({
               <span className="text-xs text-on-primary-container uppercase mb-1 flex items-center gap-1"><span className="material-symbols-outlined text-sm">local_shipping</span> Yetkazib berish ma'lumoti</span>
               {deliveryData.deliveryUrl ? (
                 <div className="space-y-3">
-                  <a href={deliveryData.deliveryUrl} target="_blank" rel="noreferrer" className="w-full flex items-center justify-center gap-2 py-3 bg-[#10b981]/10 border border-[#10b981]/30 text-[#10b981] rounded-xl font-bold hover:bg-[#10b981]/20 transition-all text-sm">
-                    Loyihani yuklab olish / Ko'rish (Sotuvchi havolasi)
+                  <a 
+                    href={deliveryData.deliveryUrl} 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    onClick={(e) => {
+                      // Validate URL before redirect
+                      try {
+                        const url = new URL(deliveryData.deliveryUrl!);
+                        if (!url.protocol.startsWith('http')) {
+                          e.preventDefault();
+                          onActionToast("Xavfsiz bo'lmagan havola.");
+                        }
+                      } catch {
+                        e.preventDefault();
+                        onActionToast("Havola xato.");
+                      }
+                    }}
+                    className="w-full flex items-center justify-center gap-2 py-3 bg-[#10b981]/10 border border-[#10b981]/30 text-[#10b981] rounded-xl font-bold hover:bg-[#10b981]/20 transition-all text-sm"
+                  >
+                    Loyihani yuklab olish (Sotuvchi havolasi)
                     <span className="material-symbols-outlined text-sm">open_in_new</span>
                   </a>
                   {deliveryData.telegramToken && (
-                    <a href={`https://t.me/Savdo24Bot?start=${deliveryData.telegramToken}`} target="_blank" rel="noreferrer" className="w-full flex items-center justify-center gap-2 py-3 bg-[#229ED9]/10 border border-[#229ED9]/30 text-[#229ED9] rounded-xl font-bold hover:bg-[#229ED9]/20 transition-all text-sm">
+                    <a 
+                      href={`https://t.me/Savdo24Bot?start=${encodeURIComponent(deliveryData.telegramToken)}`} 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      className="w-full flex items-center justify-center gap-2 py-3 bg-[#229ED9]/10 border border-[#229ED9]/30 text-[#229ED9] rounded-xl font-bold hover:bg-[#229ED9]/20 transition-all text-sm"
+                    >
                       📥 Telegram bot orqali yuklab olish
                       <span className="material-symbols-outlined text-sm">send</span>
                     </a>
                   )}
                 </div>
               ) : (
+                // Hide seller contact - use encrypted/masked display
                 <div className="bg-[#10b981]/10 border border-[#10b981]/30 rounded-xl p-4 flex flex-col items-center text-center">
                   <span className="material-symbols-outlined text-[#10b981] text-2xl mb-2">hourglass_top</span>
                   <p className="text-white text-sm font-bold mb-1">Sotuvchi 24 soat ichida siz bilan bog'lanadi</p>
-                  <p className="text-[#10b981] text-xs">Sotuvchi aloqa ma'lumoti: {deliveryData.sellerContact}</p>
+                  <p className="text-[#10b981] text-xs">
+                    Aloqa ma'lumotlari maxfiy: {deliveryData.sellerContact ? '✓ Qabul qilindi' : '⏳ Kutilmoqda'}
+                  </p>
                 </div>
               )}
             </div>

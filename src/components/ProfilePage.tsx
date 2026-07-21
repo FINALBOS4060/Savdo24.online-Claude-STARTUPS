@@ -39,65 +39,86 @@ export default function ProfilePage({
   const [b2bAccount, setB2BAccount] = useState<any>(null);
 
   React.useEffect(() => {
-    if (activeTab === 'purchases' && user.id) {
-      fetch('/api/payments/my')
-      .then(res => res.json())
-      .then(data => {
-        if (data.payments) setMyPurchases(data.payments);
-      })
-      .catch(console.error);
-    }
+    if (!user.id) return;
 
-    if (activeTab === 'earnings' && user.id) {
-      fetch('/api/users/me/earnings')
-      .then(res => res.json())
-      .then(data => {
-        setEarningsData(data);
-      })
-      .catch(console.error);
-    }
+    let isMounted = true;
 
-    if (activeTab === 'reviews' && user.id) {
-      fetch('/api/users/me/reviews-given')
-      .then(res => res.json())
-      .then(data => setReviewsGiven(data))
-      .catch(console.error);
+    const loadTabData = async () => {
+      try {
+        switch (activeTab) {
+          case 'purchases':
+            // Fetch both payments and escrows in parallel
+            const [paymentsRes, escrowRes] = await Promise.all([
+              fetch('/api/payments/my'),
+              fetch('/api/escrow/my-purchases')
+            ]);
+            
+            if (paymentsRes.ok && isMounted) {
+              const data = await paymentsRes.json();
+              setMyPurchases(data.payments || []);
+            }
+            
+            if (escrowRes.ok && isMounted) {
+              const data = await escrowRes.json();
+              setEscrows(data || []);
+            }
+            break;
 
-      fetch('/api/users/me/reviews-received')
-      .then(res => res.json())
-      .then(data => setReviewsReceivedData(data))
-      .catch(console.error);
-    }
+          case 'earnings':
+            const earningsRes = await fetch('/api/users/me/earnings');
+            if (earningsRes.ok && isMounted) {
+              setEarningsData(await earningsRes.json());
+            }
+            break;
 
-    if (activeTab === 'security' && user.id) {
-      fetch('/api/auth/sessions')
-      .then(res => res.json())
-      .then(data => {
-        setSessions(data);
-      })
-      .catch(console.error);
-    }
+          case 'reviews':
+            const [givenRes, receivedRes] = await Promise.all([
+              fetch('/api/users/me/reviews-given'),
+              fetch('/api/users/me/reviews-received')
+            ]);
+            
+            if (givenRes.ok && isMounted) {
+              setReviewsGiven(await givenRes.json());
+            }
+            if (receivedRes.ok && isMounted) {
+              setReviewsReceivedData(await receivedRes.json());
+            }
+            break;
 
-    if (activeTab === 'referral' && user.id) {
-      fetch('/api/referrals/my-stats')
-      .then(res => res.json())
-      .then(data => setReferralStats(data))
-      .catch(console.error);
-    }
+          case 'security':
+            const sessionsRes = await fetch('/api/auth/sessions');
+            if (sessionsRes.ok && isMounted) {
+              setSessions(await sessionsRes.json());
+            }
+            break;
 
-    if (activeTab === 'purchases' && user.id) {
-      fetch('/api/escrow/my-purchases')
-      .then(res => res.json())
-      .then(data => setEscrows(data))
-      .catch(console.error);
-    }
+          case 'referral':
+            const refRes = await fetch('/api/referrals/my-stats');
+            if (refRes.ok && isMounted) {
+              setReferralStats(await refRes.json());
+            }
+            break;
 
-    if (activeTab === 'b2b' && user.id) {
-      fetch('/api/b2b/profile')
-      .then(res => res.json())
-      .then(data => setB2BAccount(data))
-      .catch(console.error);
-    }
+          case 'b2b':
+            const b2bRes = await fetch('/api/b2b/profile');
+            if (b2bRes.ok && isMounted) {
+              setB2BAccount(await b2bRes.json());
+            }
+            break;
+
+          default:
+            break;
+        }
+      } catch (err) {
+        console.error(`Error loading ${activeTab} data:`, err);
+      }
+    };
+
+    loadTabData();
+
+    return () => {
+      isMounted = false;
+    };
   }, [activeTab, user.id]);
 
   const revokeSession = async (id: number) => {
@@ -163,6 +184,25 @@ export default function ProfilePage({
         .then(data => setEstimatedPrice(data.price));
     }
   }, [boostDays, topModal.isOpen]);
+
+  // Lock scroll on body when topModal is open, and clean up modal state on unmount
+  useEffect(() => {
+    if (topModal.isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [topModal.isOpen]);
+
+  useEffect(() => {
+    return () => {
+      // Clean up modal state when component unmounts
+      setTopModal({ isOpen: false, startupId: null, startupName: '' });
+    };
+  }, []);
 
   const handleBuyTop = async () => {
     try {
