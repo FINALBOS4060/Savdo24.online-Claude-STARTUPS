@@ -31,6 +31,7 @@ export default function CheckoutPage({
   const [apiKeysMissing, setApiKeysMissing] = useState<boolean>(false);
   const [referralCode, setReferralCode] = useState<string>(localStorage.getItem('savdo24_referral_code') || '');
   const [discountData, setDiscountData] = useState<{ discountPercent: number, referrerName: string } | null>(null);
+  const [isApplyingReferral, setIsApplyingReferral] = useState<boolean>(false);
 
   type DeliveryData = { 
     deliveryUrl?: string; 
@@ -43,12 +44,8 @@ export default function CheckoutPage({
   // Automatic CoinGate Order Creation on Mount
   useEffect(() => {
     let isMounted = true;
-    let initiated = false;
 
     const initPayment = async () => {
-      if (initiated) return;
-      initiated = true;
-
       try {
         const res = await fetch('/api/payments/create', {
           method: 'POST',
@@ -78,11 +75,14 @@ export default function CheckoutPage({
           }
           if (data.api_keys_missing) setApiKeysMissing(true);
         } else {
-          onActionToast("To'lov buyurtmasini yaratib bo'lmadi.");
+          if (isMounted) {
+            onActionToast("To'lov buyurtmasini yaratib bo'lmadi.");
+          }
         }
       } catch (err) {
         if (isMounted) {
           console.error("Init payment error:", err);
+          onActionToast("To'lov tizimi bilan ulanishda xatolik.");
         }
       }
     };
@@ -92,46 +92,59 @@ export default function CheckoutPage({
     return () => {
       isMounted = false;
     };
-  }, [startupId]);
+  }, [startupId, amount]);
 
   const applyReferralCode = async () => {
-    if (!referralCode) return;
+    if (!referralCode || isApplyingReferral) return;
+
+    setIsApplyingReferral(true);
     try {
-      const res = await fetch(`/api/referrals/apply?code=${referralCode}`);
+      const res = await fetch(`/api/referrals/apply?code=${referralCode.trim().toUpperCase()}`);
       if (res.ok) {
         const data = await res.json();
         setDiscountData(data);
         onActionToast(`Chegirma qo'llanildi: ${data.discountPercent}% (${data.referrerName} tomonidan)`);
-        // We need to re-init payment with referral code
+        
+        // Re-init payment with referral code
         const payRes = await fetch('/api/payments/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ amount, startupId, referralCode })
+          body: JSON.stringify({ amount, startupId, referralCode: referralCode.trim().toUpperCase() })
         });
         if (payRes.ok) {
-          const data = await payRes.json();
-          setActiveOrderId(data.id);
-          if (data.paymentUrl) setPaymentUrl(data.paymentUrl);
+          const payData = await payRes.json();
+          setActiveOrderId(payData.id);
+          if (payData.paymentUrl) setPaymentUrl(payData.paymentUrl);
         }
       } else {
         const data = await res.json();
         onActionToast(data.error || "Referral kod xato.");
       }
     } catch (err) {
-      console.error(err);
+      console.error("Referral error:", err);
+      onActionToast("Referral kodini qo'llashda xatolik.");
+    } finally {
+      setIsApplyingReferral(false);
     }
   };
 
-  // Real-time payment status polling (3 seconds)
+  // Real-time payment status polling (3 seconds) with leak/duplicate protection
   useEffect(() => {
     if (!activeOrderId || paymentStep !== 'checkout') return;
 
-    const pollInterval = setInterval(async () => {
+    let isPolling = true;
+    let pollInterval: any = null;
+
+    const pollPaymentStatus = async () => {
+      if (!isPolling) return;
+
       try {
         const res = await fetch(`/api/payments/status/${activeOrderId}`);
+        if (!isPolling) return; // Check again after fetch
+
         if (res.ok) {
           const data = await res.json();
-          if (data.status === 'completed') {
+          if (data.status === 'completed' && isPolling) {
             setDeliveryData({ 
               deliveryUrl: data.deliveryUrl, 
               sellerContact: data.sellerContact, 
@@ -141,16 +154,32 @@ export default function CheckoutPage({
             setPaymentStep('success');
             onSuccessPayment();
             onActionToast("Muvaffaqiyatli! To'lov tizim tomonidan qabul qilindi.");
-            clearInterval(pollInterval);
+            isPolling = false; // Stop polling
+          } else if (!data.status) {
+            console.warn("Invalid payment status response:", data);
           }
+        } else if (res.status === 404) {
+          console.warn("Order not found:", activeOrderId);
+          isPolling = false; // Stop if order doesn't exist
         }
       } catch (err) {
         console.error("Polling payment status error:", err);
+        // Don't stop on error - retry next interval
+      } finally {
+        if (isPolling) {
+          pollInterval = setTimeout(pollPaymentStatus, 3000);
+        }
       }
-    }, 3000);
+    };
 
-    return () => clearInterval(pollInterval);
-  }, [activeOrderId, paymentStep]);
+    // Start polling immediately
+    pollPaymentStatus();
+
+    return () => {
+      isPolling = false;
+      if (pollInterval) clearTimeout(pollInterval);
+    };
+  }, [activeOrderId, paymentStep, onSuccessPayment, onActionToast]);
 
   // Countdown timer
   useEffect(() => {
@@ -286,9 +315,10 @@ export default function CheckoutPage({
                   />
                   <button 
                     onClick={applyReferralCode}
-                    className="px-4 py-2 bg-emerald-500 text-black font-bold text-xs rounded-xl hover:bg-emerald-400 transition-all"
+                    disabled={isApplyingReferral}
+                    className="px-4 py-2 bg-emerald-500 text-black font-bold text-xs rounded-xl hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                   >
-                    Qo'llash
+                    {isApplyingReferral ? "Kutilyapti..." : "Qo'llash"}
                   </button>
                 </div>
               </div>
@@ -316,12 +346,12 @@ export default function CheckoutPage({
                 <button
                   onClick={handleVerifyPayment}
                   disabled={isChecking}
-                  className="px-6 py-3 border border-[#10b981]/30 hover:bg-[#10b981]/5 active:scale-95 text-[#10b981] font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  className="px-6 py-3 border border-[#10b981]/30 hover:bg-[#10b981]/5 active:scale-95 text-[#10b981] font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <span className={`material-symbols-outlined text-sm ${isChecking ? 'animate-spin' : ''}`}>
                     {isChecking ? 'sync' : 'verified_user'}
                   </span>
-                  To'lov holatini tekshirish
+                  {isChecking ? "Tekshirilmoqda..." : "To'lov holatini tekshirish"}
                 </button>
               )}
             </div>
