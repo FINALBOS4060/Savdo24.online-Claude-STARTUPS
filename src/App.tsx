@@ -41,7 +41,17 @@ export default function App() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [selectedStartupId, setSelectedStartupId] = useState<string>('ecoflow-systems');
-  const [bookmarkedIds, setBookmarkedIds] = useState<string[]>(['ecoflow-systems']);
+  const [bookmarkedIds, setBookmarkedIds] = useState<string[]>(() => {
+    const saved = localStorage.getItem('savdo24_bookmarks');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (err) {
+        // Fallback
+      }
+    }
+    return ['ecoflow-systems'];
+  });
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isDark, setIsDark] = useState<boolean>(true);
   const [checkoutAmount, setCheckoutAmount] = useState<number>(1250.00);
@@ -105,31 +115,45 @@ export default function App() {
 
   // Initialize Google Sign-In
   useEffect(() => {
-    if (authModalOpen && googleClientId) {
+    if (!authModalOpen || !googleClientId) return;
+
+    const buttonElement = document.getElementById(`google-signin-button-${authTab}`);
+    if (!buttonElement) return;
+
+    // Only render if element is empty (prevent duplicates)
+    if (buttonElement.innerHTML.trim() === '') {
       window.google?.accounts.id.initialize({
         client_id: googleClientId,
         callback: async (response: any) => {
-          const res = await fetch('/api/auth/google', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ credential: response.credential }),
-          });
-          const data = await res.json();
-          if (res.ok) {
-            localStorage.setItem('savdo24_token', data.accessToken);
-            setIsAuthenticated(true);
-            setUser(data.user);
-            showToast(`Xush kelibsiz, ${data.user.name}!`);
-            setAuthModalOpen(false);
-          } else {
-            showToast(data.error || "Google orqali kirishda xatolik.");
+          try {
+            const res = await fetch('/api/auth/google', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ credential: response.credential }),
+            });
+            const data = await res.json();
+            if (res.ok) {
+              localStorage.setItem('savdo24_token', data.accessToken);
+              setIsAuthenticated(true);
+              setUser(data.user);
+              showToast(`Xush kelibsiz, ${data.user.name}!`);
+              setAuthModalOpen(false);
+            } else {
+              showToast(data.error || "Google orqali kirishda xatolik.");
+            }
+          } catch (err) {
+            console.error("Google auth error:", err);
+            showToast("Google auth xatosi");
           }
         },
       });
-      window.google?.accounts.id.renderButton(
-        document.getElementById(`google-signin-button-${authTab}`),
-        { theme: 'outline', size: 'large', text: 'continue_with', locale: 'uz' }
-      );
+
+      window.google?.accounts.id.renderButton(buttonElement, {
+        theme: 'outline',
+        size: 'large',
+        text: 'continue_with',
+        locale: 'uz'
+      });
     }
   }, [authModalOpen, authTab, googleClientId]);
 
@@ -209,32 +233,63 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (isAuthenticated && user.id) {
-      const fetchNotifications = async () => {
-        try {
-          const res = await fetch('/api/notifications');
-          if (res.ok) {
-            const data = await res.json();
-            setNotifications(data);
-          }
-        } catch (err) {
-          console.error("Error fetching notifications:", err);
-        }
-      };
-      fetchNotifications();
+    let isMounted = true;
+    let socketInstance: ReturnType<typeof io> | null = null;
 
-      const token = localStorage.getItem('savdo24_token');
-      const socket = io({ auth: { token } });
-      
-      socket.on('new_notification', (notif: Notification) => {
-        setNotifications(prev => [notif, ...prev]);
-        showToast(`Yangi bildirishnoma: ${notif.title}`);
-      });
-
-      return () => {
-        socket.disconnect();
-      };
+    if (!isAuthenticated || !user.id) {
+      setNotifications([]);
+      return;
     }
+
+    const fetchNotifications = async () => {
+      try {
+        const res = await fetch('/api/notifications');
+        if (res.ok && isMounted) {
+          const data = await res.json();
+          setNotifications(data);
+        }
+      } catch (err) {
+        console.error("Error fetching notifications:", err);
+      }
+    };
+    fetchNotifications();
+
+    socketInstance = io({
+      withCredentials: true,
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 5,
+      transports: ['websocket'],
+    });
+
+    socketInstance.on('new_notification', (notif: Notification) => {
+      if (!isMounted) return;
+      setNotifications((prev) => {
+        // Prevent duplicate notifications in UI state
+        if (prev.some((n) => n.id === notif.id)) return prev;
+        return [notif, ...prev].slice(0, 50);
+      });
+      showToast(`Yangi bildirishnoma: ${notif.title}`);
+    });
+
+    socketInstance.on('disconnect', () => {
+      console.warn("Socket disconnected");
+    });
+
+    socketInstance.on('error', (err: any) => {
+      console.error("Socket error:", err);
+    });
+
+    return () => {
+      isMounted = false;
+      if (socketInstance) {
+        socketInstance.off('new_notification');
+        socketInstance.off('disconnect');
+        socketInstance.off('error');
+        socketInstance.disconnect();
+        socketInstance = null;
+      }
+    };
   }, [isAuthenticated, user.id]);
 
   // Fetch Startups from our Real API
@@ -301,9 +356,11 @@ export default function App() {
 
   // Toggle dynamic bookmarks
   const toggleBookmark = (id: string) => {
-    setBookmarkedIds((prev) =>
-      prev.includes(id) ? prev.filter((bId) => bId !== id) : [...prev, id]
-    );
+    setBookmarkedIds((prev) => {
+      const updated = prev.includes(id) ? prev.filter((bId) => bId !== id) : [...prev, id];
+      localStorage.setItem('savdo24_bookmarks', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   // To'lov muvaffaqiyatli yakunlanganda
@@ -317,15 +374,30 @@ export default function App() {
   // Real JWT Login API Call
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validation
+    if (!authEmail.trim()) {
+      showToast("Email manzilingizni kiriting");
+      return;
+    }
+    if (!authPassword.trim()) {
+      showToast("Parolingizni kiriting");
+      return;
+    }
+
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: authEmail, password: authPassword }),
+        body: JSON.stringify({
+          email: authEmail.trim().toLowerCase(),
+          password: authPassword,
+        }),
       });
 
+      const data = await res.json();
+
       if (res.ok) {
-        const data = await res.json();
         localStorage.setItem('savdo24_token', data.accessToken);
         setIsAuthenticated(true);
         setUser(data.user);
@@ -335,12 +407,24 @@ export default function App() {
         setAuthEmail('');
         setAuthPassword('');
       } else {
-        const err = await res.json();
-        showToast(err.error || "Login amalga oshmadi.");
+        // Specific error messages
+        if (res.status === 401) {
+          showToast("Email yoki parol noto'g'ri");
+        } else if (res.status === 404) {
+          showToast("Akkaunt topilmadi. Ro'yxatdan o'ting");
+        } else if (res.status === 429) {
+          showToast("Juda ko'p urinish. 15 daqiqa kuting");
+        } else {
+          showToast(data.error || "Kirishda xatolik yuz berdi");
+        }
       }
-    } catch (err) {
-      console.error(err);
-      showToast("Serverga ulanib bo'lmadi.");
+    } catch (err: any) {
+      console.error("Login error:", err);
+      if (err instanceof TypeError) {
+        showToast("Serverga ulanib bo'lmadi");
+      } else {
+        showToast("Noma'lum xatolik yuz berdi");
+      }
     }
   };
 

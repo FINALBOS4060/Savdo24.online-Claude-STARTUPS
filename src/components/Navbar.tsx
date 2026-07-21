@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Send } from 'lucide-react';
 import { UserProfileData, Notification } from '../types';
 import { apiFetch as fetch } from '../lib/api';
@@ -30,6 +30,20 @@ export default function Navbar({
 }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
+  const [localSearch, setLocalSearch] = useState(searchQuery);
+
+  // Sync local search input with prop changes (e.g. reset/clear)
+  useEffect(() => {
+    setLocalSearch(searchQuery);
+  }, [searchQuery]);
+
+  // Debounce the parent state update
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setSearchQuery(localSearch);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [localSearch, setSearchQuery]);
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
@@ -118,8 +132,8 @@ export default function Navbar({
             type="text"
             className="bg-transparent border-none text-white focus:ring-0 text-sm w-48 placeholder-on-primary-container focus:outline-none ml-1"
             placeholder="Loyiha va g'oyalarni qidirish..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
           />
         </div>
 
