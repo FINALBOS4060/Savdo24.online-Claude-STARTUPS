@@ -19,6 +19,7 @@ model User {
   verified        Boolean   @default(false)
   joinDate        String
   avatarUrl       String
+  coverUrl        String?
   walletConnected Boolean   @default(false)
   walletAddress   String?
   emailVerified   Boolean   @default(false)
@@ -90,6 +91,7 @@ model Startup {
   topBoosts       TopBoost[]
   currentTier     String     @default("standard")
   subscriptions   ListingSubscription[]
+  updatedAt       DateTime   @updatedAt
 
   @@index([category])
   @@index([status])
@@ -110,6 +112,7 @@ model Payment {
   startupId          String?
   startup            Startup?  @relation(fields: [startupId], references: [id])
   gateway            String    @default("coingate")
+  source             String    @default("web")
   referralId         String?
   disputes           Dispute[]
   escrow             EscrowPayment?

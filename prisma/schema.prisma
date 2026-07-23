@@ -90,6 +90,7 @@ model Startup {
   topBoosts       TopBoost[]
   currentTier     String     @default("standard")
   subscriptions   ListingSubscription[]
+  updatedAt       DateTime   @updatedAt
 
   @@index([category])
   @@index([status])

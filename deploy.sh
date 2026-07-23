@@ -5,7 +5,7 @@ echo "🚀 Deploying Savdo24 to production..."
 
 # 1. Pull latest changes from git
 echo "📥 Pulling latest changes from Git..."
-# git pull origin main || git pull origin master
+git pull origin main || git pull origin master
 
 # 2. Install dependencies
 echo "📦 Installing dependencies..."
@@ -24,7 +24,7 @@ npx prisma migrate deploy --schema=prisma/schema.prisma
 # 5. Restart PM2 process
 echo "🔄 Restarting application via PM2..."
 # Ecosystem faylidan foydalanib restart qilamiz yoki start qilamiz
-pm2 restart ecosystem.config.js --update-env || pm2 start ecosystem.config.js
+pm2 restart ecosystem.config.cjs --update-env || pm2 start ecosystem.config.cjs
 
 # 6. Verification
 echo "--- Verifying deployment ---"
