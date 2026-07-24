@@ -436,7 +436,7 @@ io.on("connection", (socket) => {
 
 
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const PORT = 3000;
 
 // Health check endpoint
 app.get('/api/health', async (req, res) => {
@@ -2099,10 +2099,13 @@ app.patch("/api/admin/users/:id/role", authenticateToken, requireAdmin, async (r
 app.delete("/api/admin/users/:id", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const user = await prisma.user.findUnique({ where: { id: Number(id) } });
+    const userId = parseInt(id, 10);
+    if (isNaN(userId)) return res.status(400).json({ error: "Yaroqsiz foydalanuvchi ID." });
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ error: "Foydalanuvchi topilmadi." });
 
-    await prisma.user.delete({ where: { id: Number(id) } });
+    await prisma.user.delete({ where: { id: userId } });
 
     await prisma.auditLog.create({
       data: {
@@ -2159,8 +2162,10 @@ app.get("/api/startups", async (req: Request, res: Response) => {
       }
     }
 
-    const pageNum = page ? parseInt(page as string) : 1;
-    let limitNum = limit ? parseInt(limit as string) : 50;
+    const parsedPage = parseInt(page as string, 10);
+    const pageNum = isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage;
+    const parsedLimit = parseInt(limit as string, 10);
+    let limitNum = isNaN(parsedLimit) || parsedLimit < 1 ? 50 : parsedLimit;
     if (limitNum > 100) limitNum = 100; // Max limit 100 for security
     const skip = (pageNum - 1) * limitNum;
 
@@ -3494,8 +3499,9 @@ app.post("/api/payments/webhook", async (req: Request, res: Response) => {
       }
     }
 
-    const platformFeeAmount = updatedStatus === "completed" ? payment.amount * 0.05 : null;
-    const sellerPayoutAmount = updatedStatus === "completed" ? payment.amount * 0.95 : null;
+    const numAmount = Number(payment.amount);
+    const platformFeeAmount = updatedStatus === "completed" ? numAmount * 0.05 : null;
+    const sellerPayoutAmount = updatedStatus === "completed" ? numAmount * 0.95 : null;
 
     await prisma.payment.update({
       where: { id: order_id },
@@ -3516,7 +3522,7 @@ app.post("/api/payments/webhook", async (req: Request, res: Response) => {
           data: { refereeId: payment.userId || 0 }
         });
         
-        const rewardAmount = (payment.amount * referral.commissionPercent) / 100;
+        const rewardAmount = (numAmount * Number(referral.commissionPercent)) / 100;
         await prisma.referralReward.create({
           data: {
             referralId: referral.id,
@@ -3830,8 +3836,13 @@ app.post("/api/conversations", authenticateToken, async (req: AuthRequest, res: 
   try {
     const { startupId, sellerId } = req.body;
     const buyerId = req.user!.id;
+    const sellerIdNum = parseInt(sellerId, 10);
 
-    if (buyerId === parseInt(sellerId)) {
+    if (isNaN(sellerIdNum)) {
+      return res.status(400).json({ error: "Yaroqsiz sotuvchi ID." });
+    }
+
+    if (buyerId === sellerIdNum) {
       return res.status(400).json({ error: "O'zingiz bilan suhbat ocha olmaysiz." });
     }
 
@@ -3840,17 +3851,17 @@ app.post("/api/conversations", authenticateToken, async (req: AuthRequest, res: 
     if (!startup) {
       return res.status(404).json({ error: "Loyiha topilmadi." });
     }
-    const seller = await prisma.user.findUnique({ where: { id: parseInt(sellerId) } });
+    const seller = await prisma.user.findUnique({ where: { id: sellerIdNum } });
     if (!seller) {
       return res.status(404).json({ error: "Sotuvchi topilmadi." });
     }
 
     let conversation = await prisma.conversation.findUnique({
-      where: { startupId_buyerId_sellerId: { startupId, buyerId, sellerId: parseInt(sellerId) } }
+      where: { startupId_buyerId_sellerId: { startupId, buyerId, sellerId: sellerIdNum } }
     });
     if (!conversation) {
       conversation = await prisma.conversation.create({
-        data: { startupId, buyerId, sellerId: parseInt(sellerId) }
+        data: { startupId, buyerId, sellerId: sellerIdNum }
       });
     }
     res.json(conversation);
@@ -4010,8 +4021,8 @@ app.post("/api/reviews", authenticateToken, async (req: AuthRequest, res: Respon
     return res.status(400).json({ error: "Barcha maydonlarni to'ldiring." });
   }
 
-  const ratingInt = parseInt(rating);
-  if (ratingInt < 1 || ratingInt > 5) {
+  const ratingInt = parseInt(rating, 10);
+  if (isNaN(ratingInt) || ratingInt < 1 || ratingInt > 5) {
     return res.status(400).json({ error: "Reyting 1 dan 5 gacha bo'lishi kerak." });
   }
 
@@ -4103,7 +4114,10 @@ app.post("/api/reviews", authenticateToken, async (req: AuthRequest, res: Respon
 
 // GET /api/users/:id/reviews — Foydalanuvchining sharhlarini olish
 app.get("/api/users/:id/reviews", async (req: Request, res: Response) => {
-  const sellerId = parseInt(req.params.id);
+  const sellerId = parseInt(req.params.id, 10);
+  if (isNaN(sellerId)) {
+    return res.status(400).json({ error: "Yaroqsiz foydalanuvchi ID." });
+  }
 
   try {
     const reviews = await prisma.review.findMany({
@@ -4244,7 +4258,10 @@ app.get("/api/disputes", authenticateToken, requireAdmin, async (req: AuthReques
 
 // PATCH /api/disputes/:id — Nizoni yangilash (Admin)
 app.patch("/api/disputes/:id", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  const disputeId = parseInt(req.params.id);
+  const disputeId = parseInt(req.params.id, 10);
+  if (isNaN(disputeId)) {
+    return res.status(400).json({ error: "Yaroqsiz Nizo ID." });
+  }
   const { status, adminNote } = req.body;
 
   if (!status) {
@@ -4273,7 +4290,8 @@ app.patch("/api/disputes/:id", authenticateToken, requireAdmin, async (req: Auth
 
     // Send Emails
     const buyer = await prisma.user.findUnique({ where: { id: updated.buyerId } });
-    const seller = await prisma.user.findUnique({ where: { id: updated.payment.startup?.userId } });
+    const sellerUserId = updated.payment.startup?.userId;
+    const seller = sellerUserId ? await prisma.user.findUnique({ where: { id: sellerUserId } }) : null;
     
     if (buyer) await sendEmail(buyer.email, disputeTitle, `<p>${disputeMsg}</p>`);
     if (seller) await sendEmail(seller.email, disputeTitle, `<p>${disputeMsg}</p>`);
@@ -4471,7 +4489,10 @@ app.delete("/api/admin/startups/:id", authenticateToken, requireAdmin, async (re
 
 // DELETE /api/admin/ideas/:id — G'oya/Izohni o'chirish (Admin)
 app.delete("/api/admin/ideas/:id", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    return res.status(400).json({ error: "Yaroqsiz ID." });
+  }
   try {
     await prisma.ideaVote.deleteMany({ where: { ideaId: id } });
     await prisma.idea.delete({ where: { id } });
@@ -4658,7 +4679,10 @@ app.post("/api/admin/sponsor-channels", authenticateToken, requireAdmin, async (
 
 // PATCH /api/admin/sponsor-channels/:id — Sponsor kanalni yangilash (Admin)
 app.patch("/api/admin/sponsor-channels/:id", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    return res.status(400).json({ error: "Yaroqsiz Sponsor Kanal ID." });
+  }
   const { isActive, channelId, channelUsername, displayName, advertiserContact, pricePerMonth, startDate, endDate } = req.body;
 
   try {
@@ -4694,7 +4718,10 @@ app.patch("/api/admin/sponsor-channels/:id", authenticateToken, requireAdmin, as
 
 // DELETE /api/admin/sponsor-channels/:id — Sponsor kanalni o'chirish (Admin)
 app.delete("/api/admin/sponsor-channels/:id", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    return res.status(400).json({ error: "Yaroqsiz Sponsor Kanal ID." });
+  }
 
   try {
     await prisma.sponsorChannel.delete({
@@ -4750,6 +4777,31 @@ async function seedSettings() {
 async function start() {
   console.log(isPostgres ? "✅ PostgreSQL bazasiga ulanildi (production)" : "⚠️  SQLite (dev.db) ishlatilyapti — bu faqat lokal rivojlantirish uchun!");
   
+  if (isPostgres) {
+    try {
+      console.log("DATABASE_URL found. Deploying PostgreSQL migrations...");
+      execSync("npx prisma migrate deploy --schema=prisma/schema.prisma", { stdio: "inherit" });
+      console.log("PostgreSQL migrations deployed successfully.");
+    } catch (migrateErr) {
+      console.error("PostgreSQL migration deployment failed on startup:", migrateErr);
+    }
+    try {
+      console.log("DATABASE_URL found. Syncing PostgreSQL schema with db push...");
+      execSync("npx prisma db push --schema=prisma/schema.prisma --accept-data-loss", { stdio: "inherit" });
+      console.log("PostgreSQL schema synced successfully.");
+    } catch (pushErr) {
+      console.error("PostgreSQL db push failed on startup:", pushErr);
+    }
+  } else {
+    try {
+      console.log("Using SQLite. Syncing database schema...");
+      execSync("npx prisma db push --schema=prisma/schema.sqlite.prisma --accept-data-loss", { stdio: "inherit" });
+      console.log("SQLite database synced successfully.");
+    } catch (pushErr) {
+      console.error("SQLite database sync failed on startup:", pushErr);
+    }
+  }
+
   // Auto-restore if database is empty with critical error handling
   async function checkAndAutoRestore() {
     try {
@@ -4786,42 +4838,15 @@ async function start() {
             console.error("Also failed to notify admin:", notifyErr);
           }
           
-          console.error("❌ Server will not start with empty/broken database when backup is available.");
-          process.exit(1);
+          console.error("❌ Server warning: empty/broken database restore attempted with errors.");
         }
       }
     } catch (checkErr: any) {
-      console.error("❌ Database check failed:", checkErr);
-      process.exit(1);
+      console.error("⚠️ Database check warning:", checkErr);
     }
   }
 
   await checkAndAutoRestore();
-
-  if (isPostgres) {
-    try {
-      console.log("DATABASE_URL found. Deploying PostgreSQL migrations...");
-      execSync("npx prisma migrate deploy --schema=prisma/schema.prisma", { stdio: "inherit" });
-      console.log("PostgreSQL migrations deployed successfully.");
-    } catch (migrateErr) {
-      console.error("PostgreSQL migration deployment failed on startup:", migrateErr);
-    }
-    try {
-      console.log("DATABASE_URL found. Syncing PostgreSQL schema with db push...");
-      execSync("npx prisma db push --schema=prisma/schema.prisma --accept-data-loss", { stdio: "inherit" });
-      console.log("PostgreSQL schema synced successfully.");
-    } catch (pushErr) {
-      console.error("PostgreSQL db push failed on startup:", pushErr);
-    }
-  } else {
-    try {
-      console.log("Using SQLite. Syncing database schema...");
-      execSync("npx prisma db push --schema=prisma/schema.sqlite.prisma --accept-data-loss", { stdio: "inherit" });
-      console.log("SQLite database synced successfully.");
-    } catch (pushErr) {
-      console.error("SQLite database sync failed on startup:", pushErr);
-    }
-  }
 
   await seedSettings();
 
@@ -4842,8 +4867,11 @@ app.get("/api/notifications", authenticateToken, async (req: AuthRequest, res: R
 
 app.patch("/api/notifications/:id/read", authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
+    const notifId = parseInt(req.params.id, 10);
+    if (isNaN(notifId)) return res.status(400).json({ error: "Yaroqsiz bildirishnoma ID." });
+
     await prisma.notification.update({
-      where: { id: Number(req.params.id), userId: req.user!.id },
+      where: { id: notifId, userId: req.user!.id },
       data: { isRead: true }
     });
     res.json({ success: true });
@@ -4936,8 +4964,11 @@ app.get("/api/auth/sessions", authenticateToken, async (req: AuthRequest, res: R
 
 app.delete("/api/auth/sessions/:id", authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
+    const sessionId = parseInt(req.params.id, 10);
+    if (isNaN(sessionId)) return res.status(400).json({ error: "Yaroqsiz sessiya ID." });
+
     await prisma.refreshToken.delete({
-      where: { id: Number(req.params.id), userId: req.user!.id }
+      where: { id: sessionId, userId: req.user!.id }
     });
     res.json({ success: true });
   } catch (err) {

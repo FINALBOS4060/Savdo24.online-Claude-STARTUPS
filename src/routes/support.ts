@@ -208,7 +208,10 @@ router.get("/reports", authenticateToken, requireAdmin, async (req: AuthRequest,
 
 // PATCH /api/reports/:id/status — Shikoyat statusini yangilash (Admin)
 router.patch("/reports/:id/status", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    return res.status(400).json({ error: "Yaroqsiz Report ID" });
+  }
   const result = statusSchema.safeParse(req.body);
   if (!result.success) {
     return res.status(400).json({ error: result.error.issues.map((e: any) => e.message).join(" ") });

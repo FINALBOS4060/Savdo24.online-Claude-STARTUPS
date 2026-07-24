@@ -69,9 +69,7 @@ router.post("/register", authLimiter, async (req: Request, res: Response) => {
   try {
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-      return res.status(201).json({ 
-         message: "Ro'yxatdan o'tish so'rovi qabul qilindi. Iltimos, Telegram orqali tasdiqlang." 
-       });
+      return res.status(400).json({ error: "Ushbu email bilan allaqachon ro'yxatdan o'tilgan." });
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
