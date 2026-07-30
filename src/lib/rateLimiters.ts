@@ -39,7 +39,13 @@ export const passwordResetLimiter = rateLimit({
 export const paymentStatusLimiter = rateLimit({
   validate: { xForwardedForHeader: false, default: true },
   windowMs: 5 * 60 * 1000, // 5 minute window
-  max: 3, // Max 3 attempts
+  // The checkout page (CheckoutPage.tsx) polls this endpoint every 3 seconds for
+  // up to ~15 minutes (the checkout countdown), i.e. up to ~100 requests per
+  // 5-minute window from a single legitimate user. The previous max of 3 caused
+  // real users to get rate-limited within ~9 seconds of starting checkout,
+  // silently blocking payment-status updates. 120 leaves headroom for retries
+  // while still bounding abuse well below an unthrottled endpoint.
+  max: 120,
   message: { error: "Juda ko'p to'lov holatini tekshirish so'rovlari. Iltimos biroz kuting." }
 });
 

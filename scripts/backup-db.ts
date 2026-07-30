@@ -42,6 +42,16 @@ async function updateSetting(key: string, value: string) {
   }
 }
 
+function encryptBackupBuffer(fileBuffer: Buffer, encryptionKey: string): Buffer {
+  const key = crypto.createHash('sha256').update(encryptionKey).digest();
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  let encrypted = cipher.update(fileBuffer);
+  encrypted = Buffer.concat([encrypted, cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return Buffer.from(`${iv.toString('hex')}:${encrypted.toString('hex')}:${tag.toString('hex')}`);
+}
+
 async function sendToTelegram(filePath: string, filename: string) {
   const botToken = await getSetting("TELEGRAM_BOT_TOKEN");
   const chatId = await getSetting("TELEGRAM_BACKUP_CHAT_ID");
@@ -60,17 +70,7 @@ async function sendToTelegram(filePath: string, filename: string) {
   console.log(`\n[Telegram] Encrypting and sending backup file ${filename} to Telegram chat/channel ${chatId}...`);
   try {
     const fileBuffer = fs.readFileSync(filePath);
-    
-    // AES-256-GCM Encryption
-    const key = crypto.createHash('sha256').update(encryptionKey).digest();
-    const iv = crypto.randomBytes(12);
-    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-    
-    let encrypted = cipher.update(fileBuffer);
-    encrypted = Buffer.concat([encrypted, cipher.final()]);
-    const tag = cipher.getAuthTag();
-    
-    const encryptedContent = `${iv.toString('hex')}:${encrypted.toString('hex')}:${tag.toString('hex')}`;
+    const encryptedContent = encryptBackupBuffer(fileBuffer, encryptionKey);
     const encryptedFilename = `${filename}.enc`;
     
     const formData = new FormData();
@@ -118,6 +118,7 @@ export async function runBackup() {
 
   if (!dbUrl) {
     console.error("DATABASE_URL is not configured in environment variables!");
+    await prismaClient.$disconnect();
     return;
   }
 
@@ -150,16 +151,42 @@ export async function runBackup() {
     try {
       console.log("Fetching all tables from database...");
 
+      // MUHIM: bu ro'yxatda schema.prisma'dagi 30 modeldan atigi 9 tasi bor edi
+      // (Notification, Conversation/Message, VipSubscription, B2BAccount/B2BOrder,
+      // Referral va h.k. umuman yo'q edi) — pg_dump ishlamagan muhitda (fallback
+      // ishga tushganda) bu jadvallar HECH QACHON zaxiralanmasdi. Endi barcha 30
+      // modelga to'liq.
       const backupData = {
         users: await prismaClient.user.findMany(),
+        categories: await prismaClient.category.findMany(),
         startups: await prismaClient.startup.findMany(),
-        ideas: await prismaClient.idea.findMany(),
-        reviews: await prismaClient.review.findMany(),
         payments: await prismaClient.payment.findMany(),
+        ideas: await prismaClient.idea.findMany(),
+        subscribers: await prismaClient.subscriber.findMany(),
+        ideaVotes: await prismaClient.ideaVote.findMany(),
+        reviews: await prismaClient.review.findMany(),
         disputes: await prismaClient.dispute.findMany(),
         refreshTokens: await prismaClient.refreshToken.findMany(),
         reports: await prismaClient.report.findMany(),
+        auditLogs: await prismaClient.auditLog.findMany(),
         settings: await prismaClient.setting.findMany(),
+        telegramDeliveries: await prismaClient.telegramDelivery.findMany(),
+        sponsorChannels: await prismaClient.sponsorChannel.findMany(),
+        topBoosts: await prismaClient.topBoost.findMany(),
+        vipSubscriptions: await prismaClient.vipSubscription.findMany(),
+        conversations: await prismaClient.conversation.findMany(),
+        messages: await prismaClient.message.findMany(),
+        referrals: await prismaClient.referral.findMany(),
+        referralRewards: await prismaClient.referralReward.findMany(),
+        listingTiers: await prismaClient.listingTier.findMany(),
+        listingSubscriptions: await prismaClient.listingSubscription.findMany(),
+        escrowPayments: await prismaClient.escrowPayment.findMany(),
+        disputeResolutions: await prismaClient.disputeResolution.findMany(),
+        b2bAccounts: await prismaClient.b2BAccount.findMany(),
+        b2bOrders: await prismaClient.b2BOrder.findMany(),
+        analyticsEvents: await prismaClient.analyticsEvent.findMany(),
+        supportTickets: await prismaClient.supportTicket.findMany(),
+        notifications: await prismaClient.notification.findMany(),
         exportedAt: new Date().toISOString(),
       };
 
@@ -170,6 +197,7 @@ export async function runBackup() {
       console.log("Local JSON backup generated successfully.");
     } catch (prismaErr) {
       console.error("Prisma Client fallback backup failed:", prismaErr);
+      await prismaClient.$disconnect();
       return;
     }
   }
@@ -192,6 +220,23 @@ export async function runBackup() {
     return;
   }
 
+  // MUHIM: bu yerda avval bazaning to'liq nusxasi (parol xeshlari, refresh
+  // tokenlar, to'lovlar va h.k.) HECH QANDAY shifrlanmasdan uchinchi tomon S3
+  // xotirasiga yuklanardi — Telegram orqali yuborishda esa AES-256-GCM bilan
+  // shifrlash SHART qilib qo'yilgan edi (ENCRYPTION_KEY bo'lmasa yuborilmaydi).
+  // Bu nomuvofiqlik jiddiy xavfsizlik zaifligi edi. Endi S3 uchun ham xuddi
+  // shu shifrlash qo'llaniladi.
+  const encryptionKey = process.env.ENCRYPTION_KEY;
+  if (!encryptionKey || encryptionKey.length < 32) {
+    console.error("\n[S3] CRITICAL ERROR: ENCRYPTION_KEY is not defined or too short (min 32 chars). Cloud backup will NOT be uploaded unencrypted.");
+    console.log(`Local (unencrypted) backup file remains at: ${tempFilePath}`);
+    await prismaClient.$disconnect();
+    return;
+  }
+  const rawBuffer = Buffer.isBuffer(uploadContent) ? uploadContent : Buffer.from(uploadContent);
+  const encryptedUploadContent = encryptBackupBuffer(rawBuffer, encryptionKey);
+  const encryptedFilename = `${filename}.enc`;
+
   try {
     console.log(`\nInitializing S3 Client connecting to ${endpoint}...`);
     const s3 = new S3Client({
@@ -204,15 +249,15 @@ export async function runBackup() {
       forcePathStyle: true 
     });
 
-    console.log(`Uploading "${filename}" to Contabo bucket "${bucketName}"...`);
+    console.log(`Uploading encrypted "${encryptedFilename}" to Contabo bucket "${bucketName}"...`);
     await s3.send(new PutObjectCommand({
       Bucket: bucketName,
-      Key: `backups/${filename}`,
-      Body: uploadContent,
-      ContentType: contentType
+      Key: `backups/${encryptedFilename}`,
+      Body: encryptedUploadContent,
+      ContentType: 'application/octet-stream'
     }));
 
-    console.log(`\n🎉 Cloud Upload Succeeded! Backed up to backups/${filename}`);
+    console.log(`\n🎉 Cloud Upload Succeeded! Backed up to backups/${encryptedFilename}`);
     
     // Clean up local file
     if (fs.existsSync(tempFilePath)) {
@@ -228,9 +273,19 @@ export async function runBackup() {
 }
 
 // CLI execution
+// Note: when this file is dynamically imported from the bundled (CJS) production
+// server, `import.meta.url` is empty and fileURLToPath() throws. Guard against
+// that so importing this module for programmatic use (e.g. from server.ts)
+// never crashes — only running it directly via `tsx scripts/backup-db.ts` should
+// trigger the auto-run.
 const nodePath = process.argv[1] ? path.resolve(process.argv[1]) : '';
-const modulePath = fileURLToPath(import.meta.url);
-if (nodePath === modulePath) {
+let modulePath = '';
+try {
+  modulePath = fileURLToPath(import.meta.url);
+} catch {
+  // import.meta.url unavailable (e.g. bundled to CJS) — not a direct CLI run.
+}
+if (nodePath && modulePath && nodePath === modulePath) {
   runBackup();
 }
 

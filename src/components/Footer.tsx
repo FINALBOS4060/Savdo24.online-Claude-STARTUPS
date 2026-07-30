@@ -24,6 +24,11 @@ export default function Footer({ setView }: FooterProps) {
         <div className="space-y-3">
           <h4 className="font-bold text-sm text-white">Huquqiy</h4>
           <div className="flex flex-col gap-2 text-xs text-on-primary-container">
+            {/* MUHIM (73-band): SupportPage (/support — FAQ va murojaat formasi)
+                mavjud edi, lekin uni ochish uchun saytda HECH QANDAY havola
+                yo'q edi (MessagesPage'dagi 67-banddagi bilan bir xil muammo
+                turi) — faqat URL'ni qo'lda kiritib topish mumkin edi. */}
+            <button onClick={() => setView('support')} className="hover:text-secondary-container transition-colors text-left">Yordam va FAQ</button>
             <button onClick={() => setView('terms')} className="hover:text-secondary-container transition-colors text-left">Foydalanish shartlari</button>
             <button onClick={() => setView('privacy')} className="hover:text-secondary-container transition-colors text-left">Maxfiylik siyosati</button>
             <button onClick={() => setView('refund')} className="hover:text-secondary-container transition-colors text-left">Qaytarish siyosati</button>
@@ -49,9 +54,9 @@ export default function Footer({ setView }: FooterProps) {
         <div className="space-y-3">
           <h4 className="font-bold text-sm text-white">Aloqa</h4>
           <div className="flex flex-col gap-2 text-xs text-on-primary-container">
-            <a href="mailto:support@savdo24.uz" className="flex items-center gap-2 hover:text-secondary-container transition-colors">
+            <a href="mailto:support@savdo24.online" className="flex items-center gap-2 hover:text-secondary-container transition-colors">
               <Mail className="w-4 h-4" />
-              support@savdo24.uz
+              support@savdo24.online
             </a>
           </div>
         </div>

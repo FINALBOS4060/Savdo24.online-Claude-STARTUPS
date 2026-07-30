@@ -16,13 +16,15 @@ const prisma: any = isPostgres
     });
 
 async function main() {
-  const email = process.argv[2];
+  const rawEmail = process.argv[2];
 
-  if (!email) {
+  if (!rawEmail) {
     console.error("Xatolik: Iltimos, foydalanuvchi email manzilini kiriting.");
     console.log("Foydalanish: npx tsx scripts/make-admin.ts <email_address>");
     process.exit(1);
   }
+
+  const email = rawEmail.trim().toLowerCase();
 
   console.log(`Foydalanish ma'lumotlar bazasi turi: ${isPostgres ? "PostgreSQL" : "SQLite"}`);
   console.log(`Email bo'yicha foydalanuvchi qidirilmoqda: ${email}`);
@@ -34,7 +36,8 @@ async function main() {
 
     if (!user) {
       console.error(`Xatolik: '${email}' email manzilli foydalanuvchi topilmadi.`);
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
 
     console.log(`Foydalanish: Foydalanuvchi topildi - ${user.name} (Hozirgi roli: ${user.role})`);
@@ -47,7 +50,7 @@ async function main() {
     console.log(`Muvaffaqiyatli: ${updatedUser.name} roli muvaffaqiyatli 'Admin' qilib o'zgartirildi!`);
   } catch (error) {
     console.error("Xatolik yuz berdi:", error);
-    process.exit(1);
+    process.exitCode = 1;
   } finally {
     await prisma.$disconnect();
   }

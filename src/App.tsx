@@ -30,6 +30,7 @@ export default function App() {
   
   const setView = (view: string, id?: string) => {
     if (view === 'browse') navigate('/');
+    else if (view === 'login') { navigate('/'); setAuthTab('login'); setAuthModalOpen(true); }
     else if (view === 'detail') navigate(`/startup/${id || selectedStartupId}`);
     else if (view === 'edit-startup') navigate(`/edit-startup/${id}`);
     else navigate(`/${view}`);
@@ -40,7 +41,7 @@ export default function App() {
   const [startups, setStartups] = useState<Startup[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [selectedStartupId, setSelectedStartupId] = useState<string>('ecoflow-systems');
+  const [selectedStartupId, setSelectedStartupId] = useState<string>('');
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>(() => {
     const saved = localStorage.getItem('savdo24_bookmarks');
     if (saved) {
@@ -50,7 +51,7 @@ export default function App() {
         // Fallback
       }
     }
-    return ['ecoflow-systems'];
+    return [];
   });
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isDark, setIsDark] = useState<boolean>(true);
@@ -81,6 +82,12 @@ export default function App() {
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authName, setAuthName] = useState('');
+  // 87-band: Kirish/Ro'yxatdan o'tish formalarida submit paytida
+  // disabled/loading holati yo'q edi (ProfilePage/BrowsePage/SellPage'dagi
+  // 60/74/76/83/84-band bilan bir xil muammo turi) — butun saytdagi ENG
+  // muhim formalar, tez-tez bosilsa bir nechta login/register so'rovi
+  // yuborilishi mumkin edi.
+  const [isAuthSubmitting, setIsAuthSubmitting] = useState(false);
 
   // Google client ID dynamic state
   const [googleClientId, setGoogleClientId] = useState<string | null>(null);
@@ -168,7 +175,13 @@ export default function App() {
       }, 4000);
       return () => clearTimeout(timer);
     }
-  }, [toast.visible]);
+    // MUHIM: bu yerda avval faqat [toast.visible] ga bog'liq edi. Agar bitta
+    // xabar hali ko'rinib turgan (4s ichida) paytda YANGI showToast() chaqirilsa,
+    // `visible` true->true bo'lib qolgani uchun effekt qayta ishga tushmasdi va
+    // eski taymer davom etib, yangi xabarni muddatidan oldin yopib yuborardi.
+    // Endi `toast.message` ham dependency'ga qo'shildi — har bir yangi xabar
+    // o'zining to'liq 4 soniyalik vaqtini oladi.
+  }, [toast.visible, toast.message]);
 
   // Sync state with global fetch token updates
   useEffect(() => {
@@ -296,7 +309,12 @@ export default function App() {
   const fetchStartups = async () => {
     setIsLoadingStartups(true);
     try {
-      const res = await fetch('/api/startups');
+      // 45-MUAMMO: server endi "o'ziniki" pending/rejected e'lonlarni faqat
+      // includeMine=true so'ralganda qaytaradi (BrowsePage'ning ommaviy
+      // katalogiga aralashib ketmasligi uchun) — Profil "Mening loyihalarim"
+      // bo'limi shu global ro'yxatga tayanadi, shuning uchun bu yerda
+      // includeMine=true yuboriladi.
+      const res = await fetch('/api/startups?includeMine=true');
       if (res.ok) {
         const data = await res.json();
         setStartups(Array.isArray(data?.startups) ? data.startups : Array.isArray(data) ? data : []);
@@ -343,6 +361,11 @@ export default function App() {
         const created = await res.json();
         setStartups((prev) => [created, ...prev]);
         showToast(`${created.name} muvaffaqiyatli tekshiruvga yuborildi.`);
+        // 67-MUAMMO: profileTab avvalgi qiymatida qolib ketardi (masalan
+        // "settings"), shu sabab yangi joylangan e'lon foydalanuvchiga
+        // profilga qaytganda ko'rinmasdi ("yo'qolgandek" tuyulardi).
+        // Endi "Mening loyihalarim" tabiga aniq o'tkaziladi.
+        setProfileTab('startups');
         setView('profile');
       } else {
         const err = await res.json();
@@ -368,8 +391,17 @@ export default function App() {
     fetchStartups(); // Reload fresh data with updated progresses & proposals from DB
   };
 
+  // MUHIM: bu yerda "|| startups[0]" fallback ATAYLAB OLIB TASHLANDI.
+  // Avval, agar selectedStartupId hech qanday mos startapga to'g'ri kelmasa
+  // (masalan foydalanuvchi to'g'ridan-to'g'ri /checkout ga o'tsa, orqaga qaytsa
+  // yoki ro'yxat yangilanib eski ID mos kelmay qolsa), tizim JIMGINA birinchi
+  // startapni ("startups[0]") checkout uchun tanlab qo'yardi — bu foydalanuvchi
+  // butunlay BOSHQA mahsulot uchun to'lov qilib qo'yishiga olib kelishi mumkin edi.
+  // Endi mos kelmasa `undefined` qaytadi va CheckoutPage o'zining
+  // "mahsulot tanlanmagan" ogohlantirishini ko'rsatib, xavfsiz tarzda bosh sahifaga
+  // yo'naltiradi.
   const selectedStartup =
-    startups.find((s) => s.id === selectedStartupId) || startups[0];
+    startups.find((s) => s.id === selectedStartupId);
 
   // Real JWT Login API Call
   const handleLoginSubmit = async (e: React.FormEvent) => {
@@ -384,6 +416,8 @@ export default function App() {
       showToast("Parolingizni kiriting");
       return;
     }
+    if (isAuthSubmitting) return;
+    setIsAuthSubmitting(true);
 
     try {
       const res = await fetch('/api/auth/login', {
@@ -425,18 +459,22 @@ export default function App() {
       } else {
         showToast("Noma'lum xatolik yuz berdi");
       }
+    } finally {
+      setIsAuthSubmitting(false);
     }
   };
 
   // Real JWT Register API Call
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isAuthSubmitting) return;
+    setIsAuthSubmitting(true);
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: authEmail,
+          email: authEmail.trim().toLowerCase(),
           password: authPassword,
           name: authName,
         }),
@@ -460,6 +498,8 @@ export default function App() {
     } catch (err) {
       console.error(err);
       showToast("Serverga ulanib bo'lmadi.");
+    } finally {
+      setIsAuthSubmitting(false);
     }
   };
 
@@ -499,6 +539,7 @@ export default function App() {
         notifications={notifications}
         setNotifications={setNotifications}
         setSelectedStartupId={setSelectedStartupId}
+        setProfileTab={setProfileTab}
       />
 
       <div className="flex">
@@ -523,12 +564,12 @@ export default function App() {
                 <div>
                   <h4 className="text-yellow-500 font-extrabold text-sm">Hisobingiz tasdiqlanmagan!</h4>
                   <p className="text-xs text-on-primary-container leading-relaxed mt-1">
-                    Loyihalarni sotib olish yoki yangi startap e'lon qilish uchun hisobingizni tasdiqlashingiz shart. Buning uchun <b>@Savdo24_Official_bot</b> botiga kirib <b>/start {user.telegramLinkCode || "kod"}</b> deb yozing.
+                    Loyihalarni sotib olish yoki yangi startap e'lon qilish uchun hisobingizni tasdiqlashingiz shart. Buning uchun shaxsiy tasdiqlash kodingizni oling va <b>@Savdo24_Official_bot</b> botiga <b>/start [kodingiz]</b> deb yozing.
                   </p>
                 </div>
               </div>
               <button
-                onClick={() => setView('profile')}
+                onClick={() => { setProfileTab('settings'); setView('profile'); }}
                 className="px-4 py-2.5 bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/40 text-yellow-500 font-bold text-xs rounded-xl transition-all whitespace-nowrap active:scale-95 cursor-pointer self-start sm:self-center"
               >
                 Kodni olish
@@ -628,6 +669,7 @@ export default function App() {
                     setCheckoutAmount={setCheckoutAmount}
                     user={user}
                     categories={categories}
+                    setSelectedStartupId={setSelectedStartupId}
                   />
                 </motion.div>
               } />
@@ -647,6 +689,7 @@ export default function App() {
                     isEditing={true}
                     startups={startups}
                     fetchStartups={fetchStartups}
+                    setInitialProfileTab={setInitialProfileTab}
                   />
                 </motion.div>
               } />
@@ -899,9 +942,10 @@ export default function App() {
                   </div>
                   <button
                     type="submit"
-                    className="w-full py-3 bg-[#f0b90b] text-black font-bold text-sm rounded-xl hover:brightness-110 active:scale-95 transition-all mt-6 shadow-lg shadow-[#f0b90b]/10"
+                    disabled={isAuthSubmitting}
+                    className="w-full py-3 bg-[#f0b90b] text-black font-bold text-sm rounded-xl hover:brightness-110 active:scale-95 transition-all mt-6 shadow-lg shadow-[#f0b90b]/10 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Tizimga kirish
+                    {isAuthSubmitting ? 'Kuting...' : 'Tizimga kirish'}
                   </button>
                   <div className="text-center text-xs text-on-primary-container my-4">yoki</div>
                   <div id="google-signin-button-login" className="flex justify-center"></div>
@@ -946,9 +990,10 @@ export default function App() {
                   </div>
                   <button
                     type="submit"
-                    className="w-full py-3 bg-[#f0b90b] text-black font-bold text-sm rounded-xl hover:brightness-110 active:scale-95 transition-all mt-6 shadow-lg shadow-[#f0b90b]/10"
+                    disabled={isAuthSubmitting}
+                    className="w-full py-3 bg-[#f0b90b] text-black font-bold text-sm rounded-xl hover:brightness-110 active:scale-95 transition-all mt-6 shadow-lg shadow-[#f0b90b]/10 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Ro'yxatdan o'tish
+                    {isAuthSubmitting ? 'Kuting...' : "Ro'yxatdan o'tish"}
                   </button>
                   <div className="text-center text-xs text-on-primary-container my-4">yoki</div>
                   <div id="google-signin-button-register" className="flex justify-center"></div>

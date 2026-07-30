@@ -45,6 +45,7 @@ model User {
   referrals          Referral[] @relation("ReferrerReferrals")
   referredBy         Referral[] @relation("RefereeReferrals")
   b2bAccount         B2BAccount?
+  auditLogs          AuditLog[]
 }
 
 model Category {
@@ -65,6 +66,7 @@ model Startup {
   listingType     String    @default("To'liq loyiha (manba kodi bilan)")
   techStack       String    @default("[]") // Serialized JSON array of strings
   demoUrl         String?
+  githubUrl       String?
   repoIncluded    Boolean   @default(false)
   soldStatus      String    @default("sotuvda") // "sotuvda" | "sotildi"
   status          String    @default("pending") // "active" | "pending"
@@ -196,15 +198,28 @@ model Report {
   description String?
   status      String   @default("pending") // "pending" | "reviewed" | "dismissed"
   createdAt   DateTime @default(now())
+
+  // MUHIM: avval bu yerda unikal cheklov yo'q edi — src/routes/support.ts'dagi
+  // "avval qidir, keyin qo'sh" (findFirst + create) tekshiruvi ilova darajasida
+  // ishlaydi, lekin bu poyga holatiga (race condition) qarshi himoyasiz: ikkita
+  // bir vaqtdagi so'rov ikkalasi ham "hali yo'q" deb topib, bitta foydalanuvchi
+  // bitta targetga ikkita bir xil shikoyat yaratib qo'yishi mumkin edi. Loyihada
+  // IdeaVote kabi boshqa modellarda xuddi shu maqsadda @@unique ishlatilgan —
+  // endi Report ham shu konventsiyaga muvofiqlashtirildi.
+  @@unique([reporterId, targetId, targetType])
 }
 
 model AuditLog {
-  id        Int      @id @default(autoincrement())
-  adminId   Int
-  action    String   // "approve_startup" | "reject_startup" | "resolve_dispute" | "delete_report" va h.k.
-  targetId  String
-  details   String?
-  createdAt DateTime @default(now())
+  id         Int      @id @default(autoincrement())
+  adminId    Int
+  admin      User     @relation(fields: [adminId], references: [id])
+  action     String   // "approve_startup" | "reject_startup" | "resolve_dispute" | "delete_report" va h.k.
+  targetType String?
+  targetId   String
+  details    String?
+  createdAt  DateTime @default(now())
+
+  @@index([adminId])
 }
 
 model Setting {
@@ -405,4 +420,23 @@ model SupportTicket {
   message     String
   status      String   @default("pending") // pending, reviewing, resolved, closed
   createdAt   DateTime @default(now())
+}
+
+// MUHIM: bu model avval SCHEMA'DA UMUMAN YO'Q EDI, lekin server.ts'da
+// `prisma.notification.create/findMany/update/updateMany` deb KO'P JOYDA
+// ishlatiladi (createNotification() yordamchi funksiyasi, GET
+// /api/notifications, PATCH /api/notifications/:id/read va h.k.). Model
+// mavjud bo'lmagani sabab bu chaqiruvlarning BARCHASI ishlab chiqarishda
+// xato berardi. Endi qo'shildi.
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  type      String
+  title     String
+  message   String
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }

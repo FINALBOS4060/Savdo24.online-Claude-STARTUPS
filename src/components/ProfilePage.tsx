@@ -155,8 +155,20 @@ export default function ProfilePage({
   const [boostDays, setBoostDays] = useState(7);
   const [estimatedPrice, setEstimatedPrice] = useState(0);
   const [vipDays, setVipDays] = useState(30);
+  const [vipEstimatedPrice, setVipEstimatedPrice] = useState(0);
+  const [vipDiscountPercent, setVipDiscountPercent] = useState(40);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
+  // 83-band: Sozlamalar/B2B formalarida submit paytida disabled/loading
+  // holati yo'q edi (SellPage/SupportPage/MessagesPage'dagi 60/74/76-band
+  // bilan bir xil muammo turi).
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [isSubmittingB2B, setIsSubmittingB2B] = useState(false);
+  // 120-band: TOP/VIP xarid va escrow tugmalarida ham xuddi shu turdagi
+  // himoya yo'q edi (60/74/76/83/84/117/118/119-band naqshi).
+  const [isBuyingTop, setIsBuyingTop] = useState(false);
+  const [isBuyingVip, setIsBuyingVip] = useState(false);
+  const [escrowActionId, setEscrowActionId] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const coverInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -179,11 +191,32 @@ export default function ProfilePage({
 
   useEffect(() => {
     if (topModal.isOpen) {
+      // 98-band: pastdagi VIP narx effekti bilan bir xil so'rov, lekin bu yerda
+      // .catch() va `data.price || 0` fallback yo'q edi — server 365 kundan
+      // ortiq (yoki tarmoq xatosi) uchun {error:...} qaytarganda `data.price`
+      // undefined bo'lib, "Hisoblangan narx: $undefined" ko'rsatilardi.
       fetch(`/api/top-boost/price?days=${boostDays}`)
         .then(res => res.json())
-        .then(data => setEstimatedPrice(data.price));
+        .then(data => setEstimatedPrice(data.price || 0))
+        .catch(() => {});
     }
   }, [boostDays, topModal.isOpen]);
+
+  // MUHIM: bu yerda avval VIP narxi qattiq kodlangan `vipDays * 0.5 * 0.6`
+  // formulasi bilan hisoblanardi — bu VIP_PRICE_PER_DAY/VIP_DISCOUNT_PERCENT
+  // admin sozlamalaridan mustaqil edi (agar admin bu qiymatlarni o'zgartirsa,
+  // foydalanuvchiga ko'rsatilgan narx bilan /api/vip/create orqali haqiqatda
+  // undiriladigan narx mos kelmay qolardi). Endi TOP boost bilan bir xil
+  // naqshda, haqiqiy narx serverdan (/api/vip/price) olinadi.
+  useEffect(() => {
+    fetch(`/api/vip/price?days=${vipDays}`)
+      .then(res => res.json())
+      .then(data => {
+        setVipEstimatedPrice(data.price || 0);
+        if (typeof data.discountPercent === 'number') setVipDiscountPercent(data.discountPercent);
+      })
+      .catch(() => {});
+  }, [vipDays]);
 
   // Lock scroll on body when topModal is open, and clean up modal state on unmount
   useEffect(() => {
@@ -205,6 +238,8 @@ export default function ProfilePage({
   }, []);
 
   const handleBuyTop = async () => {
+    if (isBuyingTop) return;
+    setIsBuyingTop(true);
     try {
       const res = await fetch('/api/top-boost/create', {
         method: 'POST',
@@ -213,14 +248,27 @@ export default function ProfilePage({
       });
       if (res.ok) {
         const data = await res.json();
-        window.location.href = data.paymentUrl;
+        if (data.paymentUrl) {
+          window.location.href = data.paymentUrl;
+          return; // navigating away, keep button disabled
+        } else {
+          onActionToast("To'lov havolasini olishda xatolik yuz berdi.");
+        }
+      } else {
+        const err = await res.json().catch(() => ({}));
+        onActionToast(err.error || "TOP xizmatini sotib olishda xatolik yuz berdi.");
       }
     } catch (err) {
       console.error("TOP boost error:", err);
+      onActionToast("Tarmoq xatosi yuz berdi.");
+    } finally {
+      setIsBuyingTop(false);
     }
   };
 
   const handleBuyVip = async () => {
+    if (isBuyingVip) return;
+    setIsBuyingVip(true);
     try {
       const res = await fetch('/api/vip/create', {
         method: 'POST',
@@ -229,10 +277,21 @@ export default function ProfilePage({
       });
       if (res.ok) {
         const data = await res.json();
-        window.location.href = data.paymentUrl;
+        if (data.paymentUrl) {
+          window.location.href = data.paymentUrl;
+          return; // navigating away, keep button disabled
+        } else {
+          onActionToast("To'lov havolasini olishda xatolik yuz berdi.");
+        }
+      } else {
+        const err = await res.json().catch(() => ({}));
+        onActionToast(err.error || "VIP obunasini sotib olishda xatolik yuz berdi.");
       }
     } catch (err) {
       console.error("VIP subscription error:", err);
+      onActionToast("Tarmoq xatosi yuz berdi.");
+    } finally {
+      setIsBuyingVip(false);
     }
   };
 
@@ -326,34 +385,38 @@ export default function ProfilePage({
   }, [user]);
 
   // If the user is logged in (has an id), show only startups matching their userId.
-  // Otherwise, fallback to showing the default seeded portfolio.
+  // Otherwise, there is nothing personal to show yet.
   const myStartups = user.id
     ? startups.filter((s: any) => s.userId === user.id)
-    : startups.filter(
-        (s) =>
-          s.id === 'quantumpay-ai' ||
-          s.id === 'greenlogistics' ||
-          s.id === 'retroarcade-io' ||
-          (!['ecoflow-systems', 'neuralpath-ai', 'greenhorizon', 'pulsemetrics'].includes(s.id) && s.id !== 'ecoflow-systems')
-      );
+    : [];
 
   const savedStartups = startups.filter((s) => bookmarkedIds.includes(s.id));
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSavingSettings) return;
+    setIsSavingSettings(true);
     try {
       const res = await fetch('/api/users/me', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: editName, role: editRole, avatarUrl: editAvatar }),
+        body: JSON.stringify({ name: editName, avatarUrl: editAvatar }),
       });
       if (res.ok) {
+        // MUHIM: server /api/users/me orqali `role`ni xavfsizlik sababli
+        // (privilege escalation oldini olish uchun) qasddan qabul qilmaydi
+        // va o'zgartirmaydi. Oldin bu yerda serverning haqiqiy javobidan
+        // qat'i nazar mahalliy `editRole` qiymati state'ga yozib qo'yilardi —
+        // foydalanuvchiga "saqlandi" deyilardi, aslida rol o'zgarmagan bo'lardi
+        // (sahifa yangilanganda eski rol qaytib kelardi). Endi serverning
+        // haqiqiy javobi ishlatiladi, rol tanlovi esa faqat ma'lumot uchun.
+        const updatedUser = await res.json();
         setUser((prev) => ({
           ...prev,
-          name: editName,
-          role: editRole,
-          avatarUrl: editAvatar,
+          name: updatedUser.name,
+          avatarUrl: updatedUser.avatarUrl,
         }));
+        setEditRole(updatedUser.role);
         onActionToast('Profil sozlamalari muvaffaqiyatli saqlandi!');
       } else {
         const err = await res.json();
@@ -362,6 +425,8 @@ export default function ProfilePage({
     } catch (err) {
       console.error(err);
       onActionToast("Tarmoq xatosi yuz berdi.");
+    } finally {
+      setIsSavingSettings(false);
     }
   };
 
@@ -618,19 +683,31 @@ export default function ProfilePage({
               <form 
                 onSubmit={async (e) => {
                   e.preventDefault();
+                  if (isSubmittingB2B) return;
+                  setIsSubmittingB2B(true);
                   const formData = new FormData(e.currentTarget);
-                  const res = await fetch('/api/b2b/onboard', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      companyName: formData.get('companyName'),
-                      taxId: formData.get('taxId')
-                    })
-                  });
-                  if (res.ok) {
-                    const data = await res.json();
-                    setB2BAccount(data);
-                    onActionToast("B2B so'rovingiz qabul qilindi!");
+                  try {
+                    const res = await fetch('/api/b2b/onboard', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        companyName: formData.get('companyName'),
+                        taxId: formData.get('taxId')
+                      })
+                    });
+                    if (res.ok) {
+                      const data = await res.json();
+                      setB2BAccount(data);
+                      onActionToast("B2B so'rovingiz qabul qilindi!");
+                    } else {
+                      const err = await res.json().catch(() => ({}));
+                      onActionToast(err.error || "B2B so'rovini yuborishda xatolik yuz berdi.");
+                    }
+                  } catch (err) {
+                    console.error("B2B onboard error:", err);
+                    onActionToast("Tarmoq xatosi yuz berdi.");
+                  } finally {
+                    setIsSubmittingB2B(false);
                   }
                 }}
                 className="max-w-md mx-auto space-y-4 bg-[#0b1426] p-8 rounded-2xl border border-outline-variant/20"
@@ -643,8 +720,12 @@ export default function ProfilePage({
                   <label className="text-xs font-bold text-on-primary-container uppercase">STIR (INN) / Soliq ID</label>
                   <input name="taxId" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-400" placeholder="123456789" />
                 </div>
-                <button type="submit" className="w-full py-4 bg-blue-500 text-black font-black rounded-xl hover:bg-blue-400 transition-all shadow-lg shadow-blue-500/20">
-                  B2B a'zolik so'rovini yuborish
+                <button
+                  type="submit"
+                  disabled={isSubmittingB2B}
+                  className="w-full py-4 bg-blue-500 text-black font-black rounded-xl hover:bg-blue-400 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSubmittingB2B ? 'Yuborilmoqda...' : "B2B a'zolik so'rovini yuborish"}
                 </button>
               </form>
             )}
@@ -705,6 +786,9 @@ export default function ProfilePage({
                     const data = await res.json();
                     setReferralStats(prev => ({ ...prev, referrals: [{ code: data.code, isActive: true }] }));
                     onActionToast('Referal kod yaratildi!');
+                  } else {
+                    const err = await res.json().catch(() => ({}));
+                    onActionToast(err.error || "Referal kod yaratishda xatolik yuz berdi.");
                   }
                 }}
                 className="px-8 py-4 bg-emerald-500 text-black font-black rounded-xl hover:bg-emerald-400 transition-all shadow-lg shadow-emerald-500/20"
@@ -769,7 +853,7 @@ export default function ProfilePage({
             return (
               <div
                 key={startup.id}
-                onClick={() => startup.id !== 'greenlogistics' && handleCardClick(startup.id)}
+                onClick={() => handleCardClick(startup.id)}
                 className={`glass-card rounded-2xl p-6 hover:shadow-2xl transition-all duration-300 group border border-outline-variant/10 flex flex-col justify-between min-h-[320px] ${
                   isSold ? 'opacity-70 hover:opacity-100 grayscale hover:grayscale-0' : 'cursor-pointer hover:-translate-y-1'
                 }`}
@@ -837,14 +921,6 @@ export default function ProfilePage({
                           <span className="material-symbols-outlined text-xs">vertical_align_top</span>
                           TOP qilish
                         </button>
-                        <div className="flex -space-x-2">
-                          <div className="w-6 h-6 rounded-full border-2 border-[#0b1426] bg-slate-600"></div>
-                          <div className="w-6 h-6 rounded-full border-2 border-[#0b1426] bg-slate-400"></div>
-                          <div className="w-6 h-6 rounded-full border-2 border-[#0b1426] bg-slate-200 flex items-center justify-center text-[8px] text-black font-extrabold">
-                            +4
-                          </div>
-                        </div>
-                        <span className="text-xs font-bold text-secondary-container">12 ta taklif</span>
                       </>
                     ) : isPending ? (
                       <>
@@ -928,23 +1004,24 @@ export default function ProfilePage({
                       <input 
                         type="number" 
                         value={vipDays} 
-                        onChange={(e) => setVipDays(Math.max(1, parseInt(e.target.value) || 1))}
+                        onChange={(e) => setVipDays(Math.min(365, Math.max(1, parseInt(e.target.value) || 1)))}
                         className="w-24 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white font-mono font-bold focus:border-yellow-400/50 outline-none"
                       />
                     </div>
                     <div className="text-right">
-                      <p className="text-[10px] uppercase font-bold text-on-primary-container mb-1">Jami (40% chegirma bilan)</p>
+                      <p className="text-[10px] uppercase font-bold text-on-primary-container mb-1">Jami ({vipDiscountPercent}% chegirma bilan)</p>
                       <p className="text-3xl font-black text-yellow-400">
-                        ${Math.round(vipDays * 0.5 * 0.6 * 100) / 100}
+                        ${vipEstimatedPrice}
                       </p>
                     </div>
                   </div>
 
                   <button 
                     onClick={handleBuyVip}
-                    className="w-full py-4 bg-yellow-400 text-black font-black rounded-xl hover:brightness-110 transition-all shadow-lg shadow-yellow-400/20 active:scale-[0.98]"
+                    disabled={isBuyingVip}
+                    className="w-full py-4 bg-yellow-400 text-black font-black rounded-xl hover:brightness-110 transition-all shadow-lg shadow-yellow-400/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    👑 VIP bo'lish
+                    {isBuyingVip ? 'Yuklanmoqda...' : "👑 VIP bo'lish"}
                   </button>
                 </div>
               </div>
@@ -992,7 +1069,7 @@ export default function ProfilePage({
                 <input 
                   type="number"
                   value={boostDays}
-                  onChange={(e) => setBoostDays(Math.max(1, parseInt(e.target.value) || 1))}
+                  onChange={(e) => setBoostDays(Math.min(365, Math.max(1, parseInt(e.target.value) || 1)))}
                   className="w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-mono font-bold focus:border-secondary-container outline-none"
                   placeholder="Boshqa kun..."
                 />
@@ -1010,9 +1087,10 @@ export default function ProfilePage({
 
               <button 
                 onClick={handleBuyTop}
-                className="w-full py-4 bg-secondary-container text-on-secondary-fixed font-black rounded-xl hover:brightness-110 transition-all shadow-lg shadow-secondary-container/20 active:scale-[0.98]"
+                disabled={isBuyingTop}
+                className="w-full py-4 bg-secondary-container text-on-secondary-fixed font-black rounded-xl hover:brightness-110 transition-all shadow-lg shadow-secondary-container/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                🔝 To'lovga o'tish
+                {isBuyingTop ? 'Yuklanmoqda...' : "🔝 To'lovga o'tish"}
               </button>
             </div>
           </div>
@@ -1112,8 +1190,20 @@ export default function ProfilePage({
                   </div>
                   {payment.startup && payment.startup.deliveryUrl ? (
                     <div className="flex flex-col sm:flex-row gap-2">
+                      {/* 15-MUAMMO: eski yozuvlarda deliveryUrl javascript:/data: bo'lishi mumkin edi */}
                       <a
                         href={payment.startup.deliveryUrl} target="_blank" rel="noreferrer"
+                        onClick={(e) => {
+                          // Faqat http/https havolalarga ruxsat (javascript:/data: XSS'ga qarshi)
+                          try {
+                            const url = new URL(payment.startup.deliveryUrl!);
+                            if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+                              e.preventDefault();
+                            }
+                          } catch {
+                            e.preventDefault();
+                          }
+                        }}
                         className="px-4 py-2 bg-secondary-container/10 text-secondary-container hover:bg-secondary-container/20 rounded-lg font-bold text-sm whitespace-nowrap transition-colors border border-secondary-container/20 text-center"
                       >
                         Loyihani yuklash
@@ -1121,25 +1211,47 @@ export default function ProfilePage({
                       {escrows.find(e => e.paymentId === payment.id)?.status === 'held' && (
                         <div className="flex gap-2">
                           <button
+                            disabled={escrowActionId === payment.id}
                             onClick={async () => {
-                              const res = await fetch('/api/escrow/release', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ paymentId: payment.id })
-                              });
-                              if (res.ok) {
-                                onActionToast("Mablag' ozod qilindi!");
-                                setEscrows(prev => prev.map(e => e.paymentId === payment.id ? { ...e, status: 'released' } : e));
+                              // 63-band: avval faqat res.ok tekshirilardi — ochiq nizo
+                              // sababli server 400 qaytarganda (server.ts) tugma hech
+                              // narsa demasdi, xarid go'yo "osilib qolgandek" ko'rinardi.
+                              // Endi xato xabari ham ko'rsatiladi.
+                              // 120-band: tugma so'rov davomida disabled bo'lmasdi,
+                              // tez-tez bosilsa bir nechta release so'rovi ketardi.
+                              if (escrowActionId === payment.id) return;
+                              setEscrowActionId(payment.id);
+                              try {
+                                const res = await fetch('/api/escrow/release', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ paymentId: payment.id })
+                                });
+                                const data = await res.json().catch(() => ({}));
+                                if (res.ok) {
+                                  onActionToast("Mablag' ozod qilindi!");
+                                  setEscrows(prev => prev.map(e => e.paymentId === payment.id ? { ...e, status: 'released' } : e));
+                                } else {
+                                  onActionToast(data.error || "Mablag'ni ozod qilishda xatolik yuz berdi.");
+                                }
+                              } catch (err) {
+                                console.error("Escrow release error:", err);
+                                onActionToast("Tarmoq xatosi yuz berdi.");
+                              } finally {
+                                setEscrowActionId(null);
                               }
                             }}
-                            className="px-4 py-2 bg-emerald-500 text-black rounded-lg font-bold text-sm"
+                            className="px-4 py-2 bg-emerald-500 text-black rounded-lg font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             Tasdiqlash
                           </button>
                           <button
+                            disabled={escrowActionId === payment.id}
                             onClick={() => {
+                              if (escrowActionId === payment.id) return;
                               const reason = prompt("Nizo sababini yozing:");
                               if (reason) {
+                                  setEscrowActionId(payment.id);
                                   fetch('/api/escrow/dispute', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
@@ -1148,10 +1260,13 @@ export default function ProfilePage({
                                     const data = await res.json();
                                     onActionToast(data.message || data.error);
                                     if (res.ok) setEscrows(prev => prev.map(e => e.paymentId === payment.id ? { ...e, status: 'disputed' } : e));
-                                  });
+                                  }).catch((err) => {
+                                    console.error("Escrow dispute error:", err);
+                                    onActionToast("Tarmoq xatosi yuz berdi.");
+                                  }).finally(() => setEscrowActionId(null));
                               }
                             }}
-                            className="px-4 py-2 bg-red-500/10 text-red-500 border border-red-500/20 rounded-lg font-bold text-sm"
+                            className="px-4 py-2 bg-red-500/10 text-red-500 border border-red-500/20 rounded-lg font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             Nizo
                           </button>
@@ -1407,20 +1522,22 @@ export default function ProfilePage({
             <div className="space-y-2">
               <label className="text-xs font-bold text-on-primary-container block">Sotuvchi/Xaridor roli</label>
               <select
-                className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-lg p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container focus:ring-1 focus:ring-secondary-container transition-all appearance-none"
+                className="w-full bg-[#0b1426] border border-outline-variant/30 text-white/50 rounded-lg p-3 font-semibold text-sm focus:outline-none appearance-none cursor-not-allowed"
                 value={editRole}
-                onChange={(e) => setEditRole(e.target.value)}
+                disabled
               >
-                <option value="Buyer">Xaridor</option>
-                <option value="Seller">Sotuvchi</option>
+                <option value="Xaridor">Xaridor</option>
+                <option value="Sotuvchi">Sotuvchi</option>
               </select>
+              <p className="text-[10px] text-on-primary-container">Xavfsizlik sababli rolni bu yerdan o'zgartirib bo'lmaydi. Sotuvchi bo'lish uchun shunchaki birinchi e'loningizni joylashtiring.</p>
             </div>
 
             <button
               type="submit"
-              className="w-full py-3 bg-secondary-container text-on-secondary-fixed rounded-xl font-bold text-sm shadow-lg shadow-secondary-container/10 hover:brightness-110 active:scale-95 transition-all"
+              disabled={isSavingSettings}
+              className="w-full py-3 bg-secondary-container text-on-secondary-fixed rounded-xl font-bold text-sm shadow-lg shadow-secondary-container/10 hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Sozlamalarni saqlash
+              {isSavingSettings ? 'Saqlanmoqda...' : 'Sozlamalarni saqlash'}
             </button>
           </form>
 

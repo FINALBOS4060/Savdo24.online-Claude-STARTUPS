@@ -6,6 +6,7 @@ import {
   notifyAdminTelegram, 
   authenticateToken, 
   requireAdmin, 
+  escapeHtml,
   AuthRequest 
 } from "../../server";
 import { supportLimiter, reportLimiter } from "../lib/rateLimiters";
@@ -51,16 +52,16 @@ router.post("/support", supportLimiter, async (req: Request, res: Response) => {
     });
 
     await sendEmail(
-      "admin@savdo24.uz",
-      `Yangi qo'llab-quvvatlash chiptasi: ${subject}`,
+      "admin@savdo24.online",
+      `Yangi qo'llab-quvvatlash chiptasi: ${escapeHtml(subject)}`,
       `
       <div style="font-family: sans-serif; padding: 20px;">
         <h2>Yangi qo'llab-quvvatlash chiptasi</h2>
-        <p><strong>Email:</strong> ${email}</p>
-        <p><strong>Mavzu:</strong> ${subject}</p>
+        <p><strong>Email:</strong> ${escapeHtml(email)}</p>
+        <p><strong>Mavzu:</strong> ${escapeHtml(subject)}</p>
         <p><strong>Xabar:</strong></p>
         <div style="background: #f4f4f4; padding: 15px; border-radius: 8px;">
-          ${message.replace(/\n/g, '<br>')}
+          ${escapeHtml(message).replace(/\n/g, '<br>')}
         </div>
         <hr/>
         <p>ID: ${ticket.id}</p>
@@ -69,7 +70,7 @@ router.post("/support", supportLimiter, async (req: Request, res: Response) => {
     );
 
     await notifyAdminTelegram(
-      `📩 <b>Yangi murojaat/shikoyat</b>\n\n<b>Email:</b> ${email}\n<b>Mavzu:</b> ${subject}\n<b>Xabar:</b>\n${message}\n\n<b>Ticket ID:</b> ${ticket.id}`
+      `📩 <b>Yangi murojaat/shikoyat</b>\n\n<b>Email:</b> ${escapeHtml(email)}\n<b>Mavzu:</b> ${escapeHtml(subject)}\n<b>Xabar:</b>\n${escapeHtml(message)}\n\n<b>Ticket ID:</b> ${ticket.id}`
     );
 
     res.json({ success: true, message: "Xabaringiz muvaffaqiyatli yuborildi. Tez orada siz bilan bog'lanamiz." });
@@ -79,22 +80,11 @@ router.post("/support", supportLimiter, async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/support — Barcha chiptalarni olish (Admin uchun)
-router.get("/support", authenticateToken, async (req: Request, res: Response) => {
-  const user = (req as any).user;
-  if (!user || user.role !== "Admin") {
-    return res.status(403).json({ error: "Faqat adminlar uchun ruxsat etilgan." });
-  }
-
-  try {
-    const tickets = await prisma.supportTicket.findMany({
-      orderBy: { createdAt: "desc" }
-    });
-    res.json(tickets);
-  } catch (err) {
-    res.status(500).json({ error: "Chiptalarni yuklashda xatolik." });
-  }
-});
+// ESLATMA: avval shu yerda GET /api/support (admin uchun) alohida endpoint
+// bor edi, lekin u hech qayerdan (frontendda) chaqirilmasdi — GET
+// /api/admin/support-tickets (pastda) aynan bir xil ma'lumotni qaytaradi
+// va AdminPage.tsx haqiqatda shuni ishlatadi. Duplikat o'lik endpoint
+// olib tashlandi (94-band bilan bir xil turdagi tozalash).
 
 // GET /api/admin/support-tickets
 router.get("/admin/support-tickets", authenticateToken, requireAdmin, async (req, res) => {
@@ -121,6 +111,22 @@ router.patch("/admin/support-tickets/:id/status", authenticateToken, requireAdmi
       where: { id: req.params.id },
       data: { status: result.data.status }
     });
+
+    // Boshqa admin amallari kabi (reports, users va h.k.) bu o'zgarish ham
+    // audit logga yozilishi kerak — avval bu yerda unutilgan edi.
+    const adminUser = (req as any).user;
+    await prisma.auditLog.create({
+      data: {
+        adminId: adminUser?.id || 0,
+        action: "update_support_ticket_status",
+        targetType: "SupportTicket",
+        targetId: String(ticket.id),
+        details: `Support ticket status updated to ${result.data.status}`
+      }
+    }).catch((auditErr: any) => {
+      console.error("Audit log yozishda xatolik (support ticket):", auditErr);
+    });
+
     res.json(ticket);
   } catch (err) {
     console.error("Update ticket error:", err);
@@ -129,7 +135,11 @@ router.patch("/admin/support-tickets/:id/status", authenticateToken, requireAdmi
 });
 
 // POST /api/reports — Shikoyat qilish
-router.post("/reports", authenticateToken, reportLimiter, supportLimiter, async (req: AuthRequest, res: Response) => {
+// 122-band: avval bu yerda supportLimiter HAM qo'shilgan edi (reportLimiter
+// bilan bir vaqtda) — ikkalasi bir xil sozlamaga ega (max=5/15min), shu
+// sabab ikkinchisi sof ortiqcha edi (funksional farq yo'q, faqat keraksiz
+// ikkinchi hisoblagich). reportLimiter o'zi maqsadli va yetarli.
+router.post("/reports", authenticateToken, reportLimiter, async (req: AuthRequest, res: Response) => {
   const result = reportSchema.safeParse(req.body);
   if (!result.success) {
     return res.status(400).json({ error: result.error.issues.map((e: any) => e.message).join(" ") });
@@ -141,7 +151,8 @@ router.post("/reports", authenticateToken, reportLimiter, supportLimiter, async 
     const existingReport = await prisma.report.findFirst({
       where: {
         reporterId: req.user?.id || 0,
-        targetId
+        targetId,
+        targetType
       }
     });
 
@@ -163,15 +174,22 @@ router.post("/reports", authenticateToken, reportLimiter, supportLimiter, async 
     await notifyAdminTelegram(
       `⚠️ <b>Yangi shikoyat (Report) yaratildi</b>\n\n` +
       `<b>Shikoyat qiluvchi (User ID):</b> ${req.user?.id || 'Noma\'lum'}\n` +
-      `<b>Nishon turi:</b> ${targetType}\n` +
-      `<b>Nishon ID:</b> ${targetId}\n` +
-      `<b>Sabab:</b> ${reason}\n` +
-      `<b>Tafsilotlar:</b> ${description || 'Yo\'q'}\n\n` +
+      `<b>Nishon turi:</b> ${escapeHtml(targetType)}\n` +
+      `<b>Nishon ID:</b> ${escapeHtml(targetId)}\n` +
+      `<b>Sabab:</b> ${escapeHtml(reason)}\n` +
+      `<b>Tafsilotlar:</b> ${description ? escapeHtml(description) : 'Yo\'q'}\n\n` +
       `<b>Report ID:</b> ${report.id}`
     );
 
     res.status(201).json(report);
-  } catch (err) {
+  } catch (err: any) {
+    // Yangi qo'shilgan @@unique([reporterId, targetId, targetType]) cheklovi
+    // poyga holatida (ikkita bir vaqtdagi so'rov) ishga tushishi mumkin —
+    // bu holatda ham foydalanuvchiga tushunarli xabar ko'rsatamiz, xom 500
+    // xatosi emas.
+    if (err?.code === "P2002") {
+      return res.status(409).json({ error: "Siz ushbu e'lon yoki izoh bo'yicha allaqachon shikoyat qoldirgansiz." });
+    }
     console.error("Create report error:", err);
     res.status(500).json({ error: "Shikoyat yuborishda xatolik yuz berdi." });
   }

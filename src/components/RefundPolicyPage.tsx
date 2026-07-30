@@ -57,7 +57,7 @@ export default function RefundPolicyPage({ setView }: RefundPolicyPageProps) {
           </p>
           <ul className="list-disc pl-5 space-y-2">
             <li>Har ikki tomondan (sotuvchi va xaridor) dalillar, chat yozishmalari, topshirilgan kodlar yoki topshirish xatlarini so'raydi.</li>
-            <li>Agar sotuvchi haqiqatan ham loyihani topshirishdan bosh tortsa yoki uning mahsuloti va'dalarga to'liq zid bo'lsa, admin bitimni bekor qiladi va muzlatilgan mablag'ni xaridor hamyoniga qaytaradi (Refund).</li>
+            <li>Agar sotuvchi haqiqatan ham loyihani topshirishdan bosh tortsa yoki uning mahsuloti va'dalarga to'liq zid bo'lsa, admin bitimni bekor qiladi va xaridorga mablag'ni qaytarish jarayonini tasdiqlaydi (to'lov CoinGate orqali amalga oshirilgani sababli, haqiqiy pul qaytarilishi CoinGate tizimi orqali qo'lda amalga oshiriladi).</li>
             <li>Agar barcha talablar bajarilgan bo'lib, xaridor asossiz ravishda nizo ochgan bo'lsa, admin nizoni rad etadi (Rejected) va mablag'larni sotuvchiga o'tkazadi.</li>
           </ul>
         </section>

@@ -13,6 +13,7 @@ interface DetailPageProps {
   setCheckoutAmount: (amount: number) => void;
   user?: UserProfileData;
   categories: Category[];
+  setSelectedStartupId?: (id: string) => void;
 }
 
 export default function DetailPage({
@@ -24,27 +25,18 @@ export default function DetailPage({
   setCheckoutAmount,
   user,
   categories,
+  setSelectedStartupId,
 }: DetailPageProps) {
   const { id } = useParams<{ id: string }>();
   
   // Find the current startup by ID from URL
+  // MUHIM: bu yerda ataylab early-return QILINMAYDI — pastda hali ko'plab
+  // useState/useEffect chaqiruvlari bor, React Hooks qoidasiga ko'ra ular
+  // har renderda bir xil tartibda va sonda chaqirilishi SHART. `startup`
+  // topilmagan holatdagi JSX pastda, barcha hooklardan KEYIN qaytariladi.
   const startup = startups.find(s => s.id === id);
 
-  // If not found and we have startups loaded, redirect to home
-  if (!startup && startups.length > 0) {
-    return <Navigate to="/" replace />;
-  }
-
-  // If startups are still loading or empty, show a loader or just wait
-  if (!startup) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-12 h-12 border-4 border-[#f0b90b]/20 border-t-[#f0b90b] rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
-  const isBookmarked = bookmarkedIds.includes(startup.id);
+  const isBookmarked = startup ? bookmarkedIds.includes(startup.id) : false;
 
   // Update SEO Meta Tags
   useEffect(() => {
@@ -91,7 +83,7 @@ export default function DetailPage({
 
   // Parse dynamic category-specific attributes
   let parsedAttrs: Record<string, string> = {};
-  if (startup.attributes) {
+  if (startup?.attributes) {
     try {
       parsedAttrs = JSON.parse(startup.attributes);
     } catch (e) {
@@ -121,6 +113,9 @@ export default function DetailPage({
   const [newIdeaContent, setNewIdeaContent] = useState('');
   const [newIdeaAuthor, setNewIdeaAuthor] = useState('');
   const [isSubmittingIdea, setIsSubmittingIdea] = useState(false);
+  // IdeasRatingPage.tsx'dagi 118-band bilan bir xil muammo turi: "Ovoz
+  // berish" tugmasi so'rov davomida disabled bo'lmasdi.
+  const [votingIdeaIds, setVotingIdeaIds] = useState<Set<number>>(new Set());
 
   // Reviews and disputes state
   const [hasPurchased, setHasPurchased] = useState<boolean>(false);
@@ -192,6 +187,7 @@ export default function DetailPage({
   };
 
   const checkPurchase = async () => {
+    if (!startup) return;
     try {
       const res = await fetch('/api/payments/my');
       if (res.ok) {
@@ -210,7 +206,7 @@ export default function DetailPage({
   };
 
   const fetchSellerReviews = async () => {
-    if (!startup.userId) return;
+    if (!startup?.userId) return;
     try {
       const res = await fetch(`/api/users/${startup.userId}/reviews`);
       if (res.ok) {
@@ -223,14 +219,16 @@ export default function DetailPage({
   };
 
   useEffect(() => {
+    if (!startup) return;
     checkPurchase();
     fetchSellerReviews();
-  }, [startup.id, startup.userId]);
+  }, [startup?.id, startup?.userId]);
 
 
 
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!startup) return;
     if (!reviewComment.trim()) {
       onActionToast("Iltimos, sharh matnini yozing.");
       return;
@@ -302,6 +300,7 @@ export default function DetailPage({
   };
 
   const fetchIdeas = async () => {
+    if (!startup) return;
     setIsLoadingIdeas(true);
     try {
       const res = await fetch(`/api/startups/${startup.id}/ideas`);
@@ -318,10 +317,11 @@ export default function DetailPage({
 
   useEffect(() => {
     fetchIdeas();
-  }, [startup.id]);
+  }, [startup?.id]);
 
   const handleSubmitIdea = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!startup) return;
     if (!newIdeaContent.trim()) {
       onActionToast("Iltimos, g'oya matnini kiriting.");
       return;
@@ -367,7 +367,9 @@ export default function DetailPage({
       onActionToast("Siz ushbu g'oyaga allaqachon ovoz bergansiz.");
       return;
     }
+    if (votingIdeaIds.has(ideaId)) return; // so'rov allaqachon yuborilmoqda
 
+    setVotingIdeaIds(prev => new Set(prev).add(ideaId));
     try {
       const res = await fetch(`/api/ideas/${ideaId}/upvote`, {
         method: 'POST',
@@ -391,12 +393,18 @@ export default function DetailPage({
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      setVotingIdeaIds(prev => {
+        const next = new Set(prev);
+        next.delete(ideaId);
+        return next;
+      });
     }
   };
 
 
   // Dynamic tech stack based on project data
-  const techStack = (startup.techStack || []).map((tech) => {
+  const techStack = (startup?.techStack || []).map((tech) => {
     const lower = tech.toLowerCase();
     let icon = 'code';
     if (lower.includes('react') || lower.includes('vue') || lower.includes('angular') || lower.includes('next')) icon = 'javascript';
@@ -409,14 +417,44 @@ export default function DetailPage({
     return { name: tech, icon, desc: `${tech} texnologiyasida yozilgan modullar.` };
   });
 
+  const isOwnListing = !!(user && startup && user.id === startup.userId);
+
   const handlePurchaseClick = () => {
-    const amt = startup.price || 250;
+    if (!startup) return;
+    // 91-band: o'z e'loningizni sotib olishning oldini olish (server ham tekshiradi)
+    if (isOwnListing) {
+      onActionToast("O'z loyihangizni sotib ololmaysiz.");
+      return;
+    }
+    // MUHIM: avval bu yerda narx yo'q/0 bo'lsa "$250" degan o'zboshimchalik
+    // bilan o'ylab topilgan summa qo'llanilardi — bu haqiqatda 0 narxli
+    // (yoki hali narxlanmagan) e'lon uchun foydalanuvchidan noto'g'ri summa
+    // undirib olinishiga olib kelishi mumkin edi. Endi narx haqiqatan ham
+    // yaroqsiz bo'lsa, xaridni to'xtatib xato ko'rsatamiz.
+    const amt = Number(startup.price);
+    if (!amt || isNaN(amt) || amt <= 0) {
+      onActionToast("Ushbu e'lon uchun narx to'g'ri belgilanmagan. Sotuvchi bilan bog'laning.");
+      return;
+    }
+    // MUHIM: DetailPage sotilayotgan mahsulotni URL'dagi :id orqali (useParams)
+    // aniqlaydi, lekin CheckoutPage/App.tsx esa to'lov qilinadigan mahsulotni
+    // butunlay boshqa, ilova darajasidagi `selectedStartupId` state'idan oladi —
+    // bu state faqat BrowsePage/IdeasRatingPage ro'yxatidan yoki bildirishnoma
+    // orqali bosilganda o'rnatiladi. Agar foydalanuvchi ushbu sahifaga
+    // to'g'ridan-to'g'ri havola orqali kirsa (ulashilgan link, qidiruv
+    // natijasi) yoki sahifani yangilasa (F5), bu state bo'sh qolib ketardi va
+    // "Sotib olish" tugmasi har doim "mahsulot tanlanmagan" xatosi bilan
+    // checkout'ni bekor qilardi — hattoki ekranda aynan shu mahsulot ko'rinib
+    // turgan bo'lsa ham. Endi xarid tugmasi bosilganda ilova darajasidagi
+    // tanlangan ID ham joriy mahsulotga sinxronlanadi.
+    if (setSelectedStartupId) setSelectedStartupId(startup.id);
     setCheckoutAmount(amt);
     setView('checkout');
     onActionToast(`To'lov sahifasiga yo'naltirilmoqda...`);
   };
 
   const handleContactSeller = async () => {
+    if (!startup) return;
     if (!user || user.name === 'Mehmon') {
       onActionToast("Iltimos, suhbatni boshlash uchun tizimga kiring.");
       return;
@@ -439,6 +477,20 @@ export default function DetailPage({
       onActionToast("Tarmoq xatosi yuz berdi.");
     }
   };
+
+  // Barcha Hook'lar yuqorida e'lon qilingandan KEYIN — endi startup mavjudligini
+  // tekshirib, mos JSX qaytaramiz (Hooks tartib qoidasini buzmaslik uchun).
+  if (!startup && startups.length > 0) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (!startup) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="w-12 h-12 border-4 border-[#f0b90b]/20 border-t-[#f0b90b] rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-12 animate-fade-in text-left">
@@ -664,6 +716,38 @@ export default function DetailPage({
             </div>
           </section>
 
+          {/* Loyiha bosqichlari (Milestones) — faqat sotuvchi kiritgan bo'lsa ko'rsatiladi */}
+          {startup.milestones && startup.milestones.length > 0 && (
+            <section>
+              <h3 className="text-white font-bold text-xs uppercase tracking-widest mb-6">
+                Loyiha bosqichlari
+              </h3>
+              <div className="space-y-4">
+                {startup.milestones.map((m, idx) => (
+                  <div key={idx} className="flex gap-4 bg-white/5 dark:bg-primary-container/20 border border-outline-variant/10 rounded-xl p-5">
+                    <div className="flex flex-col items-center flex-shrink-0">
+                      <span className="w-3 h-3 rounded-full bg-[#f3ba2f] mt-1" />
+                      {idx < startup.milestones.length - 1 && (
+                        <span className="w-px flex-1 bg-white/10 mt-1" />
+                      )}
+                    </div>
+                    <div className="pb-1">
+                      {m.date && (
+                        <span className="text-[10px] text-[#f3ba2f] font-mono font-bold uppercase tracking-wider block mb-1">
+                          {m.date}
+                        </span>
+                      )}
+                      <h4 className="text-white font-extrabold text-sm">{m.title}</h4>
+                      {m.desc && (
+                        <p className="text-on-primary-container text-xs mt-1 leading-relaxed">{m.desc}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
 
 
           {/* Ideas Rating System Section */}
@@ -753,7 +837,8 @@ export default function DetailPage({
 
                         <button
                           onClick={() => handleUpvoteIdea(idea.id)}
-                          className="flex flex-col items-center justify-center gap-1 bg-white/4 hover:bg-[#f0b90b]/10 hover:border-[#f0b90b]/30 border border-white/5 rounded-xl px-3 py-2 transition-all active:scale-95 group shrink-0"
+                          disabled={votingIdeaIds.has(idea.id)}
+                          className="flex flex-col items-center justify-center gap-1 bg-white/4 hover:bg-[#f0b90b]/10 hover:border-[#f0b90b]/30 border border-white/5 rounded-xl px-3 py-2 transition-all active:scale-95 group shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <span className="material-symbols-outlined text-[#f3ba2f] text-base group-hover:scale-110 transition-transform">
                             thumb_up
@@ -777,7 +862,14 @@ export default function DetailPage({
               </h4>
 
               <div className="space-y-3">
-                {!user && (
+                {/* 44-MUAMMO: `user` prop mehmon uchun ham har doim to'ldirilgan
+                    obyekt ({name:'Mehmon'}) sifatida keladi, hech qachon
+                    undefined bo'lmaydi — shu sabab shu yerdagi eski `!user`
+                    sharti hech qachon rost bo'lmay, mehmonlar "Ismingiz"
+                    maydonini umuman ko'rmasdi. Boshqa joylardagi (masalan
+                    handleOpenReportModal) mehmonni aniqlash usuliga mos
+                    qilib tuzatildi. */}
+                {(!user || user.name === 'Mehmon') && (
                   <div>
                     <label className="block text-[10px] text-on-primary-container uppercase font-extrabold tracking-wider mb-1">
                       Sizning ismingiz (Majburiy emas)
@@ -807,7 +899,7 @@ export default function DetailPage({
               </div>
 
               <div className="flex justify-between items-center flex-wrap gap-2 pt-1">
-                {user ? (
+                {user && user.name !== 'Mehmon' ? (
                   <p className="text-[10px] text-[#f3ba2f] flex items-center gap-1 font-bold">
                     <span className="material-symbols-outlined text-xs">person</span>
                     Tizimga kirilgan: {user.name}
@@ -905,22 +997,60 @@ export default function DetailPage({
               {/* Primary "Sotib olish" Button */}
               <button
                 onClick={handlePurchaseClick}
-                className="w-full py-4 bg-[#f3ba2f] hover:brightness-110 text-[#12161c] font-black text-sm rounded-xl active:scale-95 transition-all shadow-lg shadow-yellow-500/10 uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
+                disabled={startup.soldStatus === 'sotildi' || isOwnListing}
+                className="w-full py-4 bg-[#f3ba2f] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100 text-[#12161c] font-black text-sm rounded-xl active:scale-95 transition-all shadow-lg shadow-yellow-500/10 uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-lg">shopping_cart</span>
-                {startup.soldStatus === 'sotildi' ? "Sotilgan (Band qilingan)" : "Loyihani sotib olish"}
+                {startup.soldStatus === 'sotildi' ? "Sotilgan (Band qilingan)" : isOwnListing ? "Bu sizning e'loningiz" : "Loyihani sotib olish"}
               </button>
 
               {/* Demo URL Button */}
+              {/* 15-MUAMMO: eski (safeUrl validatoridan oldingi) yozuvlarda
+                  demoUrl javascript:/data: bo'lishi mumkin edi, endi bloklanadi */}
               {startup.demoUrl && (
                 <a
                   href={startup.demoUrl}
                   target="_blank"
                   rel="noreferrer"
+                  onClick={(e) => {
+                    // Faqat http/https havolalarga ruxsat (javascript:/data: XSS'ga qarshi)
+                    try {
+                      const url = new URL(startup.demoUrl!);
+                      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+                        e.preventDefault();
+                      }
+                    } catch {
+                      e.preventDefault();
+                    }
+                  }}
                   className="w-full py-3 bg-white/5 hover:bg-white/10 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 border border-white/10 transition-all active:scale-95 text-center uppercase tracking-wider"
                 >
                   <span className="material-symbols-outlined text-sm">open_in_new</span>
                   Demoni ko'rish
+                </a>
+              )}
+
+              {/* GitHub repo (ommaviy) havolasi — deliveryUrl'dan farqli, bu maxfiy
+                  emas, xarid qilishdan oldin ko'rish uchun mo'ljallangan */}
+              {startup.githubUrl && (
+                <a
+                  href={startup.githubUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(e) => {
+                    try {
+                      const url = new URL(startup.githubUrl!);
+                      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+                        e.preventDefault();
+                      }
+                    } catch {
+                      e.preventDefault();
+                    }
+                  }}
+                  className="w-full py-3 bg-white/5 hover:bg-white/10 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 border border-white/10 transition-all active:scale-95 text-center uppercase tracking-wider"
+                >
+                  <span className="material-symbols-outlined text-sm">code</span>
+                  Repozitoriyani ko'rish
                 </a>
               )}
 
@@ -959,6 +1089,10 @@ export default function DetailPage({
 
             {/* Other details in small font */}
             <div className="border-t border-white/5 pt-4 space-y-3 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-on-primary-container font-medium">Kategoriya</span>
+                <span className="text-white font-semibold">{categories.find(c => c.id === startup.category)?.name || startup.category}</span>
+              </div>
               <div className="flex justify-between items-center">
                 <span className="text-on-primary-container font-medium">E'lon turi</span>
                 <span className="text-white font-semibold">{startup.listingType || "To'liq loyiha (manba kodi bilan)"}</span>
@@ -1051,36 +1185,30 @@ export default function DetailPage({
                   </button>
                 </div>
               )}
+
+              {/* 97-band: 'user' targetType handleOpenReportModal'da e'lon
+                  qilingan/qo'llab-quvvatlangan edi, lekin uni chaqiradigan
+                  birorta ham tugma yo'q edi — sotuvchini (o'zini) shikoyat
+                  qilish imkoni umuman yo'q edi (faqat e'lon/g'oya bo'lardi).
+                  Endi shu yerga qo'shildi (o'ziga shikoyat yubormaslik uchun
+                  himoya bilan). */}
+              {!isOwnListing && (
+                <button
+                  onClick={() => handleOpenReportModal('user', String(startup.userId))}
+                  className="w-full py-2.5 border-t border-white/5 pt-4 mt-2 hover:text-red-400 text-on-primary-container text-[11px] font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-xs">flag</span>
+                  Sotuvchini shikoyat qilish
+                </button>
+              )}
             </div>
           )}
 
-          {/* Hamkorlar va Maslahatchilar */}
-          <div className="p-6 border border-outline-variant/20 rounded-2xl bg-white/5 dark:bg-primary-container/20">
-            <h4 className="text-white font-bold text-xs tracking-wider uppercase mb-4">YETAKCHI HAMKORLAR VA MASLAHATChILAR</h4>
-            <div className="flex -space-x-3 mb-4">
-              {[
-                "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop",
-                "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&fit=crop",
-                "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=80&fit=crop"
-              ].map((logo, index) => (
-                <img
-                  key={index}
-                  className="w-10 h-10 rounded-full border-2 border-[#0b1426] bg-white object-cover shadow-sm"
-                  src={logo}
-                  alt={`Maslahatchi professional hamkor ${index + 1}`}
-                  loading="lazy"
-                  width={40}
-                  height={40}
-                />
-              ))}
-              <div className="w-10 h-10 rounded-full border-2 border-[#0b1426] bg-secondary-container flex items-center justify-center text-[9px] font-bold text-[#12161c] shadow-sm">
-                +12
-              </div>
-            </div>
-            <p className="text-on-primary-container text-xs leading-relaxed">
-              15 ta faol jamoa, hamkorlar va professional maslahatchilar ushbu loyihani qo'llab-quvvatlamoqda.
-            </p>
-          </div>
+          {/* Hamkorlar va Maslahatchilar bo'limi olib tashlandi — butunlay
+              qattiq kodlangan soxta ma'lumot edi (stok rasmlar, "+12",
+              "15 ta faol jamoa..." matni) — hech qanday haqiqiy backend
+              modeliga bog'lanmagan, HAR BIR e'londa bir xil ko'rinardi
+              (ProfilePage'dagi 64-band bilan bir xil muammo turi). */}
         </aside>
       </div>
 

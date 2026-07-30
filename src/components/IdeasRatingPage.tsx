@@ -31,9 +31,18 @@ export default function IdeasRatingPage({
   const [totalItems, setTotalItems] = useState(0);
 
   const limit = 15; // Number of items per page
+  // Filtr/sahifa tez almashtirilsa (BrowsePage/AdminPage/MessagesPage'dagi
+  // 65/66/75-band bilan bir xil poyga sharoiti) eski so'rov javobi keyinroq
+  // kelib yangisini bosib ketmasligi uchun so'rov tartib raqami.
+  const requestIdRef = React.useRef(0);
+  // Ovoz berish tugmasi boshqa formalardagi kabi (60/74/76/83/84/117-band)
+  // tez-tez bosilishiga qarshi himoyaga ega emas edi — har bir g'oya uchun
+  // alohida "hozir yuborilyapti" holati.
+  const [votingIds, setVotingIds] = useState<Set<number>>(new Set());
 
   const fetchTopIdeas = async () => {
     setIsLoading(true);
+    const requestId = ++requestIdRef.current;
     try {
       const queryParams = new URLSearchParams({
         page: page.toString(),
@@ -43,6 +52,7 @@ export default function IdeasRatingPage({
       });
 
       const res = await fetch(`/api/ideas/top?${queryParams.toString()}`);
+      if (requestId !== requestIdRef.current) return; // eskirgan javob, tashlab yuborildi
       if (res.ok) {
         const data = await res.json();
         setIdeas(data.ideas);
@@ -52,10 +62,11 @@ export default function IdeasRatingPage({
         onActionToast("Ma'lumotlarni yuklab bo'lmadi.");
       }
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       console.error("Fetch top ideas error:", err);
       onActionToast("Tarmoq ulanishida xatolik.");
     } finally {
-      setIsLoading(false);
+      if (requestId === requestIdRef.current) setIsLoading(false);
     }
   };
 
@@ -76,17 +87,24 @@ export default function IdeasRatingPage({
 
   const handleUpvote = async (ideaId: number) => {
     const storageKey = `savdo24_upvoted_${ideaId}`;
-    if (sessionStorage.getItem(storageKey)) {
+    // 119-band: bu yerda avval sessionStorage ishlatilardi, lekin
+    // DetailPage.tsx'dagi AYNAN shu funksiya (bir xil kalit format) doim
+    // localStorage ishlatgan — ikkisi bir xil g'oyaga tegishli bo'lsa ham
+    // vaqtinchalik/doimiy holat mos kelmasdi (bir sahifada "ovoz berilgan"
+    // ko'rinsa, ikkinchisida ko'rinmasdi). localStorage'ga moslashtirildi.
+    if (localStorage.getItem(storageKey)) {
       onActionToast("Siz ushbu g'oyaga allaqachon ovoz bergansiz.");
       return;
     }
+    if (votingIds.has(ideaId)) return; // so'rov allaqachon yuborilmoqda
 
+    setVotingIds(prev => new Set(prev).add(ideaId));
     try {
       const res = await fetch(`/api/ideas/${ideaId}/upvote`, {
         method: 'POST',
       });
       if (res.ok) {
-        sessionStorage.setItem(storageKey, 'true');
+        localStorage.setItem(storageKey, 'true');
         onActionToast("Ovoz berildi!");
         setIdeas((prev) =>
           prev.map((idea) =>
@@ -97,11 +115,17 @@ export default function IdeasRatingPage({
         const errData = await res.json().catch(() => ({}));
         onActionToast(errData.error || "Ovoz berishda xatolik yuz berdi.");
         if (res.status === 409) {
-          sessionStorage.setItem(storageKey, 'true');
+          localStorage.setItem(storageKey, 'true');
         }
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      setVotingIds(prev => {
+        const next = new Set(prev);
+        next.delete(ideaId);
+        return next;
+      });
     }
   };
 
@@ -252,7 +276,8 @@ export default function IdeasRatingPage({
                   {/* Upvote rating trigger */}
                   <button
                     onClick={() => handleUpvote(idea.id)}
-                    className="w-full md:w-auto flex items-center justify-center gap-2 bg-white/3 hover:bg-[#f3ba2f]/10 hover:border-[#f3ba2f]/30 border border-white/5 rounded-xl px-4 py-2.5 transition-all active:scale-95 group shrink-0"
+                    disabled={votingIds.has(idea.id)}
+                    className="w-full md:w-auto flex items-center justify-center gap-2 bg-white/3 hover:bg-[#f3ba2f]/10 hover:border-[#f3ba2f]/30 border border-white/5 rounded-xl px-4 py-2.5 transition-all active:scale-95 group shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <span className="material-symbols-outlined text-[#f3ba2f] text-base group-hover:scale-110 transition-transform">
                       thumb_up

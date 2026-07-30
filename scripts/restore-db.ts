@@ -6,6 +6,7 @@ import { PrismaClient } from '@prisma/client';
 import { decryptSecret } from '../src/lib/crypto';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
+import { S3Client, ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/client-s3';
 
 dotenv.config();
 
@@ -52,26 +53,12 @@ async function downloadFromTelegram(botToken: string, fileId: string): Promise<B
   }
 }
 
-async function getMessageFromTelegram(botToken: string, chatId: string, messageId: string) {
-  // Telegram Bot API does not have a "getMessage" by ID. 
-  // However, we can use "forwardMessage" to ourselves or a dummy chat to check if it exists and get its content.
-  // Or simpler: The backup script sends a document. We can't "get" it by ID directly via Bot API without getUpdates.
-  // BUT, if we have the file_id, we can download it.
-  // Wait, the message_id we saved is for the message containing the document.
-  // To get the file_id from a message_id, we'd normally need getUpdates or a user-bot.
-  
-  // Alternative: The backup script could save the FILE_ID instead of MESSAGE_ID.
-  // File IDs are persistent for the same bot.
-  console.log(`[Telegram] Attempting to find backup via message_id: ${messageId} in chat: ${chatId}`);
-  // Since we can't easily get the message content by ID, let's assume we saved the FILE_ID instead, 
-  // or that we are using a method that can retrieve it.
-  
-  // If we can't get it by ID, and the DB is empty, auto-restore is hard.
-  // Let's check if there is any other way. 
-  // Actually, I will modify backup-db.ts to also save the FILE_ID to a local file 'last_backup.json' 
-  // as a fallback for auto-restore when the DB is wiped.
-  return null;
-}
+// Eslatma: avval shu yerda `getMessageFromTelegram` degan funksiya bor edi —
+// u hech qayerda chaqirilmasdi va faqat har doim `null` qaytarardi (aslida
+// ishlamaydigan, faqat fikr-mulohaza izohlaridan iborat "o'lik kod" edi).
+// Haqiqiy auto-restore FILE_ID orqali ishlaydi (pastdagi
+// `restoreFromLatestBackup` va uning `last_backup_file_id` / `last_backup.json`
+// fallback mexanizmiga qarang), shu sabab bu funksiya olib tashlandi.
 
 async function decryptBackup(encryptedContent: string, encryptionKey: string): Promise<Buffer | null> {
   try {
@@ -97,6 +84,54 @@ async function decryptBackup(encryptedContent: string, encryptionKey: string): P
   }
 }
 
+// 69-MUAMMO: backup-db.ts to'liq mustaqil ravishda Contabo S3'ga zaxira
+// yuklay oladi (Telegram sozlanmagan bo'lsa ham), lekin bu funksiya faqat
+// Telegram file_id orqali tiklay olardi — S3'ga yuklangan zaxiralar HECH
+// QACHON tiklanmasdi (checkAndAutoRestore ham faqat last_backup_file_id/
+// last_backup.json'ga qarardi, ikkalasi ham faqat Telegram muvaffaqiyatli
+// bo'lgandagina yoziladi). Ya'ni faqat S3 sozlangan loyihalarda zaxira
+// "bir tomonlama" edi — yuklanadi, lekin hech qachon qaytarib olinmaydi.
+// Endi Telegram manbasi topilmasa, eng so'nggi S3 obyekti qidirib topiladi.
+async function downloadLatestFromS3(): Promise<Buffer | null> {
+  const endpoint = await getSetting("CONTABO_S3_ENDPOINT");
+  const accessKeyId = await getSetting("CONTABO_ACCESS_KEY");
+  const secretAccessKey = await getSetting("CONTABO_SECRET_KEY");
+  const bucketName = await getSetting("CONTABO_BUCKET_NAME");
+
+  if (!endpoint || !accessKeyId || !secretAccessKey || !bucketName) {
+    return null;
+  }
+
+  try {
+    const s3 = new S3Client({
+      endpoint,
+      region: 'us-east-1',
+      credentials: { accessKeyId, secretAccessKey },
+      forcePathStyle: true
+    });
+
+    const listed = await s3.send(new ListObjectsV2Command({ Bucket: bucketName, Prefix: 'backups/' }));
+    const objects = listed.Contents || [];
+    if (objects.length === 0) {
+      console.log("[S3] Bucketda 'backups/' ostida hech qanday fayl topilmadi.");
+      return null;
+    }
+
+    const latest = objects.reduce((a, b) => ((a.LastModified?.getTime() || 0) >= (b.LastModified?.getTime() || 0) ? a : b));
+    console.log(`[S3] Eng so'nggi zaxira topildi: ${latest.Key}`);
+
+    const obj = await s3.send(new GetObjectCommand({ Bucket: bucketName, Key: latest.Key! }));
+    const chunks: Buffer[] = [];
+    for await (const chunk of obj.Body as any) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
+  } catch (err: any) {
+    console.error("[S3] Zaxirani yuklab olishda xatolik:", err.message);
+    return null;
+  }
+}
+
 export async function restoreFromLatestBackup(manualFileId?: string) {
   console.log("=== Savdo24 Database Restore Process ===");
   
@@ -105,14 +140,15 @@ export async function restoreFromLatestBackup(manualFileId?: string) {
   const encryptionKey = process.env.ENCRYPTION_KEY;
   const dbUrl = process.env.DATABASE_URL;
 
-  if (!botToken || !encryptionKey || !dbUrl) {
-    console.error("[Restore] Missing required configuration (TELEGRAM_BOT_TOKEN, ENCRYPTION_KEY, or DATABASE_URL).");
+  if (!encryptionKey || !dbUrl) {
+    console.error("[Restore] Missing required configuration (ENCRYPTION_KEY or DATABASE_URL).");
+    await prismaClient.$disconnect();
     return;
   }
 
   let fileId = manualFileId;
 
-  if (!fileId) {
+  if (!fileId && botToken) {
     // Try to get from settings
     const savedFileId = await getSetting("last_backup_file_id");
     if (savedFileId) {
@@ -128,14 +164,25 @@ export async function restoreFromLatestBackup(manualFileId?: string) {
     }
   }
 
-  if (!fileId) {
-    console.error("[Restore] No backup fileId found in Settings or local fallback. Auto-restore aborted.");
-    return;
+  // 69-MUAMMO: Telegram manbasi topilmasa (yoki umuman sozlanmagan bo'lsa),
+  // avvalgi kod shu yerda to'xtab qolardi — S3'dagi zaxira umuman
+  // ko'rilmasdi. Endi shu holatda Contabo S3'dan eng so'nggi zaxira izlanadi.
+  let encryptedBuffer: Buffer | null = null;
+  if (fileId && botToken) {
+    encryptedBuffer = await downloadFromTelegram(botToken, fileId);
+    if (!encryptedBuffer) {
+      console.error("[Restore] Failed to download backup file from Telegram.");
+    }
   }
 
-  const encryptedBuffer = await downloadFromTelegram(botToken, fileId);
   if (!encryptedBuffer) {
-    console.error("[Restore] Failed to download backup file from Telegram.");
+    console.log("[Restore] Telegram manbasi mavjud emas, Contabo S3 tekshirilmoqda...");
+    encryptedBuffer = await downloadLatestFromS3();
+  }
+
+  if (!encryptedBuffer) {
+    console.error("[Restore] No backup found via Telegram or Contabo S3. Auto-restore aborted.");
+    await prismaClient.$disconnect();
     return;
   }
 
@@ -143,6 +190,7 @@ export async function restoreFromLatestBackup(manualFileId?: string) {
   const decryptedBuffer = await decryptBackup(encryptedBuffer.toString(), encryptionKey);
   if (!decryptedBuffer) {
     console.error("[Restore] Failed to decrypt backup.");
+    await prismaClient.$disconnect();
     return;
   }
 
@@ -166,16 +214,41 @@ export async function restoreFromLatestBackup(manualFileId?: string) {
       const data = JSON.parse(decryptedBuffer.toString());
       
       // Import tables sequentially to respect relations (simple approach)
+      // MUHIM: bu ro'yxat backup-db.ts kabi atigi 9/30 modelni tiklardi — endi
+      // backupData'dagi barcha 30 modelga to'liq, FK bog'liqliklariga mos
+      // tartibda (masalan Startup Category'dan, Payment Startup'dan, Message
+      // Conversation'dan keyin keladi).
       const tables = [
         { name: 'user', data: data.users },
+        { name: 'category', data: data.categories },
         { name: 'startup', data: data.startups },
-        { name: 'idea', data: data.ideas },
-        { name: 'review', data: data.reviews },
         { name: 'payment', data: data.payments },
+        { name: 'idea', data: data.ideas },
+        { name: 'subscriber', data: data.subscribers },
+        { name: 'ideaVote', data: data.ideaVotes },
+        { name: 'review', data: data.reviews },
         { name: 'dispute', data: data.disputes },
         { name: 'refreshToken', data: data.refreshTokens },
         { name: 'report', data: data.reports },
-        { name: 'setting', data: data.settings }
+        { name: 'auditLog', data: data.auditLogs },
+        { name: 'setting', data: data.settings },
+        { name: 'telegramDelivery', data: data.telegramDeliveries },
+        { name: 'sponsorChannel', data: data.sponsorChannels },
+        { name: 'topBoost', data: data.topBoosts },
+        { name: 'vipSubscription', data: data.vipSubscriptions },
+        { name: 'conversation', data: data.conversations },
+        { name: 'message', data: data.messages },
+        { name: 'referral', data: data.referrals },
+        { name: 'referralReward', data: data.referralRewards },
+        { name: 'listingTier', data: data.listingTiers },
+        { name: 'listingSubscription', data: data.listingSubscriptions },
+        { name: 'escrowPayment', data: data.escrowPayments },
+        { name: 'disputeResolution', data: data.disputeResolutions },
+        { name: 'b2BAccount', data: data.b2bAccounts },
+        { name: 'b2BOrder', data: data.b2bOrders },
+        { name: 'analyticsEvent', data: data.analyticsEvents },
+        { name: 'supportTicket', data: data.supportTickets },
+        { name: 'notification', data: data.notifications }
       ];
 
       for (const table of tables) {
@@ -198,13 +271,25 @@ export async function restoreFromLatestBackup(manualFileId?: string) {
   if (fs.existsSync(tempRestorePath)) {
     fs.unlinkSync(tempRestorePath);
   }
+
+  await prismaClient.$disconnect();
 }
 
 // CLI execution
+// Note: when this file is dynamically imported from the bundled (CJS) production
+// server, `import.meta.url` is empty and fileURLToPath() throws. Guard against
+// that so importing this module for programmatic use (e.g. from server.ts)
+// never crashes — only running it directly via `tsx scripts/restore-db.ts` should
+// trigger the auto-run.
 const nodePath = process.argv[1] ? path.resolve(process.argv[1]) : '';
-const modulePath = fileURLToPath(import.meta.url);
-if (nodePath === modulePath) {
+let modulePath = '';
+try {
+  modulePath = fileURLToPath(import.meta.url);
+} catch {
+  // import.meta.url unavailable (e.g. bundled to CJS) — not a direct CLI run.
+}
+if (nodePath && modulePath && nodePath === modulePath) {
   const args = process.argv.slice(2);
   const manualFileId = args[0];
-  restoreFromLatestBackup(manualFileId).then(() => prismaClient.$disconnect());
+  restoreFromLatestBackup(manualFileId);
 }

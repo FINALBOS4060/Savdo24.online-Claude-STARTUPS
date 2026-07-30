@@ -1,17 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Startup, Category } from '../types';
+import { Startup, Category, LoyihaMilestone } from '../types';
 import { CATEGORY_FIELDS } from '../categoryFields';
 import { apiFetch as fetch } from '../lib/api';
 
 interface SellPageProps {
-  onAddStartup: (startup: Startup) => void;
+  onAddStartup: (startup: Startup) => void | Promise<void>;
   onActionToast: (message: string) => void;
   setView: (view: string) => void;
   categories: Category[];
   isEditing?: boolean;
   startups?: Startup[];
   fetchStartups?: () => void;
+  setInitialProfileTab?: (tab: import('../types').ProfileTab | null) => void;
 }
 
 export default function SellPage({ 
@@ -21,7 +22,8 @@ export default function SellPage({
   categories, 
   isEditing = false,
   startups = [],
-  fetchStartups
+  fetchStartups,
+  setInitialProfileTab
 }: SellPageProps) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -35,6 +37,8 @@ export default function SellPage({
   const [selectedTechs, setSelectedTechs] = useState<string[]>(['React', 'TypeScript', 'Node.js']);
   const [customTechInput, setCustomTechInput] = useState('');
   const [demoUrl, setDemoUrl] = useState('');
+  const [githubUrl, setGithubUrl] = useState('');
+  const [milestones, setMilestones] = useState<LoyihaMilestone[]>([]);
   const [deliveryUrl, setDeliveryUrl] = useState('');
   const [dynamicAttributes, setDynamicAttributes] = useState<Record<string, any>>({});
   const [imageUrl, setImageUrl] = useState('');
@@ -62,6 +66,8 @@ export default function SellPage({
         setSelectedTechs(techs);
         
         setDemoUrl(s.demoUrl || '');
+        setGithubUrl(s.githubUrl || '');
+        setMilestones(Array.isArray(s.milestones) ? s.milestones : []);
         setDeliveryUrl(s.deliveryUrl || '');
         setImageUrl(s.image || '');
         setEmail(s.contactEmail || '');
@@ -87,10 +93,19 @@ export default function SellPage({
 
   // Handle Dynamic Image Uploading to Backend
   const uploadImageFile = async (file: File) => {
-    // File size validation (MAX 5MB)
-    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    // Fayl hajmini bu yerda oldindan tekshirish endi faqat multer'ning umumiy
+    // (10MB) chegarasiga qarshi — chunki haqiqiy ruxsat etilgan hajm
+    // foydalanuvchi VIP yoki yo'qligiga bog'liq (server.ts: oddiy 2MB, VIP
+    // 6MB), lekin SellPage bu yerda foydalanuvchi ma'lumotiga ega emas.
+    // Avval bu yerda universal "5MB" chegarasi qo'yilgan edi — bu oddiy
+    // foydalanuvchilar uchun noto'g'ri (haqiqiy limit 2MB bo'lgani uchun
+    // 3-5MB fayllar baribir serverda rad etilardi) va VIP foydalanuvchilar
+    // uchun ham noto'g'ri (ular 6MB gacha yuklay olishi kerak edi, lekin bu
+    // yerda 5MB'da to'xtatib qo'yilardi). Aniq va to'g'ri xabar serverning
+    // javobida ("Fayl hajmi Xmb dan oshmasligi kerak...") allaqachon mavjud.
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // multer'ning haqiqiy umumiy chegarasi
     if (file.size > MAX_FILE_SIZE) {
-      onActionToast("Fayl hajmi 5MB dan kam bo'lishi kerak.");
+      onActionToast("Fayl hajmi 10MB dan kam bo'lishi kerak.");
       return;
     }
 
@@ -175,6 +190,17 @@ export default function SellPage({
       return;
     }
 
+    const parsedPriceCheck = parseFloat(price);
+    if (!price || isNaN(parsedPriceCheck) || parsedPriceCheck <= 0) {
+      onActionToast('Iltimos, narxni to\'g\'ri kiriting (0 dan katta bo\'lishi kerak).');
+      return;
+    }
+
+    if (deliveryUrl && !deliveryUrl.match(/^https?:\/\/.+/)) {
+      onActionToast("Yetkazib berish havolasi HTTPS bilan boshlangan to'g'ri URL bo'lishi kerak.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     const finalImage = imageUrl || 'https://images.unsplash.com/photo-1559136555-9303baea8ebd?q=80&w=600&auto=format&fit=crop';
@@ -201,6 +227,13 @@ export default function SellPage({
       listingType,
       techStack: selectedTechs,
       demoUrl: demoUrl || undefined,
+      githubUrl: githubUrl || undefined,
+      // 95-band: bo'sh (sarlavhasiz) bosqich qatorlari ham xuddi shu holda
+      // yuborilardi — foydalanuvchi "Bosqich qo'shish"ni bosib, keyin
+      // to'ldirmasdan chop etsa, DetailPage'da sarlavhasiz bo'sh bosqich
+      // ko'rinardi. Endi sarlavhasi bo'sh qatorlar yuborishdan oldin
+      // filtrlanadi.
+      milestones: milestones.filter((m) => m.title && m.title.trim()),
       deliveryUrl: deliveryUrl || undefined,
       repoIncluded,
       image: finalImage,
@@ -228,6 +261,8 @@ export default function SellPage({
           setImageFile(null);
           setSelectedTechs(['React', 'TypeScript', 'Node.js']);
           setDemoUrl('');
+          setGithubUrl('');
+          setMilestones([]);
           setDeliveryUrl('');
           setEmail('');
           setPhone('');
@@ -236,6 +271,9 @@ export default function SellPage({
 
           onActionToast(`${name} muvaffaqiyatli tahrirlandi.`);
           if (fetchStartups) fetchStartups();
+          // 67-MUAMMO: profileTab eskisicha qolib, tahrirlangan e'lon
+          // "Mening loyihalarim"da emas, oldingi tabda ko'rinardi.
+          if (setInitialProfileTab) setInitialProfileTab('startups');
           navigate('/profile');
         } else {
           const err = await res.json();
@@ -251,10 +289,9 @@ export default function SellPage({
           proposalsCount: 0,
           gallery: [],
           team: [{ name: 'Siz', role: 'Asoschi', imgUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=You' }],
-          milestones: [],
           techStack: payload.techStack,
         };
-        onAddStartup(newStartup);
+        await onAddStartup(newStartup);
       }
     } catch (err) {
       console.error(err);
@@ -449,6 +486,8 @@ export default function SellPage({
               <input
                 type="number"
                 required
+                min="1"
+                step="0.01"
                 className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
                 placeholder="Masalan: 250 (faqat raqam kiriting)"
                 value={price}
@@ -583,12 +622,15 @@ export default function SellPage({
                 value={deliveryUrl}
                 onChange={(e) => {
                   const url = e.target.value;
-                  // Basic URL validation
-                  if (url && !url.match(/^https?:\/\/.+/)) {
-                    onActionToast("Iltimos, HTTPS bilan boshlangan to'g'ri URL kiriting.");
-                    return;
-                  }
                   setDeliveryUrl(url);
+                  // Ogohlantirish faqat foydalanuvchi yozib bo'lgach (va noto'g'ri
+                  // formatda bo'lsa) ko'rsatiladi — har bir bosilgan tugma uchun
+                  // emas, aks holda maydonga umuman yozib bo'lmas edi (chunki
+                  // avval setDeliveryUrl faqat to'liq "https://..." mos kelgandagina
+                  // chaqirilardi, ya'ni har bir oraliq belgi darhol rad etilardi).
+                  if (url && url.length > 8 && !url.match(/^https?:\/\/.+/)) {
+                    onActionToast("Iltimos, HTTPS bilan boshlangan to'g'ri URL kiriting.");
+                  }
                 }}
               />
             </div>
@@ -603,6 +645,93 @@ export default function SellPage({
                 onChange={(e) => setDemoUrl(e.target.value)}
               />
             </div>
+
+            <div className="col-span-1 md:col-span-2 space-y-2 mt-4">
+              <label className="text-xs font-bold text-on-primary-container block">GitHub repozitoriyasi (ixtiyoriy, ommaviy ko'rinadi)</label>
+              <input
+                type="url"
+                className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
+                placeholder="Masalan: https://github.com/foydalanuvchi/repo"
+                value={githubUrl}
+                onChange={(e) => setGithubUrl(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Loyiha bosqichlari (Milestones) — ixtiyoriy, DetailPage'da timeline
+              ko'rinishida ko'rsatiladi */}
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-on-primary-container block">Loyiha bosqichlari (ixtiyoriy)</label>
+              <button
+                type="button"
+                onClick={() => {
+                  // 92-band: server (milestonesPreprocess, zod .max(20)) 21+ bosqichni
+                  // 400 bilan rad etadi, lekin frontend cheklovsiz qo'sha beraverardi —
+                  // foydalanuvchi "Chop etish"da tushunarsiz xatoga duch kelardi.
+                  if (milestones.length >= 20) {
+                    onActionToast("Ko'pi bilan 20 ta bosqich qo'shish mumkin.");
+                    return;
+                  }
+                  setMilestones([...milestones, { date: '', title: '', desc: '' }]);
+                }}
+                disabled={milestones.length >= 20}
+                className="text-xs font-bold text-secondary-container hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:no-underline"
+              >
+                <span className="material-symbols-outlined text-sm">add_circle</span>
+                Bosqich qo'shish{milestones.length > 0 ? ` (${milestones.length}/20)` : ''}
+              </button>
+            </div>
+            {milestones.length > 0 && (
+              <div className="space-y-3">
+                {milestones.map((m, idx) => (
+                  <div key={idx} className="bg-[#0b1426] border border-outline-variant/30 rounded-xl p-4 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <input
+                        type="text"
+                        className="flex-1 bg-transparent border border-outline-variant/30 text-white rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-secondary-container transition-all"
+                        placeholder="Sana (masalan: 2026-Yanvar)"
+                        value={m.date}
+                        onChange={(e) => {
+                          const updated = [...milestones];
+                          updated[idx] = { ...updated[idx], date: e.target.value };
+                          setMilestones(updated);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setMilestones(milestones.filter((_, i) => i !== idx))}
+                        className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-all cursor-pointer flex-shrink-0"
+                      >
+                        <span className="material-symbols-outlined text-sm">delete</span>
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      className="w-full bg-transparent border border-outline-variant/30 text-white rounded-lg px-3 py-2 text-xs font-bold focus:outline-none focus:border-secondary-container transition-all"
+                      placeholder="Bosqich sarlavhasi"
+                      value={m.title}
+                      onChange={(e) => {
+                        const updated = [...milestones];
+                        updated[idx] = { ...updated[idx], title: e.target.value };
+                        setMilestones(updated);
+                      }}
+                    />
+                    <textarea
+                      className="w-full bg-transparent border border-outline-variant/30 text-white rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-secondary-container transition-all resize-none"
+                      placeholder="Qisqacha tavsif"
+                      rows={2}
+                      value={m.desc}
+                      onChange={(e) => {
+                        const updated = [...milestones];
+                        updated[idx] = { ...updated[idx], desc: e.target.value };
+                        setMilestones(updated);
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Image Upload Area with Drag & Drop functionality */}
@@ -674,7 +803,7 @@ export default function SellPage({
                     Faylni tortib olib tashlang yoki ko'rib chiqish uchun bosing
                   </p>
                   <p className="text-[10px] text-on-primary-container">
-                    PNG, JPG yoki SVG formatlarini qo'llab-quvvatlaydi (Maks. 10MB)
+                    PNG, JPG yoki SVG formatlarini qo'llab-quvvatlaydi (oddiy: 2MB, VIP: 6MB gacha)
                   </p>
                 </>
               )}
@@ -744,9 +873,10 @@ export default function SellPage({
 
           <button
             type="submit"
-            className="w-full py-4 bg-secondary-container hover:brightness-110 text-on-secondary-fixed rounded-xl font-bold text-sm shadow-xl shadow-secondary-container/10 uppercase tracking-widest transition-all"
+            disabled={isSubmitting || isUploading}
+            className="w-full py-4 bg-secondary-container hover:brightness-110 text-on-secondary-fixed rounded-xl font-bold text-sm shadow-xl shadow-secondary-container/10 uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            E'lonni chop etish
+            {isSubmitting ? "Yuborilmoqda..." : "E'lonni chop etish"}
           </button>
         </form>
       </div>

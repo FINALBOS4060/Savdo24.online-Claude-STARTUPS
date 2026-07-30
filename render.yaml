@@ -42,7 +42,25 @@ services:
         sync: false
       - key: GOOGLE_CLIENT_ID
         sync: false
+      - key: VITE_GOOGLE_CLIENT_ID
+        sync: false
       - key: GOOGLE_CLIENT_SECRET
         sync: false
       - key: APP_URL
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: SMTP_SERVICE
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: TELEGRAM_ADMIN_CHAT_ID
         sync: false

@@ -78,7 +78,7 @@ export default function MobileNav({
             <span
               className="material-symbols-outlined text-xl select-none"
               style={{
-                fontVariationSettings: (isActive || tab.fillIcon) && tab.id === 'profile' ? "'FILL' 1" : "'FILL' 0"
+                fontVariationSettings: isActive && tab.fillIcon ? "'FILL' 1" : "'FILL' 0"
               }}
             >
               {tab.icon}

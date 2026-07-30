@@ -13,6 +13,7 @@ import {
   sendEmail,
   authenticateToken,
   getSetting,
+  escapeHtml,
   AuthRequest
 } from "../../server";
 import { authLimiter, passwordResetLimiter } from "../lib/rateLimiters";
@@ -21,7 +22,7 @@ const router = Router();
 
 // Zod schemas for input validation
 const registerSchema = z.object({
-  email: z.string().email("Noto'g'ri email formati."),
+  email: z.string().email("Noto'g'ri email formati.").transform(v => v.trim().toLowerCase()),
   password: z.string()
     .min(8, "Parol kamida 8 ta belgidan iborat bo'lishi kerak.")
     .regex(/\d/, "Parolda kamida bitta raqam bo'lishi kerak."),
@@ -29,7 +30,7 @@ const registerSchema = z.object({
 });
 
 const loginSchema = z.object({
-  email: z.string().email("Noto'g'ri email formati."),
+  email: z.string().email("Noto'g'ri email formati.").transform(v => v.trim().toLowerCase()),
   password: z.string().min(1, "Parol kiritilishi shart.")
 });
 
@@ -41,19 +42,32 @@ const resetPasswordSchema = z.object({
 });
 
 // Helper to set HttpOnly auth cookies
+const COOKIE_DOMAIN = process.env.NODE_ENV === "production" ? ".savdo24.online" : undefined;
+
 function setAuthCookies(res: Response, accessToken: string, refreshToken: string) {
   res.cookie("token", accessToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    maxAge: 15 * 60 * 1000 // 15 minutes
+    maxAge: 15 * 60 * 1000, // 15 minutes
+    path: "/",
+    domain: COOKIE_DOMAIN
   });
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: "/",
+    domain: COOKIE_DOMAIN
   });
+}
+
+// clearCookie faqat set qilingandagi bilan AYNAN bir xil domain/path berilganda ishlaydi
+// (brauzerlar shunday talab qiladi) — shuning uchun alohida helper orqali izchillikni ta'minlaymiz.
+function clearAuthCookies(res: Response) {
+  res.clearCookie("token", { path: "/", domain: COOKIE_DOMAIN });
+  res.clearCookie("refreshToken", { path: "/", domain: COOKIE_DOMAIN });
 }
 
 // 1. POST /api/auth/register
@@ -125,7 +139,18 @@ router.post("/register", authLimiter, async (req: Request, res: Response) => {
       },
       message: "Hisob yaratildi. Davom etish uchun Telegram orqali tasdiqlang."
     });
-  } catch (err) {
+  } catch (err: any) {
+    // 102-band: agar bir xil email bilan ikkita ro'yxatdan o'tish so'rovi
+    // AYNAN bir vaqtda kelsa (masalan tarmoq kechikishi tufayli qayta
+    // yuborilsa yoki ikki xil qurilmadan), yuqoridagi findUnique tekshiruvi
+    // ikkalasi uchun ham "mavjud emas" deb topishi mumkin — keyin Prisma'ning
+    // o'zi unikal cheklov (email) tufayli xato tashlaydi. Bu xato avval umumiy
+    // catch blokiga tushib, chalkash "Serverda xatolik" (500) xabarini
+    // ko'rsatardi — endi boshqa joylardagi (routes/support.ts, server.ts)
+    // P2002 ishlov berish naqshiga mos ravishda aniq xabar beriladi.
+    if (err?.code === "P2002") {
+      return res.status(400).json({ error: "Ushbu email bilan allaqachon ro'yxatdan o'tilgan." });
+    }
     logger.error({ err }, "Register endpoint error");
     res.status(500).json({ error: "Serverda xatolik yuz berdi." });
   }
@@ -269,8 +294,7 @@ router.post("/logout", async (req: Request, res: Response) => {
       where: { token: refreshToken }
     }).catch(() => {});
   }
-  res.clearCookie("token");
-  res.clearCookie("refreshToken");
+  clearAuthCookies(res);
   res.json({ success: true, message: "Sessiya tugatildi." });
 });
 
@@ -293,8 +317,7 @@ router.get("/me", async (req: Request, res: Response) => {
     });
 
     if (!user || user.isBanned) {
-      res.clearCookie("token");
-      res.clearCookie("refreshToken");
+      clearAuthCookies(res);
       return res.status(403).json({ error: "Hisobingiz bloklangan yoki o'chirilgan." });
     }
 
@@ -325,10 +348,11 @@ router.get("/me", async (req: Request, res: Response) => {
 
 // 7. POST /api/auth/forgot-password
 router.post("/forgot-password", passwordResetLimiter, async (req: Request, res: Response) => {
-  const { email } = req.body;
-  if (!email) {
+  let { email } = req.body;
+  if (!email || typeof email !== "string") {
     return res.status(400).json({ error: "Email manzilini kiritish majburiy." });
   }
+  email = email.trim().toLowerCase();
 
   try {
     const user = await prisma.user.findUnique({ where: { email } });
@@ -363,7 +387,7 @@ router.post("/forgot-password", passwordResetLimiter, async (req: Request, res: 
       `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px; background-color: #0d131a; color: #ffffff;">
           <h2 style="color: #10b981; text-align: center;">Parolni qayta tiklash so'rovi</h2>
-          <p>Salom <strong>${user.name}</strong>,</p>
+          <p>Salom <strong>${escapeHtml(user.name)}</strong>,</p>
           <p>Siz Savdo24 platformasida parolingizni unutganingiz sababli tiklash so'rovini yubordingiz. Parolingizni qayta tiklash uchun quyidagi tugmani bosing:</p>
           <div style="text-align: center; margin: 30px 0;">
             <a href="${resetUrl}" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Parolni yangilash</a>
@@ -415,6 +439,12 @@ router.post("/reset-password", passwordResetLimiter, async (req: Request, res: R
         resetTokenExpiry: null
       }
     });
+
+    // Xavfsizlik: parol tiklangach, o'sha foydalanuvchining barcha eski
+    // refresh tokenlari (faol seanslari) bekor qilinishi shart — aks holda
+    // parolni o'g'irlagan/eski sessiyaga ega bo'lgan odam kirishda davom eta oladi.
+    await prisma.refreshToken.deleteMany({ where: { userId: user.id } }).catch(() => {});
+    clearAuthCookies(res);
 
     logger.info({ userId: user.id }, "Password reset successfully");
     res.json({ success: true, message: "Parol muvaffaqiyatli yangilandi. Yangi parol bilan tizimga kirishingiz mumkin." });

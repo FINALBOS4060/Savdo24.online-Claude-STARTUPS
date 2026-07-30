@@ -1,10 +1,11 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, type User, type Startup, type Payment } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
 import { simpleGit, SimpleGit } from 'simple-git';
 import dotenv from 'dotenv';
 import { decryptSecret } from '../src/lib/crypto';
+import { fileURLToPath } from 'url';
 
 dotenv.config();
 
@@ -27,7 +28,7 @@ async function getSetting(key: string): Promise<string | null> {
   return process.env[key] || null;
 }
 
-async function exportToGithub() {
+export async function exportToGithub() {
   console.log("=== Starting Weekly Data Export to GitHub ===");
 
   const GITHUB_TOKEN = await getSetting("BACKUP_GITHUB_TOKEN");
@@ -44,12 +45,14 @@ async function exportToGithub() {
     return;
   }
 
+  const tempDir = path.join('/tmp', 'savdo24-github-export');
+
   try {
     console.log("Fetching and sanitizing database tables...");
 
     // 1. Fetch Users - strictly excluding email, password, tokens, etc.
     const rawUsers = await prisma.user.findMany();
-    const sanitizedUsers = rawUsers.map(user => ({
+    const sanitizedUsers = rawUsers.map((user: User) => ({
       id: user.id,
       role: user.role,
       verified: user.verified,
@@ -61,21 +64,35 @@ async function exportToGithub() {
 
     // 2. Fetch Startups - excluding personal contact information
     const rawStartups = await prisma.startup.findMany();
-    const sanitizedStartups = rawStartups.map(s => ({
-      id: s.id,
-      category: s.category,
-      price: s.price,
-      listingType: s.listingType,
-      soldStatus: s.soldStatus,
-      status: s.status,
-      proposalsCount: s.proposalsCount,
-      dateCreated: s.dateCreated,
-      techStack: JSON.parse(s.techStack || "[]").length, // length for stats
-    }));
+    const sanitizedStartups = rawStartups.map((s: Startup) => {
+      // MUHIM: agar bironta yozuvning techStack maydoni yaroqsiz JSON bo'lsa,
+      // himoyasiz JSON.parse butun eksportni (users/payments jadvallari bilan
+      // birga) to'xtatib qo'yardi. Endi bitta buzuq yozuv faqat shu yozuv
+      // uchun 0 qiymat bilan almashtiriladi, qolgan barcha ma'lumotlar
+      // baribir muvaffaqiyatli eksport qilinadi.
+      let techStackCount = 0;
+      try {
+        const parsed = JSON.parse(s.techStack || "[]");
+        techStackCount = Array.isArray(parsed) ? parsed.length : 0;
+      } catch {
+        techStackCount = 0;
+      }
+      return {
+        id: s.id,
+        category: s.category,
+        price: s.price,
+        listingType: s.listingType,
+        soldStatus: s.soldStatus,
+        status: s.status,
+        proposalsCount: s.proposalsCount,
+        dateCreated: s.dateCreated,
+        techStack: techStackCount, // length for stats
+      };
+    });
 
     // 3. Fetch Payments - excluding callback tokens
     const rawPayments = await prisma.payment.findMany();
-    const sanitizedPayments = rawPayments.map(p => ({
+    const sanitizedPayments = rawPayments.map((p: Payment) => ({
       id: p.id,
       amount: p.amount,
       status: p.status,
@@ -99,7 +116,6 @@ async function exportToGithub() {
 
     console.log("Database tables sanitized. Preparing local repository...");
 
-    const tempDir = path.join('/tmp', 'savdo24-github-export');
     if (fs.existsSync(tempDir)) {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
@@ -136,8 +152,12 @@ async function exportToGithub() {
     // Commit and push
     await localGit.add('data-stats.json');
     const status = await localGit.status();
-    
-    if (status.modified.length > 0 || status.not_added.length > 0) {
+
+    // MUHIM: `git add`dan keyin yangi fayl `not_added`dan emas, `staged`ga
+    // o'tadi — avval faqat modified/not_added tekshirilgani uchun eng birinchi
+    // eksport (yangi fayl) hech qachon commit qilinmasdi — status.staged bilan
+    // tuzatildi.
+    if (status.staged.length > 0) {
       console.log("Changes detected. Committing backup stats...");
       await localGit.commit(`Weekly sanitized statistics backup: ${new Date().toISOString()}`);
       
@@ -154,17 +174,38 @@ async function exportToGithub() {
       console.log("No statistical changes detected since last export. Skipping commit.");
     }
 
-    // Clean up temporary workspace
-    if (fs.existsSync(tempDir)) {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-      console.log("Temporary workspace cleaned up.");
-    }
-
   } catch (err: any) {
     console.error("Export to GitHub failed with error:", err.message || err);
   } finally {
+    // MUHIM: tempDir ichida GITHUB_TOKEN o'rnatilgan remote URL (.git/config da)
+    // saqlanadi. Xato yuz berib catch blokiga o'tib ketilsa ham, bu papka
+    // diskda (token bilan birga) qolib ketmasligi uchun tozalash har doim
+    // (muvaffaqiyatli yoki xato bo'lsa ham) shu yerda bajariladi.
+    if (fs.existsSync(tempDir)) {
+      try {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+        console.log("Temporary workspace cleaned up.");
+      } catch (cleanupErr) {
+        console.error("Failed to clean up temporary workspace (may contain a GitHub token):", cleanupErr);
+      }
+    }
     await prisma.$disconnect();
   }
 }
 
-exportToGithub();
+// MUHIM (70-band): bu skript hech qachon avtomatik ishga tushmasdi — server.ts'da
+// hech qanday cron.schedule uni chaqirmasdi, faqat "npm run export-github" orqali
+// qo'lda ishga tushirilishi mumkin edi ("Weekly" deb yozilgan bo'lsa ham). Endi
+// server.ts haftalik cron orqali dynamic import qiladi; shu sabab bu yerda ham
+// backup-db.ts'dagi kabi faqat to'g'ridan-to'g'ri CLI orqali ishga tushirilganda
+// avtomatik chaqiriladi, import qilinganda emas.
+const nodePath = process.argv[1] ? path.resolve(process.argv[1]) : '';
+let modulePath = '';
+try {
+  modulePath = fileURLToPath(import.meta.url);
+} catch {
+  // import.meta.url mavjud emas (bundle qilingan CJS) — to'g'ridan-to'g'ri CLI emas.
+}
+if (nodePath && modulePath && nodePath === modulePath) {
+  exportToGithub();
+}

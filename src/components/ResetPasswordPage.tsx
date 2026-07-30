@@ -26,6 +26,9 @@ export default function ResetPasswordPage({ onNavigate }: ResetPasswordPageProps
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // ForgotPasswordPage'dagi bilan bir xil 117-band tuzatishi: tugma
+    // disabled bo'lishi Enter kalitidan qayta submit bo'lishini bloklamaydi.
+    if (loading) return;
     setError('');
     setSuccess('');
 
@@ -34,8 +37,13 @@ export default function ResetPasswordPage({ onNavigate }: ResetPasswordPageProps
       return;
     }
 
-    if (password.length < 6) {
-      setError('Parol kamida 6 ta belgidan iborat bo\'lishi kerak.');
+    if (password.length < 8) {
+      setError('Parol kamida 8 ta belgidan iborat bo\'lishi kerak.');
+      return;
+    }
+
+    if (!/\d/.test(password)) {
+      setError('Parolda kamida bitta raqam bo\'lishi kerak.');
       return;
     }
 
@@ -124,7 +132,8 @@ export default function ResetPasswordPage({ onNavigate }: ResetPasswordPageProps
                     required
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
-                    className="mt-1.5 block w-full px-4 py-3 bg-[#131b26] border border-[#222e3d] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm transition-colors duration-200"
+                    disabled={loading}
+                    className="mt-1.5 block w-full px-4 py-3 bg-[#131b26] border border-[#222e3d] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm transition-colors duration-200 disabled:opacity-60"
                     placeholder="Email orqali yuborilgan tokenni kiriting"
                   />
                 </div>
@@ -142,7 +151,8 @@ export default function ResetPasswordPage({ onNavigate }: ResetPasswordPageProps
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="block w-full px-4 py-3 bg-[#131b26] border border-[#222e3d] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm pr-12 transition-colors duration-200"
+                    disabled={loading}
+                    className="block w-full px-4 py-3 bg-[#131b26] border border-[#222e3d] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm pr-12 transition-colors duration-200 disabled:opacity-60"
                     placeholder="••••••••"
                   />
                   <button
@@ -166,7 +176,8 @@ export default function ResetPasswordPage({ onNavigate }: ResetPasswordPageProps
                   required
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="mt-1.5 block w-full px-4 py-3 bg-[#131b26] border border-[#222e3d] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm transition-colors duration-200"
+                  disabled={loading}
+                  className="mt-1.5 block w-full px-4 py-3 bg-[#131b26] border border-[#222e3d] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm transition-colors duration-200 disabled:opacity-60"
                   placeholder="••••••••"
                 />
               </div>

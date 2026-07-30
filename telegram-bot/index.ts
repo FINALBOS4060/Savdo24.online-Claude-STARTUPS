@@ -14,7 +14,34 @@ interface SessionData {
 
 type MyContext = Context & SessionFlavor<SessionData>;
 
+// Telegram parse_mode: "HTML" bilan yuborilgan xabarlarda foydalanuvchi/sotuvchi
+// kiritgan matn (mahsulot nomi, tavsifi, foydalanuvchi ismi va h.k.) xom holda
+// qo'yilsa, unda "<", "&" kabi belgilar bo'lsa Telegram xabarni yubormay xato
+// qaytaradi (yoki formatlash buziladi). Shu sabab har doim shu funksiyadan o'tkazish kerak.
+function escapeHtml(input: unknown): string {
+  const str = input === null || input === undefined ? "" : String(input);
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.TELEGRAM_BOT_API_TOKEN || "";
+
+// MUHIM: agar botToken bo'sh bo'lsa, `new Bot("")` grammy ichida darhol
+// (tushunarsiz, inglizcha) xato tashlaydi — PM2 buni cheksiz qayta ishga
+// tushirishga (restart loop) urinardi, log'da esa haqiqiy sabab yo'qolib
+// ketardi. Boshqa skriptlarda (backup-db.ts DATABASE_URL kabi) mavjud
+// bo'lgan aniq tekshiruv naqshi shu yerga ham qo'shildi.
+if (!botToken) {
+  console.error("❌ TELEGRAM_BOT_TOKEN (yoki TELEGRAM_BOT_API_TOKEN) .env faylida sozlanmagan — bot ishga tushmaydi.");
+  process.exit(1);
+}
+if (!process.env.APP_URL) {
+  console.error("❌ APP_URL .env faylida sozlanmagan — bot server bilan bog'lana olmaydi (barcha so'rovlar 'undefined/api/...' manziliga ketardi).");
+  process.exit(1);
+}
+
 const bot = new Bot<MyContext>(botToken);
 
 bot.use(session({ initial: () => ({ token: "", startupId: "" }) }));
@@ -46,7 +73,10 @@ bot.command("start", async (ctx) => {
     }
 
     // Aks holda u fayl olish tokni bo'lishi mumkin
-    const res = await fetch(`${process.env.APP_URL}/api/telegram/verify/${token}`);
+    // 14-MUAMMO: server endi secret header talab qiladi, shu sabab qo'shildi
+    const res = await fetch(`${process.env.APP_URL}/api/telegram/verify/${token}`, {
+      headers: { "x-telegram-bot-secret": process.env.TELEGRAM_BOT_INTERNAL_SECRET || "" }
+    });
     if (!res.ok) {
       return ctx.reply("Havola eskirgan yoki noto'g'ri.");
     }
@@ -73,7 +103,7 @@ bot.command("start", async (ctx) => {
 });
 
 bot.command("bogla", async (ctx) => {
-  const code = ctx.match;
+  const code = ctx.match?.trim().toUpperCase();
   if (!code) {
     return ctx.reply("Iltimos ulanish kodini kiriting. Masalan: /bogla 123456\nKodni saytdagi Profil -> Sozlamalar bo'limidan olishingiz mumkin.");
   }
@@ -116,7 +146,7 @@ bot.command("new_listings", async (ctx) => {
     
     let text = "<b>🆕 Eng so'nggi elonlar:</b>\n\n";
     startups.forEach((s: any) => {
-      text += `• <b>${s.name}</b> - ${s.price} USDT\n/mahsulot ${s.id}\n\n`;
+      text += `• <b>${escapeHtml(s.name)}</b> - ${escapeHtml(s.price)} USDT\n/mahsulot ${escapeHtml(s.id)}\n\n`;
     });
     
     ctx.reply(text, { parse_mode: "HTML" });
@@ -135,7 +165,7 @@ bot.command("top_deals", async (ctx) => {
     
     let text = "<b>🔥 TOP Takliflar:</b>\n\n";
     startups.forEach((s: any) => {
-      text += `• <b>${s.name}</b> - ${s.price} USDT\n/mahsulot ${s.id}\n\n`;
+      text += `• <b>${escapeHtml(s.name)}</b> - ${escapeHtml(s.price)} USDT\n/mahsulot ${escapeHtml(s.id)}\n\n`;
     });
     
     ctx.reply(text, { parse_mode: "HTML" });
@@ -153,12 +183,12 @@ bot.command("profile", async (ctx) => {
     if (!res.ok) return ctx.reply("Profil ma'lumotlarini olish uchun hisobingizni bog'lang: /bogla {kod}");
     
     const data = await res.json();
-    let text = `<b>👤 Profil: ${data.name}</b>\n\n`;
-    text += `📧 Email: ${data.email}\n`;
-    text += `💰 Balans: ${data.balance} USDT\n`;
-    text += `🔗 Referral kod: <code>${data.referralCode || 'Mavjud emas'}</code>\n`;
-    text += `👥 Jami referrallar: ${data.referralCount}\n`;
-    text += `🎁 Jami mukofot: ${data.totalEarned} USDT`;
+    let text = `<b>👤 Profil: ${escapeHtml(data.name)}</b>\n\n`;
+    text += `📧 Email: ${escapeHtml(data.email)}\n`;
+    text += `💰 Balans: ${escapeHtml(data.balance)} USDT\n`;
+    text += `🔗 Referral kod: <code>${escapeHtml(data.referralCode || 'Mavjud emas')}</code>\n`;
+    text += `👥 Jami referrallar: ${escapeHtml(data.referralCount)}\n`;
+    text += `🎁 Jami mukofot: ${escapeHtml(data.totalEarned)} USDT`;
     
     ctx.reply(text, { parse_mode: "HTML" });
   } catch (err) {
@@ -167,9 +197,20 @@ bot.command("profile", async (ctx) => {
 });
 
 // Handle plain text ID as well
+// 123-band: startup ID'lar (server.ts) foydalanuvchi kiritgan nomdan
+// generatsiya qilinadigan slug (kamida 150 belgigacha + tasodifiy hex
+// qo'shimcha) — avval bu yerda `text.length < 20` sharti bor edi, ya'ni
+// 20 belgidan uzunroq (haqiqatda ko'pchilik) slug'lar oddiy matn sifatida
+// yuborilganda SIZINGDA jimgina e'tiborsiz qoldirilardi (hech qanday
+// javob yo'q). Endi uzunlik chegarasi haqiqiy slug formatiga mos (160)
+// va faqat slug pattern'iga (kichik harf/raqam/tire) mos matnlar mahsulot
+// ID sifatida qabul qilinadi — bo'sh joy/tinish belgili oddiy xabarlar
+// (savol, shikoyat va h.k.) endi ID qidiruviga yuborilib, keraksiz
+// API so'rovi yaratmaydi.
+const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 bot.on("message:text", async (ctx) => {
-  const text = ctx.message.text;
-  if (!text.startsWith("/") && text.length < 20) {
+  const text = ctx.message.text.trim();
+  if (!text.startsWith("/") && text.length <= 160 && SLUG_PATTERN.test(text)) {
     await showProduct(ctx, text);
   }
 });
@@ -184,18 +225,38 @@ async function showProduct(ctx: any, id: string) {
       return ctx.reply(`"${product.name}" mahsuloti allaqachon sotilgan.`);
     }
 
-    const message = `<b>${product.name}</b>\n\n${product.shortDescription || "Tavsif mavjud emas."}\n\n💰 Narxi: ${product.price} USDT`;
+    const message = `<b>${escapeHtml(product.name)}</b>\n\n${escapeHtml(product.description || "Tavsif mavjud emas.")}\n\n💰 Narxi: ${escapeHtml(product.price)} USDT`;
     
     const keyboard = [
       [{ text: `💳 Sotib olish (${product.price} USDT)`, callback_data: `buy_${product.id}` }]
     ];
 
-    if (product.imageUrl) {
-      await ctx.replyWithPhoto(product.imageUrl, {
-        caption: message,
-        parse_mode: "HTML",
-        reply_markup: { inline_keyboard: keyboard }
-      });
+    // MUHIM: /api/upload orqali yuklangan rasmlar uchun `image` maydoni
+    // nisbiy (relative) yo'l ko'rinishida saqlanadi (masalan "/api/files/xxx"),
+    // to'liq URL emas. Telegram replyWithPhoto esa to'liq (http/https) URL
+    // yoki file_id talab qiladi — nisbiy yo'l yuborilsa Telegram uni rad etib,
+    // xato tashlaydi. Shu sabab kerak bo'lsa APP_URL bilan to'liqlanadi.
+    const imageUrl = product.image
+      ? (product.image.startsWith("/") ? `${process.env.APP_URL}${product.image}` : product.image)
+      : null;
+
+    if (imageUrl) {
+      try {
+        await ctx.replyWithPhoto(imageUrl, {
+          caption: message,
+          parse_mode: "HTML",
+          reply_markup: { inline_keyboard: keyboard }
+        });
+      } catch (photoErr) {
+        // Rasm yuborib bo'lmasa (masalan Telegram tomonidan noto'g'ri format
+        // deb rad etilsa), foydalanuvchi hech narsa olmay qolmasligi uchun
+        // oddiy matnli xabarga qaytamiz.
+        console.error("replyWithPhoto error, falling back to text:", photoErr);
+        await ctx.reply(message, {
+          parse_mode: "HTML",
+          reply_markup: { inline_keyboard: keyboard }
+        });
+      }
     } else {
       await ctx.reply(message, {
         parse_mode: "HTML",
@@ -230,26 +291,41 @@ bot.callbackQuery(/^buy_(.+)$/, async (ctx) => {
       return ctx.reply(data.error || "To'lov yaratishda xatolik.");
     }
 
-    // Asosiy post caption'ini yangilash
-    await ctx.editMessageCaption({
-      caption: (ctx.callbackQuery.message?.caption || "") + "\n\n✅ To'lov havolasi tayyor! Quyidagi tugma yoki QR-kod orqali to'lang.",
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "💰 To'lovni yakunlash", url: data.paymentUrl }]
-        ]
-      }
-    });
+    // 41-MUAMMO: rasmsiz mahsulotlar oddiy matnli xabar (text) sifatida
+    // yuborilgan, rasmli mahsulotlar esa caption bilan (photo) — shu farqni
+    // hisobga olmay doim editMessageCaption chaqirilsa, matnli xabarlarda
+    // Telegram xato qaytarib, butun xarid oqimi try/catch ichida "Xatolik
+    // yuz berdi"ga tushib qolardi. Endi xabar turiga qarab tanlanadi.
+    const newMarkup = {
+      inline_keyboard: [
+        [{ text: "💰 To'lovni yakunlash", url: data.paymentUrl }]
+      ]
+    };
+    const hasPhoto = !!(ctx.callbackQuery.message as any)?.photo;
+    if (hasPhoto) {
+      await ctx.editMessageCaption({
+        caption: (ctx.callbackQuery.message?.caption || "") + "\n\n✅ To'lov havolasi tayyor! Quyidagi tugma yoki QR-kod orqali to'lang.",
+        parse_mode: "HTML",
+        reply_markup: newMarkup
+      });
+    } else {
+      await ctx.editMessageText(
+        (ctx.callbackQuery.message?.text || "") + "\n\n✅ To'lov havolasi tayyor! Quyidagi tugma yoki QR-kod orqali to'lang.",
+        { parse_mode: "HTML", reply_markup: newMarkup }
+      );
+    }
 
-    // QR-kodni reply sifatida yuborish
-    const qrBuffer = Buffer.from(data.qrCode.split(",")[1], "base64");
-    await ctx.replyWithPhoto(
-      new InputFile(qrBuffer, "qr-payment.png"),
-      {
-        caption: "📱 Kripto hamyoningiz orqali to'lash uchun shu QR-kodni skanerlang.",
-        reply_to_message_id: ctx.callbackQuery.message?.message_id
-      }
-    );
+    // QR-kodni reply sifatida yuborish (mavjud bo'lsa)
+    if (data.qrCode && typeof data.qrCode === "string" && data.qrCode.includes(",")) {
+      const qrBuffer = Buffer.from(data.qrCode.split(",")[1], "base64");
+      await ctx.replyWithPhoto(
+        new InputFile(qrBuffer, "qr-payment.png"),
+        {
+          caption: "📱 Kripto hamyoningiz orqali to'lash uchun shu QR-kodni skanerlang.",
+          reply_to_message_id: ctx.callbackQuery.message?.message_id
+        }
+      );
+    }
 
   } catch (err) {
     console.error("Buy callback error:", err);
@@ -285,17 +361,28 @@ bot.callbackQuery("check_subscription", async (ctx) => {
       return ctx.answerCallbackQuery("Hali quyidagi kanallarga obuna bo'lmagansiz: " + notSubscribed.map((c:any)=>c.channelUsername).join(", "));
     }
   
+    // 13-MUAMMO: server endi secret header talab qiladi, shu sabab qo'shildi
     const res = await fetch(`${process.env.APP_URL}/api/telegram/deliver/${ctx.session.token}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-telegram-bot-secret": process.env.TELEGRAM_BOT_INTERNAL_SECRET || ""
+      },
       body: JSON.stringify({ telegramUserId: ctx.from?.id })
     });
 
     if (res.ok) {
       const data = await res.json();
+      await ctx.answerCallbackQuery();
       ctx.reply(`Faylingiz tayyor: ${data.deliveryUrl}`);
     } else {
-      ctx.reply("Xatolik yuz berdi, faylni olib bo'lmadi.");
+      // 68-MUAMMO: bu yo'lda ctx.answerCallbackQuery() umuman chaqirilmagan
+      // edi (faqat "kanalga obuna bo'lmagan" holatida chaqirilardi) —
+      // tugma Telegram mijozida "yuklanmoqda" holatida osilib qolardi.
+      // Bundan tashqari serverdan qaytgan aniq xato matni ham o'qilmasdi.
+      const data = await res.json().catch(() => ({}));
+      await ctx.answerCallbackQuery(data.error || "Xatolik yuz berdi, faylni olib bo'lmadi.");
+      ctx.reply(data.error || "Xatolik yuz berdi, faylni olib bo'lmadi.");
     }
   } catch (err) {
     ctx.answerCallbackQuery("Tekshirishda xatolik yuz berdi.");

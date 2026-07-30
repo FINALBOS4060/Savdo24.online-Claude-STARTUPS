@@ -1,11 +1,25 @@
 import crypto from 'crypto';
 
+// Development rejimida ENCRYPTION_KEY sozlanmagan bo'lsa, JWT_SECRET bilan bir xil
+// naqshda vaqtinchalik kalit generatsiya qilamiz (faqat shu jarayon uchun keshlanadi,
+// aks holda encrypt/decrypt har safar boshqa kalit olib, deshifrlash doim ishlamay qolardi).
+let cachedDevKey: Buffer | null = null;
+
 function getEncryptionKey(): Buffer {
   const secret = process.env.ENCRYPTION_KEY;
-  if (!secret) {
+  if (secret) {
+    return crypto.createHash('sha256').update(secret).digest();
+  }
+
+  if (process.env.NODE_ENV === "production") {
     throw new Error("CRITICAL ERROR: ENCRYPTION_KEY is not defined in environment variables.");
   }
-  return crypto.createHash('sha256').update(secret).digest();
+
+  if (!cachedDevKey) {
+    console.warn("⚠️ ENCRYPTION_KEY topilmadi — faqat shu sessiya uchun tasodifiy vaqtinchalik kalit generatsiya qilindi (development rejimi).");
+    cachedDevKey = crypto.randomBytes(32);
+  }
+  return cachedDevKey;
 }
 
 export function encryptSecret(text: string): string {

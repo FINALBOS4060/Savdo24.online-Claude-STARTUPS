@@ -14,6 +14,12 @@ export default function ForgotPasswordPage({ onNavigate }: ForgotPasswordPagePro
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Tugma disabled bo'lsa ham, input ichida Enter bosilganda forma submit
+    // bo'lishi mumkin — bu himoyani chetlab o'tib qayta-qayta xat yuborilishi
+    // (SellPage/SupportPage/MessagesPage'dagi 60/74/76-band bilan bir xil
+    // muammo turi, lekin bu yerda faqat tugma disabled edi, funksiya ichida
+    // qayta kirishdan himoya yo'q edi).
+    if (loading) return;
     if (!email) {
       setError('Email manzilini kiritishingiz lozim.');
       return;
@@ -34,10 +40,6 @@ export default function ForgotPasswordPage({ onNavigate }: ForgotPasswordPagePro
 
       if (response.ok) {
         setSuccess('Parolni tiklash havolasi email manzilingizga yuborildi. Iltimos, pochtangizni tekshiring.');
-        // If we are in dev/local mode, print token for testing convenience
-        if (data.token) {
-          console.log("Dev reset token:", data.token);
-        }
       } else {
         setError(data.error || 'Parolni tiklash so\'rovida xatolik yuz berdi.');
       }
@@ -109,7 +111,8 @@ export default function ForgotPasswordPage({ onNavigate }: ForgotPasswordPagePro
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="block w-full pl-11 pr-4 py-3 bg-[#131b26] border border-[#222e3d] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm transition-colors duration-200"
+                    disabled={loading}
+                    className="block w-full pl-11 pr-4 py-3 bg-[#131b26] border border-[#222e3d] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm transition-colors duration-200 disabled:opacity-60"
                     placeholder="name@example.com"
                   />
                 </div>

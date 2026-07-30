@@ -15,6 +15,7 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import { PrismaClient as PGClient } from "@prisma/client";
 import { createRequire } from 'module';
+import compression from "compression";
 const _require = typeof require !== 'undefined' ? require : createRequire(import.meta.url);
 const SQLiteClient = _require(path.join(process.cwd(), "src/generated/sqlite-client/index.js")).PrismaClient;
 import bcrypt from "bcryptjs";
@@ -36,7 +37,8 @@ import {
   reportLimiter, supportLimiter,
   uploadLimiter,
   paymentStatusLimiter,
-  globalLimiter
+  globalLimiter,
+  authLimiter
 } from "./src/lib/rateLimiters";
 
 dotenv.config();
@@ -108,12 +110,23 @@ function getSecret(envVar: string, minLength: number): string {
     return value;
   }
   if (process.env.NODE_ENV === "production") {
-    console.warn(`⚠️ OGOOHLANTIRISH: ${envVar} muhit o'zgaruvchisi production'da to'g'ri sozlanmagan (kamida ${minLength} belgi bo'lishi shart). Vaqtinchalik xavfsiz kalit generatsiya qilindi.`);
-    return crypto.randomBytes(32).toString('hex');
+    // MUHIM: Production'da tasodifiy vaqtinchalik kalit generatsiya QILMAYMIZ —
+    // bu har bir server qayta ishga tushganda (yoki bir nechta instance ishlaganda)
+    // barcha foydalanuvchilarning tokenlarini jim ravishda yaroqsiz qilib qo'yardi.
+    // Buning o'rniga serverni butunlay ishga tushirmaymiz, xato aniq ko'rinsin.
+    throw new Error(
+      `❌ XATOLIK: ${envVar} muhit o'zgaruvchisi production'da sozlanmagan yoki juda qisqa (kamida ${minLength} belgi bo'lishi shart). Serverni ishga tushirishdan oldin .env faylida ${envVar} ni to'g'ri sozlang.`
+    );
   }
   console.warn(`⚠️ ${envVar} topilmadi — faqat shu sessiya uchun tasodifiy vaqtinchalik kalit generatsiya qilindi (development rejimi).`);
   return crypto.randomBytes(32).toString('hex');
 }
+
+// 122-bosqich: escapeHtml/getReferralTier/safeCompare src/lib/pure-helpers.ts'ga
+// ko'chirildi (sof funksiyalar, DB'ga bog'liq emas — avtomatik test yozish
+// uchun). Bu yerda faqat qayta eksport qilinadi, boshqa fayllardagi
+// `from "../../server"` importlari o'zgarishsiz ishlayveradi.
+export { escapeHtml, getReferralTier, safeCompare } from "./src/lib/pure-helpers";
 
 export const JWT_SECRET = getSecret("JWT_SECRET", 32);
 const ENCRYPTION_KEY = getSecret("ENCRYPTION_KEY", 32);
@@ -140,6 +153,7 @@ function getGoogleClient() {
 
 const app = express();
 app.set('trust proxy', 1);
+app.use(compression());
 app.use('/api', globalLimiter);
 
 // Newsletter logic moved down
@@ -157,7 +171,7 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-const isPostgres = !!(process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith("postgres"));
+export const isPostgres = !!(process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith("postgres"));
 
 if (process.env.NODE_ENV === "production" && !isPostgres) {
   console.warn("⚠️ OGOOHLANTIRISH: Production muhitida DATABASE_URL to'g'ri PostgreSQL ulanish satri bilan sozlanmagan! SQLite ulanishidan foydalaniladi.");
@@ -212,14 +226,19 @@ export async function trackEvent(event: string, userId?: number, targetId?: stri
   }
 }
 
-export function getReferralTier(referralCount: number) {
-  if (referralCount >= 21) {
-    return { discount: 15, commission: 15, badge: "👑 Referral King", monthlyBonus: 50 };
-  } else if (referralCount >= 6) {
-    return { discount: 10, commission: 10, badge: "🌟 Referral Star", monthlyBonus: 0 };
-  } else {
-    return { discount: 5, commission: 5, badge: null, monthlyBonus: 0 };
-  }
+// 96-band (KATTA MUAMMO): bir foydalanuvchi uchun /api/referrals/generate faqat
+// BITTA doimiy Referral qatorini yaratadi (ko'p do'stga bir xil kod ulashish
+// uchun), lekin shu qatorning refereeId maydoni faqat BITTA foydalanuvchini
+// ushlab turadi — har safar kimdir shu kod orqali xarid yakunlaganda
+// (finalizeCompletedPayment) refereeId qayta yozib qo'yilardi (oldingi
+// referal "unutilardi"). Natijada referralCount hech qachon 1 dan oshmasdi,
+// va tarif darajasi (Referral Star/King) hech kimga hech qachon yetib
+// bo'lmasdi. ReferralReward esa har bir muvaffaqiyatli referal xaridi uchun
+// alohida qator yaratadi (hech qachon qayta yozilmaydi) — shu sabab haqiqiy
+// referal sonini o'lchash uchun undan foydalanish kerak, Referral.refereeId
+// emas.
+export async function getReferralCount(referrerId: number): Promise<number> {
+  return prisma.referralReward.count({ where: { referral: { referrerId } } });
 }
 
 // GET /api/admin/cron/newsletter — Haftalik newsletter yuborish (Internal/Admin)
@@ -294,14 +313,14 @@ async function autoReleaseEscrows() {
                 seller.id,
                 "SYSTEM",
                 "Mablag' ozod qilindi",
-                `Sizning '${escrow.payment.startup.name}' loyihangiz uchun escrow to'lovi 14 kunlik muddatdan so'ng avtomatik ozod qilindi.`,
+                `Sizning '${escrow.payment.startup.name}' loyihangiz uchun escrow to'lovi 7 kunlik muddatdan so'ng avtomatik ozod qilindi.`,
                 "/profile"
               );
 
               await sendEmail(
                 seller.email,
                 "Escrow to'lovi ozod qilindi",
-                `<p>Tabriklaymiz! <b>${escrow.payment.startup.name}</b> loyihasi uchun escrow to'lovi 14 kundan so'ng avtomatik ravishda ozod qilindi va balansingizga o'tkazildi.</p>`
+                `<p>Tabriklaymiz! <b>${escapeHtml(escrow.payment.startup.name)}</b> loyihasi uchun escrow to'lovi 7 kundan so'ng avtomatik ravishda ozod qilindi va balansingizga o'tkazildi.</p>`
               );
             }
             
@@ -338,13 +357,18 @@ async function expireTopBoosts() {
 
 async function sendWeeklyNewsletter() {
   try {
-    const users = await prisma.user.findMany({ where: { emailVerified: true } });
+    // FIX: avval barcha emailVerified foydalanuvchilarga (obuna bo'lmagan bo'lsa ham)
+    // yuborilardi — buyurtmasiz marketing xat edi. Endi faqat /api/newsletter/subscribe
+    // orqali roziligini bergan Subscriber jadvalidagi manzillarga yuboriladi.
+    const subscribers = await prisma.subscriber.findMany();
+    const users = subscribers.map((s) => ({ email: s.email }));
     
     const newListings = await prisma.startup.findMany({
       where: { 
-        createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString() },
+        updatedAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
         status: "active"
       },
+      orderBy: { updatedAt: "desc" },
       take: 5
     });
     
@@ -374,9 +398,9 @@ async function sendWeeklyNewsletter() {
               <h3 style="border-bottom: 1px solid #ffffff10; padding-bottom: 10px; margin-top: 30px;">📬 Yangi Elonlar</h3>
               ${newListings.map((s: any) => `
                 <div style="margin-bottom: 15px; padding: 15px; background: #ffffff05; border-radius: 12px;">
-                  <h4 style="margin: 0; color: #f3ba2f;">${s.name}</h4>
-                  <p style="margin: 5px 0; font-size: 14px; color: #8892b0;">${s.slogan}</p>
-                  <p style="margin: 0; font-weight: bold; color: #10b981;">$${s.price}</p>
+                  <h4 style="margin: 0; color: #f3ba2f;">${escapeHtml(s.name)}</h4>
+                  <p style="margin: 5px 0; font-size: 14px; color: #8892b0;">${escapeHtml(s.slogan)}</p>
+                  <p style="margin: 0; font-weight: bold; color: #10b981;">$${escapeHtml(s.price)}</p>
                 </div>
               `).join('')}
             ` : ''}
@@ -385,9 +409,9 @@ async function sendWeeklyNewsletter() {
               <h3 style="border-bottom: 1px solid #ffffff10; padding-bottom: 10px; margin-top: 30px;">🔥 TOP Deals</h3>
               ${topListings.map((s: any) => `
                 <div style="margin-bottom: 15px; padding: 15px; background: #f3ba2f10; border: 1px solid #f3ba2f30; border-radius: 12px;">
-                  <h4 style="margin: 0; color: #f3ba2f;">${s.name} (TOP)</h4>
-                  <p style="margin: 5px 0; font-size: 14px; color: #8892b0;">${s.slogan}</p>
-                  <p style="margin: 0; font-weight: bold; color: #10b981;">$${s.price}</p>
+                  <h4 style="margin: 0; color: #f3ba2f;">${escapeHtml(s.name)} (TOP)</h4>
+                  <p style="margin: 5px 0; font-size: 14px; color: #8892b0;">${escapeHtml(s.slogan)}</p>
+                  <p style="margin: 0; font-weight: bold; color: #10b981;">$${escapeHtml(s.price)}</p>
                 </div>
               `).join('')}
             ` : ''}
@@ -412,22 +436,39 @@ async function sendWeeklyNewsletter() {
 }
 
 io.use((socket, next) => {
-  let token = socket.handshake.auth.token;
-  
-  if (!token && socket.handshake.headers.cookie) {
+  const authToken = socket.handshake.auth.token;
+  let cookieToken: string | undefined;
+  if (socket.handshake.headers.cookie) {
     const cookies = socket.handshake.headers.cookie.split(';').reduce((acc: any, cookie) => {
       const [name, value] = cookie.trim().split('=');
       acc[name] = value;
       return acc;
     }, {});
-    token = cookies.token;
+    cookieToken = cookies.token;
   }
 
-  if (!token) return next(new Error("Autentifikatsiya xatosi: Token topilmadi"));
-  jwt.verify(token, JWT_SECRET, (err: any, decoded: any) => {
-    if (err) return next(new Error("Autentifikatsiya xatosi: Yaroqsiz token"));
-    socket.data.user = decoded;
-    next();
+  // 105-band: kirish tokeni (accessToken) atigi 15 daqiqa amal qiladi. Frontend
+  // (MessagesPage.tsx) socket'ni faqat sahifa ochilganda BIR MARTA localStorage'dagi
+  // tokenni o'qib ulanadi — agar shu payt localStorage'dagi token allaqachon eskirgan
+  // bo'lsa-yu, httpOnly cookie esa (masalan boshqa so'rov orqali) yangilangan bo'lsa,
+  // avvalgi kod faqat `auth.token` MAVJUD BO'LMAGANDA cookie'ga qaytardi — mavjud lekin
+  // ESKIRGAN tokenni cookie bilan almashtirmasdi, natijada ulanish "Yaroqsiz token"
+  // xatosi bilan butunlay muvaffaqiyatsiz tugardi (chat ishlamay qolardi). Endi avval
+  // auth.token tekshiriladi, muvaffaqiyatsiz bo'lsa cookie'dagi token bilan qayta
+  // urinib ko'riladi.
+  jwt.verify(authToken || '', JWT_SECRET, (err: any, decoded: any) => {
+    if (!err) {
+      socket.data.user = decoded;
+      return next();
+    }
+    if (!cookieToken || cookieToken === authToken) {
+      return next(new Error("Autentifikatsiya xatosi: Yaroqsiz token"));
+    }
+    jwt.verify(cookieToken, JWT_SECRET, (cookieErr: any, cookieDecoded: any) => {
+      if (cookieErr) return next(new Error("Autentifikatsiya xatosi: Yaroqsiz token"));
+      socket.data.user = cookieDecoded;
+      next();
+    });
   });
 });
 io.on("connection", (socket) => {
@@ -445,6 +486,73 @@ app.get('/api/health', async (req, res) => {
     res.json({ status: 'ok', database: isPostgres ? 'postgresql' : 'sqlite', timestamp: new Date() });
   } catch {
     res.status(503).json({ status: 'error', database: 'disconnected' });
+  }
+});
+
+// POST /api/payments/stripe-webhook — Stripe orqali to'lovni yakunlash
+// MUHIM: bu marshrut global express.json() dan OLDIN ro'yxatdan o'tkazilishi kerak,
+// chunki Stripe imzo tekshiruvi (signature verification) uchun XOM (raw) so'rov tanasi kerak.
+app.post("/api/payments/stripe-webhook", express.raw({ type: "application/json" }), async (req: Request, res: Response) => {
+  const sig = req.headers["stripe-signature"];
+  const webhookSecret = await getSetting("STRIPE_WEBHOOK_SECRET") || process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!webhookSecret || !sig) {
+    console.error("Stripe webhook: STRIPE_WEBHOOK_SECRET yoki stripe-signature header topilmadi.");
+    return res.status(400).json({ error: "Webhook not configured." });
+  }
+
+  const stripe = await getStripe();
+  if (!stripe) {
+    return res.status(503).json({ error: "Stripe sozlanmagan." });
+  }
+
+  let event: Stripe.Event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig as string, webhookSecret);
+  } catch (err: any) {
+    console.error("Stripe webhook signature tekshiruvi muvaffaqiyatsiz:", err.message);
+    return res.status(400).json({ error: `Webhook signature error: ${err.message}` });
+  }
+
+  try {
+    if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
+      const session = event.data.object as Stripe.Checkout.Session;
+      const orderId = session.metadata?.orderId;
+
+      if (!orderId) {
+        console.error("Stripe webhook: session.metadata.orderId topilmadi.", session.id);
+        return res.json({ received: true });
+      }
+
+      const payment = await prisma.payment.findUnique({ where: { id: orderId } });
+      if (!payment) {
+        console.error("Stripe webhook: to'lov topilmadi:", orderId);
+        return res.json({ received: true });
+      }
+
+      // Idempotentlik — Stripe ham webhook'ni bir necha marta qayta yuborishi mumkin
+      if (payment.status === "completed" || payment.status === "refund_required") {
+        return res.json({ received: true, idempotent: true });
+      }
+
+      if (session.payment_status !== "paid") {
+        return res.json({ received: true, status: "not_paid_yet" });
+      }
+
+      // To'langan summa haqiqatan ham kutilgan summaga mos kelishini tekshirish
+      const paidAmount = (session.amount_total ?? 0) / 100;
+      if (Math.abs(paidAmount - Number(payment.amount)) > 0.01) {
+        console.warn(`Stripe webhook: summa mos kelmadi. Kutilgan: ${payment.amount}, Kelgan: ${paidAmount}`);
+        return res.status(400).json({ error: "Payment amount mismatch." });
+      }
+
+      await finalizeCompletedPayment(payment);
+    }
+
+    res.json({ received: true });
+  } catch (err: any) {
+    console.error("Stripe webhook processing error:", err);
+    res.status(500).json({ error: "Webhook processing failed." });
   }
 });
 
@@ -553,6 +661,7 @@ export function formatStartup(dbStartup: any) {
       listingType: dbStartup.listingType || "To'liq loyiha (manba kodi bilan)",
       techStack: JSON.parse(dbStartup.techStack || "[]"),
       demoUrl: dbStartup.demoUrl || "",
+      githubUrl: dbStartup.githubUrl || "",
       repoIncluded: dbStartup.repoIncluded ?? false,
       soldStatus: dbStartup.soldStatus || "sotuvda",
       proposalsCount: dbStartup.proposalsCount || 0,
@@ -588,17 +697,7 @@ export async function createNotification(userId: number, type: string, title: st
 // Automatic Database Seeding
 async function seedDatabase() {
   try {
-    const forceReseedCheck = await prisma.startup.findUnique({ where: { id: "notion-pm-template" } });
-    if (!forceReseedCheck) {
-      console.log("Updating database seeds to support custom category-specific attributes...");
-      await prisma.payment.deleteMany({});
-      await prisma.idea.deleteMany({});
-      await prisma.startup.deleteMany({});
-      await prisma.category.deleteMany({});
-    }
-
     const categoryCount = await prisma.category.count();
-    const startupCount = await prisma.startup.count();
 
     // One-time migration for listingType
     const countToUpdate = await prisma.startup.count({ where: { listingType: "Butunlay sotiladi" } });
@@ -666,381 +765,6 @@ async function seedDatabase() {
       for (const cat of categories) {
         await prisma.category.create({ data: cat });
       }
-    }
-
-    if (startupCount === 0) {
-      console.log("Seeding startups...");
-      const startupsToSeed = [
-        {
-          id: 'ecoflow-systems',
-          name: 'EcoFlow Systems',
-          slogan: 'Aqlli energiya tejash tizimi',
-          description: 'Suyuq metall akkumulyatorlar orqali energiya saqlashni va optimallashtirishni inqilob qilish uchun tayyor dasturiy ta\'minot.',
-          longDescription: 'EcoFlow Systems tayyor dasturiy ta\'minot platformasi bo\'lib, u suyuq metall akkumulyator tizimlari va energiyani tejash datchiklari bilan ishlashga mo\'ljallangan. Tizim to\'liq avtomatlashtirilgan veb-boshqaruv paneli va real-vaqt ma\'lumotlar tahlili modulini o\'z ichiga oladi.',
-          category: 'startups',
-          price: 3500.0,
-          listingType: "To'liq loyiha (manba kodi bilan)",
-          techStack: JSON.stringify(['React', 'Node.js', 'TypeScript', 'MongoDB']),
-          demoUrl: 'https://demo.ecoflow-systems.uz',
-          repoIncluded: true,
-          soldStatus: 'sotuvda',
-          status: 'active',
-          proposalsCount: 8,
-          attributes: JSON.stringify({ teamSize: 5, stage: "Ishlab chiqarilgan", pitchDeckUrl: "https://drive.google.com/example-pitch-deck" }),
-          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCBLeM6mAr4LQY7zhSUG4tgZGKWNWY0ZRNIR_XhEKXt1jYMR02ExWAO3uckrzGgmvC4-PI7N-mHd9C8lXG-OAzJKBufMTKlpfMfSnEeJSF8e7heYGRKgRvFIrQkx5yKj_5vOLNyxFsKl_YskqkjY7SejckUabAB1QVAyOiWRo5Ue_LzWhq9IKtABXo9W9YyYvicDRVKj6KibiQpb0KoyemsI9t8PJjPQ3mmag3a-1LFqV51mgBVDlgsXJ1V6a0DitjRFPeVGsZmp5A',
-          gallery: JSON.stringify([
-            'https://lh3.googleusercontent.com/aida-public/AB6AXuC7UvHpcwWXajOrLewZmBzhPm5Uv-Wd6Lm_h6ZhtBZXqQtFtgqyctaOis2IfgTi38EFrC78gIUpozdKZ2ChemtUoSy8cvfdmfdQ1rAtcPJbYuSpw3WylcL9wM-U2lspGYA8ALHOYpMOuNVLf1HRqHSZ5wyzNElJZ9_v113hYgEzbh3S0nvU3awIQWEe11yaYYsBOTucYfhOp6p0vDGW2OcePXVkdRx8ES-iFhyKWoEPDl928YZAVLrMPAYfohEwnGjzn3gs0hDIu3c',
-            'https://lh3.googleusercontent.com/aida-public/AB6AXuC5bYHvQOPv-4tW9XUYTRj4rDUxmGsS_eah3BcXLjK0nWyPMZoZ-v3KbzYGAdi-6CeJx6uaw0ArpEim2iKQ8APg-B7RNMWCTkgjia5vTujRyPV7GN7juHdzAMwzQSK-CMe_YZLHO09spzlsTT15WKw4lBqk29Z7hzNZ-bI55i57Hp-U-EE0NtkKKWwuzRccqfkvUQmBFKSPFWLy2AJiINQRK0pQpvJ5DLSNC-pkcSI6tyfrGox5GMaXxqFR1NokOScY8cuqFIhM1nE',
-            'https://lh3.googleusercontent.com/aida-public/AB6AXuAcj_MixK83pAREjW1ixVYsVkFFps-TAbAYms21dFxcH45932nzy3456R_dfvcY41Eg8i4xuBs7vnzRy8CpyLc4n4VnQF0zIfc70GyJ1F6jf-rtbbHp9ygnTHyeXy7MvN1Jy9XDc2I106sFY0YO8NIv85nxL-IyS6LJ5DiYXkbFXIWj2Tif5OqekyUBK3dp4TCHvPZa4b7FMkTplCbw4CNwkRjXrKiXEZ4B3vF_4TSNCPY4ZaxubrHDqGpbRHoVEF-J0HT7g3WpBiU'
-          ]),
-          team: JSON.stringify([
-            {
-              name: 'Dr. Elena Volkov',
-              role: 'Bosh direktor va Asoschi (sobiq NASA mutaxassisi)',
-              imgUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDa0O3FIqyMSDgzz8mPwkA1ltnosRkGCZdRiN5vZd8_vOFXQK1hmTgJrHlg-GHTA7y3RMj6QT4Pe4tMi62J2TFz6rwTULoRE0PgU7_FfUfVDClc_IaH7rgsnBDXDa30re2u0RBFIA5wQsaYt15hLy87ZqDxQraeL0ggL2mC1uuRU9YJohPKwXik8dgH_vZ4bicEBoqfBet8NibIWqfbasbwF5klMWT_som2kgy6uB5H9NWzVYG7Vt5frYENjeljTZR6h8b1OYYsAzI'
-            },
-            {
-              name: 'Marcus Thorne',
-              role: 'Operatsion direktor (sobiq Siemens mutaxassisi)',
-              imgUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDBz9aPMR2g5XPr_QbhNFTyVHgVmu_1mgoupRnrXwKMzVctBUrGwMcvfEa8sJS8y_LOedViZpfpXhhCxxQuH569zSHsMA5RNxR3r7mawbPtJ8xeo4nN1Zg2RNyltsvYPUSZ8PruLfpgb_BXVB8hYn1NjJEqyyIOjcJUi9ACG13nhyFwttyrCF-gH-TFLBJMy_sx2L-Fv-r2CSV5dD4U0b2eHRehqxE1MNc1HlxQSFfLtzUqQN4ryaB6FWF5yzrvkGOpioPWB_3aby0'
-            }
-          ]),
-          milestones: JSON.stringify([
-            {
-              date: '2025',
-              title: 'Tizim to\'liq yakunlandi',
-              desc: 'Veb boshqaruv paneli va API integratsiyalari 100% tayyor.'
-            }
-          ]),
-          contactEmail: 'contact@ecoflow.com',
-          contactPhone: '+998 90 999 88 77',
-          contactTelegram: 'ecoflow_systems',
-          dateCreated: '2025-10-15',
-        },
-        {
-          id: 'neuralpath-ai',
-          name: 'NeuralPath AI',
-          slogan: 'Sun\'iy Intellekt SaaS marshrutizator',
-          description: 'Bashorat qiluvchi neyron tarmoqlari yordamida logistika marshrutlarini avtomatlashtirish uchun tayyor B2B yechim.',
-          longDescription: 'NeuralPath AI logistika kompaniyalari uchun tayyor SaaS platformadir. Sun\'iy intellekt yordamida yuklarni eng tezkor va arzon yo\'nalishlar bo\'ylab real vaqt rejimida taqsimlaydi.',
-          category: 'ai-models',
-          price: 2200.0,
-          listingType: 'Litsenziya/foydalanish huquqi sotiladi',
-          techStack: JSON.stringify(['Python', 'FastAPI', 'TensorFlow', 'React']),
-          demoUrl: 'https://neuralpath.ai/demo',
-          repoIncluded: false,
-          soldStatus: 'sotuvda',
-          status: 'active',
-          proposalsCount: 12,
-          attributes: JSON.stringify({ framework: "TensorFlow", modelSize: "12B parametr", datasetSource: "Common Crawl & Custom logistika ma'lumotlari" }),
-          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCF45geSO_QnC7nqx9b1yE0o1OYJZfrQnJjhANEdEVR8j-Ok2uwdCi8i8krhY_znOddGypsTbhhHierRgRTTKZ8T5krtxryW14MYjVW8LkZOw_oWJQkpETrnyoqvf-qLgl8ghvPsyc8u_IevPYo_bB7N0QDQng-xfzBwPFGAqLC9mU0UHebbsEAylgPdrBrN1e7j3ZoWCnjcJvypu4PUDfCdymvx6ozFz1oGPXG-ahwonvmeg-FPTQr5ecTEGXmM8xrWKatwsrYd38',
-          gallery: JSON.stringify([]),
-          team: JSON.stringify([
-            { name: 'Alex Volkov', role: 'Asoschi va Bosh direktor', imgUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBki15-UiKMRHYRIBQdJTisfKqtSaYpxsncBO2y7YCY2JF255CApBYI6utaNMs1ChYUgtjn2tVfN1UcBGeBMlrJcc0TSK_r8Jcvi6roPh2Lw0AS9w0cQ2Fdo0oveTBUKZZzwCFWAVdbOg2YdRT_sg6_3OM_9HWxgw2p30u4Xgo6ypFGg57R-lBH42CqeD35KOqUZO5WHjOWlQ8A0isb4DXS32bS75MTekwYi9pN7vxQuETi_viEAdQshVhB4cCztZM-qT5BirtAcwA' }
-          ]),
-          milestones: JSON.stringify([
-            { date: '2025', title: 'Beta yakunlandi', desc: 'Real mijozlar bilan test sinovlari muvaffaqiyatli yakunlandi.' }
-          ]),
-          contactEmail: 'alex@neuralpath.ai',
-          contactPhone: '+998 90 111 22 33',
-          contactTelegram: 'neuralpath',
-          dateCreated: '2025-11-01',
-        },
-        {
-          id: 'greenhorizon',
-          name: 'GreenHorizon',
-          slogan: 'Vertikal dehqonchilikni boshqarish dasturi',
-          description: 'Shahar sharoitidagi vertikal issiqxonalar va dehqonchilikni boshqarish uchun avtomatlashtirilgan IoT veb-tizimi.',
-          longDescription: 'Gidroponika va LED yorug\'lik datchiklarini boshqaruvchi tayyor veb-dastur. Suv va mineral dori sarfini to\'liq nazorat qiluvchi va tahliliy hisobotlar beruvchi tizim.',
-          category: 'sites-apps',
-          price: 1500.0,
-          listingType: "To'liq loyiha (manba kodi bilan)",
-          techStack: JSON.stringify(['React Native', 'Firebase', 'Node.js']),
-          demoUrl: 'https://greenhorizon.demo',
-          repoIncluded: true,
-          soldStatus: 'sotuvda',
-          status: 'active',
-          proposalsCount: 2,
-          attributes: JSON.stringify({ hasDomain: true, hasHosting: true, mau: 1500, platformType: "Web" }),
-          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDeo1QEZB3qsN2ZprfjyOyswyYLfkz1a08UVHqDgxJmvL0uH9hb9FERAoR3YT1TKz3gVygZFDMVmf8GtFmmKAWoy8l8hYNBMgCXJO5eOELpsqkrmlOTx8_Kv0SNQgzrQdLO8T8gWHx_yhBY9cjMKcDFuwEClzXyk59T84i-WAy9bVTWlws4PFdUABOTU6RVtWzLxcCKbPsswQXW7-xRdxhHWeL9BnGfMU7ug1iBH1FM-_S-oGmUZnuLD5CTbP6FtFKh-D3tFfqcZAU',
-          gallery: JSON.stringify([]),
-          team: JSON.stringify([
-            { name: 'Elena Green', role: 'Bosh botanik', imgUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDa0O3FIqyMSDgzz8mPwkA1ltnosRkGCZdRiN5vZd8_vOFXQK1hmTgJrHlg-GHTA7y3RMj6QT4Pe4tMi62J2TFz6rwTULoRE0PgU7_FfUfVDClc_IaH7rgsnBDXDa30re2u0RBFIA5wQsaYt15hLy87ZqDxQraeL0ggL2mC1uuRU9YJohPKwXik8dgH_vZ4bicEBoqfBet8NibIWqfbasbwF5klMWT_som2kgy6uB5H9NWzVYG7Vt5frYENjeljTZR6h8b1OYYsAzI' }
-          ]),
-          milestones: JSON.stringify([]),
-          contactEmail: 'grow@greenhorizon.com',
-          contactPhone: '+998 90 222 33 44',
-          contactTelegram: 'greenhorizon',
-          dateCreated: '2025-05-10',
-        },
-        {
-          id: 'pulsemetrics',
-          name: 'PulseMetrics',
-          slogan: 'Shifokorlar va bemorlar uchun telemeditsina portali',
-          description: 'Masofadan turib bemorlar holatini monitoring qilish, shifokorlar bilan chat va video-aloqa o\'rnatish uchun tayyor portal.',
-          longDescription: 'PulseMetrics - bu kardiologiya va umumiy tibbiy diagnostika qurilmalari bilan integratsiyalashuvchi telemeditsina veb-ilovasi. Shifokorlar uchun qulay tahliliy interfeys va bemorlar uchun shaxsiy kabinetga ega.',
-          category: 'sites-apps',
-          price: 4800.0,
-          listingType: "To'liq loyiha (manba kodi bilan)",
-          techStack: JSON.stringify(['React', 'Golang', 'PostgreSQL', 'WebRTC']),
-          demoUrl: 'https://pulsemetrics.demo',
-          repoIncluded: true,
-          soldStatus: 'sotuvda',
-          status: 'active',
-          proposalsCount: 23,
-          attributes: JSON.stringify({ hasDomain: true, hasHosting: false, mau: 4200, platformType: "Web" }),
-          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuC7XHcXHljRMitx-T_JK9v3n3twmEJVTF8yMrrFKUbhr4QMI1FGA4xHmQ2BtWdAu7DLdC4WfpfD-VKKZHVF4Go1i_22DfnJ5GKPU-UBzX0jc2C-AcnPq-kDL_rxc_688C5BUszuQjCfDBqWeX187X-vj92id9OJ2EpA-Nm4AkfzerDAj1F3MsuV25DYOBAbgb4G4pNWKXj8lRIvJcrTdMw5sfFoPzZumIBzTUqg6O3BlhUkZ7LWN-CjdA54Qqn8Sx9JydeXWVr16BE',
-          gallery: JSON.stringify([]),
-          team: JSON.stringify([
-            { name: 'Dr. John Doe', role: 'Bosh tibbiy xodim', imgUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDBz9aPMR2g5XPr_QbhNFTyVHgVmu_1mgoupRnrXwKMzVctBUrGwMcvfEa8sJS8y_LOedViZpfpXhhCxxQuH569zSHsMA5RNxR3r7mawbPtJ8xeo4nN1Zg2RNyltsvYPUSZ8PruLfpgb_BXVB8hYn1NjJEqyyIOjcJUi9ACG13nhyFwttyrCF-gH-TFLBJMy_sx2L-Fv-r2CSV5dD4U0b2eHRehqxE1MNc1HlxQSFfLtzUqQN4ryaB6FWF5yzrvkGOpioPWB_3aby0' }
-          ]),
-          milestones: JSON.stringify([]),
-          contactEmail: 'support@pulsemetrics.io',
-          contactPhone: '+998 90 333 44 55',
-          contactTelegram: 'pulsemetrics_io',
-          dateCreated: '2025-01-20',
-        },
-        {
-          id: 'quantumpay-ai',
-          name: 'QuantumPay AI',
-          slogan: 'Ko\'p valyutali crypto to\'lov shlyuzi kodi',
-          description: 'Onlayn do\'konlar va SaaS ilovalar uchun USDT va boshqa kriptovalyutalarda to\'lovlarni qabul qilish shlyuzi (API integration).',
-          longDescription: 'QuantumPay AI tayyor kripto to\'lov infratuzilmasi hisoblanadi. O\'z ichiga API hujjatlari, barcha tillar uchun SDK-lar va tranzaksiyalarny boshqarish bo\'yicha admin panelni oladi.',
-          category: 'sites-apps',
-          price: 8500.0,
-          listingType: "To'liq loyiha (manba kodi bilan)",
-          techStack: JSON.stringify(['Next.js', 'Solidity', 'Express', 'Prisma']),
-          demoUrl: 'https://quantumpay.ai/demo',
-          repoIncluded: true,
-          soldStatus: 'sotuvda',
-          status: 'active',
-          proposalsCount: 12,
-          attributes: JSON.stringify({ hasDomain: true, hasHosting: true, mau: 8900, platformType: "Web" }),
-          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCF45geSO_QnC7nqx9b1yE0o1OYJZfrQnJjhANEdEVR8j-Ok2uwdCi8i8krhY_znOddGypsTbhhHierRgRTTKZ8T5krtxryW14MYjVW8LkZOw_oWJQkpETrnyoqvf-qLgl8ghvPsyc8u_IevPYo_bB7N0QDQng-xfzBwPFGAqLC9mU0UHebbsEAylgPdrBrN1e7j3ZoWCnjcJvypu4PUDfCdymvx6ozFz1oGPXG-ahwonvmeg-FPTQr5ecTEGXmM8xrWKatwsrYd38',
-          gallery: JSON.stringify([]),
-          team: JSON.stringify([
-            { name: 'Alex Volkov', role: 'Asoschi', imgUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBki15-UiKMRHYRIBQdJTisfKqtSaYpxsncBO2y7YCY2JF255CApBYI6utaNMs1ChYUgtjn2tVfN1UcBGeBMlrJcc0TSK_r8Jcvi6roPh2Lw0AS9w0cQ2Fdo0oveTBUKZZzwCFWAVdbOg2YdRT_sg6_3OM_9HWxgw2p30u4Xgo6ypFGg57R-lBH42CqeD35KOqUZO5WHjOWlQ8A0isb4DXS32bS75MTekwYi9pN7vxQuETi_viEAdQshVhB4cCztZM-qT5BirtAcwA' }
-          ]),
-          milestones: JSON.stringify([]),
-          contactEmail: 'contact@quantumpay.ai',
-          contactPhone: '+998 90 444 55 66',
-          contactTelegram: 'quantumpay',
-          dateCreated: '2025-08-12',
-        },
-        {
-          id: 'greenlogistics',
-          name: 'GreenLogistics',
-          slogan: 'Kuryerlar uchun yo\'nalishlarni optimallashtiruvchi mobil ilova kodi',
-          description: 'Zararli chiqindilarsiz elektromobillar parkini boshqarish va yo\'nalishlarni taqsimlash uchun algoritmlangan mobil ilova loyihasi.',
-          longDescription: 'GreenLogistics kuryerlik kompaniyalari uchun optimallashtirilgan marshrutlash drayveri va mobil ilova loyihasidir. GPS telemetriyasi va kuryerlar navbatini hisobga oladi.',
-          category: 'startups',
-          price: 1250.0,
-          listingType: 'Litsenziya/foydalanish huquqi sotiladi',
-          techStack: JSON.stringify(['Python', 'Django', 'React Native', 'PostgreSQL']),
-          demoUrl: 'https://greenlogistics.demo',
-          repoIncluded: false,
-          soldStatus: 'sotuvda',
-          status: 'active',
-          proposalsCount: 0,
-          attributes: JSON.stringify({ teamSize: 4, stage: "Foydalanuvchilari bor", pitchDeckUrl: "https://drive.google.com/greenlogistics-pitch" }),
-          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCF45geSO_QnC7nqx9b1yE0o1OYJZfrQnJjhANEdEVR8j-Ok2uwdCi8i8krhY_znOddGypsTbhhHierRgRTTKZ8T5krtxryW14MYjVW8LkZOw_oWJQkpETrnyoqvf-qLgl8ghvPsyc8u_IevPYo_bB7N0QDQng-xfzBwPFGAqLC9mU0UHebbsEAylgPdrBrN1e7j3ZoWCnjcJvypu4PUDfCdymvx6ozFz1oGPXG-ahwonvmeg-FPTQr5ecTEGXmM8xrWKatwsrYd38',
-          gallery: JSON.stringify([]),
-          team: JSON.stringify([
-            { name: 'Alex Volkov', role: 'Asoschi', imgUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBki15-UiKMRHYRIBQdJTisfKqtSaYpxsncBO2y7YCY2JF255CApBYI6utaNMs1ChYUgtjn2tVfN1UcBGeBMlrJcc0TSK_r8Jcvi6roPh2Lw0AS9w0cQ2Fdo0oveTBUKZZzwCFWAVdbOg2YdRT_sg6_3OM_9HWxgw2p30u4Xgo6ypFGg57R-lBH42CqeD35KOqUZO5WHjOWlQ8A0isb4DXS32bS75MTekwYi9pN7vxQuETi_viEAdQshVhB4cCztZM-qT5BirtAcwA' }
-          ]),
-          milestones: JSON.stringify([]),
-          contactEmail: 'hello@greenlogistics.io',
-          contactPhone: '+998 90 555 66 77',
-          contactTelegram: 'greenlogistics_uz',
-          dateCreated: '2025-09-01',
-        },
-        {
-          id: 'retroarcade-io',
-          name: 'RetroArcade.io',
-          slogan: 'Web3 o\'yin portali va retro arcade o\'yinlar to\'plami',
-          description: 'Yuqori sifatli piksel-art sarguzashtlari va NFT aktivlariga ega brauzer o\'yinlari platformasi kodi.',
-          longDescription: 'RetroArcade.io muvaffaqiyatli sotilgan loyihadir. Dastlab to\'liq raqamli kolleksiya elementlariga ega bo\'lgan brauzer o\'yin portali sifatida qurilgan.',
-          category: 'sites-apps',
-          price: 950.0,
-          listingType: "To'liq loyiha (manba kodi bilan)",
-          techStack: JSON.stringify(['HTML5', 'Phaser', 'Web3JS']),
-          demoUrl: 'https://retroarcade.io/play',
-          repoIncluded: true,
-          soldStatus: 'sotildi',
-          status: 'active',
-          proposalsCount: 32,
-          attributes: JSON.stringify({ hasDomain: true, hasHosting: true, mau: 15000, platformType: "Web" }),
-          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCF45geSO_QnC7nqx9b1yE0o1OYJZfrQnJjhANEdEVR8j-Ok2uwdCi8i8krhY_znOddGypsTbhhHierRgRTTKZ8T5krtxryW14MYjVW8LkZOw_oWJQkpETrnyoqvf-qLgl8ghvPsyc8u_IevPYo_bB7N0QDQng-xfzBwPFGAqLC9mU0UHebbsEAylgPdrBrN1e7j3ZoWCnjcJvypu4PUDfCdymvx6ozFz1oGPXG-ahwonvmeg-FPTQr5ecTEGXmM8xrWKatwsrYd38',
-          gallery: JSON.stringify([]),
-          team: JSON.stringify([
-            { name: 'Alex Volkov', role: 'Asoschi', imgUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBki15-UiKMRHYRIBQdJTisfKqtSaYpxsncBO2y7YCY2JF255CApBYI6utaNMs1ChYUgtjn2tVfN1UcBGeBMlrJcc0TSK_r8Jcvi6roPh2Lw0AS9w0cQ2Fdo0oveTBUKZZzwCFWAVdbOg2YdRT_sg6_3OM_9HWxgw2p30u4Xgo6ypFGg57R-lBH42CqeD35KOqUZO5WHjOWlQ8A0isb4DXS32bS75MTekwYi9pN7vxQuETi_viEAdQshVhB4cCztZM-qT5BirtAcwA' }
-          ]),
-          milestones: JSON.stringify([]),
-          contactEmail: 'support@retroarcade.io',
-          contactPhone: '+998 90 666 77 88',
-          contactTelegram: 'retroarcade',
-          dateCreated: '2025-04-05',
-        },
-        {
-          id: 'ecommerce-prompts',
-          name: 'E-Commerce Marketing Prompt Pack',
-          slogan: 'Savdo va konversiyani oshiruvchi 150+ professional promptlar',
-          description: 'Onlayn do\'konlar va raqamli marketologlar uchun maxsus optimallashtirilgan, sotuvlarni oshiruvchi tayyor ChatGPT promptlari to\'plami.',
-          longDescription: 'E-Commerce Marketing Prompt Pack - marketing kampaniyalarini avtomatlashtirish, yuqori konversiyali reklama matnlari yozish va mahsulot tavsiflarini SEO-optimallashtirish uchun eng mukammal va sinovdan o\'tgan promptlar to\'plamidir.',
-          category: 'ai-prompts',
-          price: 150.0,
-          listingType: 'Litsenziya/foydalanish huquqi sotiladi',
-          techStack: JSON.stringify(['ChatGPT', 'Midjourney', 'Claude', 'Copywriting']),
-          demoUrl: '',
-          repoIncluded: false,
-          soldStatus: 'sotuvda',
-          status: 'active',
-          proposalsCount: 3,
-          attributes: JSON.stringify({ targetAi: "ChatGPT", promptsCount: 150, language: "o'zbek" }),
-          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCBLeM6mAr4LQY7zhSUG4tgZGKWNWY0ZRNIR_XhEKXt1jYMR02ExWAO3uckrzGgmvC4-PI7N-mHd9C8lXG-OAzJKBufMTKlpfMfSnEeJSF8e7heYGRKgRvFIrQkx5yKj_5vOLNyxFsKl_YskqkjY7SejckUabAB1QVAyOiWRo5Ue_LzWhq9IKtABXo9W9YyYvicDRVKj6KibiQpb0KoyemsI9t8PJjPQ3mmag3a-1LFqV51mgBVDlgsXJ1V6a0DitjRFPeVGsZmp5A',
-          gallery: JSON.stringify([]),
-          team: JSON.stringify([
-            { name: 'Jasur Mavlonov', role: 'Bosh Prompt Injener', imgUrl: '/default-avatar.jpg' }
-          ]),
-          milestones: JSON.stringify([]),
-          contactEmail: 'jasur@marketing-prompts.uz',
-          contactPhone: '+998 93 456 78 90',
-          contactTelegram: 'prompt_king',
-          dateCreated: '2026-03-10',
-        },
-        {
-          id: 'design-kit-3d',
-          name: 'Minimalist Dashboard 3D & UI Kit',
-          slogan: 'Professional Figma UI Kit va Blender 3D elementlar',
-          description: 'Loyiha boshqaruvi va SaaS platformalar uchun tayyor minimalist dizayn tizimi hamda yuqori sifatli Blender (.blend) 3D renderlari.',
-          longDescription: 'Ushbu paket zamonaviy veb-ilova va veb-saytlar yaratish uchun 50 dan ortiq tayyor UI komponentlar, to\'liq moslashuvchan Figma dizayn tizimi hamda mukammal darajadagi Blender 3D render va model fayllaridan tashkil topgan.',
-          category: 'other-digital',
-          price: 250.0,
-          listingType: "Manba kodisiz tayyor mahsulot",
-          techStack: JSON.stringify(['Figma', 'Blender', 'UI/UX', '3D Modeling']),
-          demoUrl: 'https://figma.com/community/file/example',
-          repoIncluded: true,
-          soldStatus: 'sotuvda',
-          status: 'active',
-          proposalsCount: 1,
-          attributes: JSON.stringify({ additionalNotes: "MIT litsenziyasi ostidagi to'liq Figma va Blender (.blend) manba fayllarini o'z ichiga oladi." }),
-          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCF45geSO_QnC7nqx9b1yE0o1OYJZfrQnJjhANEdEVR8j-Ok2uwdCi8i8krhY_znOddGypsTbhhHierRgRTTKZ8T5krtxryW14MYjVW8LkZOw_oWJQkpETrnyoqvf-qLgl8ghvPsyc8u_IevPYo_bB7N0QDQng-xfzBwPFGAqLC9mU0UHebbsEAylgPdrBrN1e7j3ZoWCnjcJvypu4PUDfCdymvx6ozFz1oGPXG-ahwonvmeg-FPTQr5ecTEGXmM8xrWKatwsrYd38',
-          gallery: JSON.stringify([]),
-          team: JSON.stringify([
-            { name: 'Diana Smith', role: 'UI/UX & 3D Artist', imgUrl: '/default-avatar.jpg' }
-          ]),
-          milestones: JSON.stringify([]),
-          contactEmail: 'diana@creative-kits.com',
-          contactPhone: '+998 94 987 65 43',
-          contactTelegram: 'diana_designs',
-          dateCreated: '2026-05-15',
-        },
-        {
-          id: 'uztranslate-ai-bot',
-          name: 'UzTranslate AI Bot',
-          slogan: "O'zbek tili uchun mukammal neyron tarjima boti kodi",
-          description: "O'zbek tilidagi shevalar va madaniy kontekstni tushunadigan Telegram/Web neyron tarjima boti manba kodi.",
-          longDescription: "UzTranslate AI Bot - bu o'zbek tilining o'ziga xos xususiyatlari, mahalliy shevalar va frazeologizmlarni mukammal tushunadigan, sun'iy intellektga asoslangan tarjimon tizimi. Telegram bot va veb-interfeys ko'rinishida to'liq tayyorlangan.",
-          category: 'ai-models',
-          price: 950.0,
-          listingType: "To'liq loyiha (manba kodi bilan)",
-          techStack: JSON.stringify(['Python', 'PyTorch', 'Telegram API', 'FastAPI']),
-          demoUrl: 'https://t.me/uztranslate_demo_bot',
-          repoIncluded: true,
-          soldStatus: 'sotuvda',
-          status: 'active',
-          proposalsCount: 2,
-          attributes: JSON.stringify({ framework: "PyTorch", modelSize: "3B parametr", datasetSource: "Uzbek Wikipedia & Parallel Corpora" }),
-          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCBLeM6mAr4LQY7zhSUG4tgZGKWNWY0ZRNIR_XhEKXt1jYMR02ExWAO3uckrzGgmvC4-PI7N-mHd9C8lXG-OAzJKBufMTKlpfMfSnEeJSF8e7heYGRKgRvFIrQkx5yKj_5vOLNyxFsKl_YskqkjY7SejckUabAB1QVAyOiWRo5Ue_LzWhq9IKtABXo9W9YyYvicDRVKj6KibiQpb0KoyemsI9t8PJjPQ3mmag3a-1LFqV51mgBVDlgsXJ1V6a0DitjRFPeVGsZmp5A',
-          gallery: JSON.stringify([]),
-          team: JSON.stringify([
-            { name: 'Sardor Rahimov', role: 'AI muhandis', imgUrl: '/default-avatar.jpg' }
-          ]),
-          milestones: JSON.stringify([]),
-          contactEmail: 'sardor@uztranslate.ai',
-          contactPhone: '+998 90 777 66 55',
-          contactTelegram: 'uztranslate_dev',
-          dateCreated: '2026-04-18',
-        },
-        {
-          id: 'midjourney-realistic-prompts',
-          name: 'Midjourney Ultra-Realistic Photo Prompt Pack',
-          slogan: 'Ultra-realistik portretlar va tabiat rasmlari uchun 50+ prompt',
-          description: "Midjourney v6 uchun optimallashtirilgan, mukammal yoritish va kameralar sozlamalariga ega professional vizual promptlar to'plami.",
-          longDescription: "Midjourney Ultra-Realistic Photo Prompt Pack - bu reklama, dizayn va ijtimoiy tarmoqlar uchun mukammal sifatdagi tasvirlarni yaratishga yordam beradigan professional promptlar to'plamidir. Har bir prompt batafsil parametrlar va namuna rasmlari bilan taqdim etiladi.",
-          category: 'ai-prompts',
-          price: 80.0,
-          listingType: 'Litsenziya/foydalanish huquqi sotiladi',
-          techStack: JSON.stringify(['Midjourney', 'AI Art', 'Prompt Engineering']),
-          demoUrl: '',
-          repoIncluded: false,
-          soldStatus: 'sotuvda',
-          status: 'active',
-          proposalsCount: 0,
-          attributes: JSON.stringify({ targetAi: "Midjourney", promptsCount: 50, language: "ingliz" }),
-          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCF45geSO_QnC7nqx9b1yE0o1OYJZfrQnJjhANEdEVR8j-Ok2uwdCi8i8krhY_znOddGypsTbhhHierRgRTTKZ8T5krtxryW14MYjVW8LkZOw_oWJQkpETrnyoqvf-qLgl8ghvPsyc8u_IevPYo_bB7N0QDQng-xfzBwPFGAqLC9mU0UHebbsEAylgPdrBrN1e7j3ZoWCnjcJvypu4PUDfCdymvx6ozFz1oGPXG-ahwonvmeg-FPTQr5ecTEGXmM8xrWKatwsrYd38',
-          gallery: JSON.stringify([]),
-          team: JSON.stringify([
-            { name: 'Diana Smith', role: 'Digital Artist & Prompt Expert', imgUrl: '/default-avatar.jpg' }
-          ]),
-          milestones: JSON.stringify([]),
-          contactEmail: 'diana@creative-prompts.com',
-          contactPhone: '+998 91 123 45 67',
-          contactTelegram: 'diana_prompts',
-          dateCreated: '2026-06-01',
-        },
-        {
-          id: 'notion-pm-template',
-          name: 'Tayyor Notion shabloni: loyiha boshqaruvi',
-          slogan: 'Kichik jamoalar va frilanserlar uchun Notion loyiha boshqaruv shabloni',
-          description: 'Kanban doskasi, vaqtni kuzatish, moliyaviy hisobot va mijozlar bazasini o\'z ichiga olgan mukammal Notion tizimi.',
-          longDescription: "Ushbu Notion shabloni frilanserlar, startaplar va kichik jamoalar uchun loyihalarni samarali boshqarish, vazifalar taqsimoti, oylik/yillik moliyaviy hisob-kitoblar va mijozlar bilan aloqalarni (CRM) bitta joyda jamlash uchun mo'ljallangan.",
-          category: 'other-digital',
-          price: 45.0,
-          listingType: 'Litsenziya/foydalanish huquqi sotiladi',
-          techStack: JSON.stringify(['Notion', 'Productivity', 'Templates', 'Project Management']),
-          demoUrl: 'https://notion.so/templates/example-pm',
-          repoIncluded: false,
-          soldStatus: 'sotuvda',
-          status: 'active',
-          proposalsCount: 5,
-          attributes: JSON.stringify({ additionalNotes: "O'zbek tiliga to'liq moslashtirilgan va foydalanish bo'yicha batafsil video-yo'riqnoma bilan birga taqdim etiladi." }),
-          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCBLeM6mAr4LQY7zhSUG4tgZGKWNWY0ZRNIR_XhEKXt1jYMR02ExWAO3uckrzGgmvC4-PI7N-mHd9C8lXG-OAzJKBufMTKlpfMfSnEeJSF8e7heYGRKgRvFIrQkx5yKj_5vOLNyxFsKl_YskqkjY7SejckUabAB1QVAyOiWRo5Ue_LzWhq9IKtABXo9W9YyYvicDRVKj6KibiQpb0KoyemsI9t8PJjPQ3mmag3a-1LFqV51mgBVDlgsXJ1V6a0DitjRFPeVGsZmp5A',
-          gallery: JSON.stringify([]),
-          team: JSON.stringify([
-            { name: 'Abdurahmon G\'ofurov', role: 'No-Code Ishlab Chiquvchi', imgUrl: '/default-avatar.jpg' }
-          ]),
-          milestones: JSON.stringify([]),
-          contactEmail: 'abdu@notion-dev.uz',
-          contactPhone: '+998 95 900 80 70',
-          contactTelegram: 'notion_master_uz',
-          dateCreated: '2026-07-02',
-        }
-      ];
-
-      console.log(`Seeding ${startupsToSeed.length} startups...`);
-      for (const startup of startupsToSeed) {
-        try {
-          // Attempt normal creation
-          await prisma.startup.create({ data: startup as any });
-        } catch (error: any) {
-          // Handle case where DB column might be missing (e.g. currentTier)
-          const errorMessage = error.message || "";
-          if (errorMessage.includes('currentTier') || errorMessage.includes('column')) {
-            console.warn(`[Seed Warning] Column issue for ${startup.id}. Retrying without 'currentTier'...`);
-            const { currentTier, ...dataWithoutTier } = startup as any;
-            await prisma.startup.create({ data: dataWithoutTier }).catch((e: Error) => {
-              console.error(`[Seed Error] Failed to seed ${startup.id} even without currentTier:`, e.message);
-            });
-          } else if (error.code === 'P2002') {
-            // Unique constraint violation (already exists) - ignore
-            console.log(`[Seed Info] Startup ${startup.id} already exists, skipping.`);
-          } else {
-            console.error(`[Seed Error] Unexpected error for ${startup.id}:`, error.message);
-          }
-        }
-      }
-      console.log("Database seeded successfully!");
     }
   } catch (err) {
     console.error("Failed to automatically seed database:", err);
@@ -1138,27 +862,6 @@ export async function authenticateToken(req: AuthRequest, res: Response, next: N
   }
 }
 
-// TOP narxini talabga qarab hisoblash (dinamik narx)
-async function calculateTopPrice(days: number) {
-  // 6-MUAMMO: "days" parametrining ichki xavfsizlik tekshiruvi (musbat butun son va 1-365 chegarasida ekanligi)
-  if (!Number.isInteger(days) || days < 1 || days > 365) {
-    throw new Error("Kunlar soni 1 dan 365 gacha butun son bo'lishi kerak.");
-  }
-
-  const basePrice = parseFloat(await getSetting("TOP_BASE_PRICE_PER_DAY") || "1");
-  const maxSlots = parseInt(await getSetting("TOP_MAX_CONCURRENT_SLOTS") || "20");
-  const activeCount = await prisma.startup.count({ 
-    where: { 
-      isTop: true, 
-      topExpiresAt: { gt: new Date() } 
-    } 
-  });
-  
-  // Talab ko'p bo'lsa (faol TOP'lar ko'p bo'lsa) — narx oshadi
-  const demandMultiplier = 1 + (activeCount / maxSlots);
-  return Math.round(basePrice * demandMultiplier * days * 100) / 100;
-}
-
 // ---------------- API ENDPOINTS ----------------
 
 app.post("/api/newsletter/subscribe", async (req: Request, res: Response) => {
@@ -1219,13 +922,13 @@ app.get("/api/auth/google-client-id", async (req: Request, res: Response) => {
 
 // 9-MUAMMO: Google orqali kirishda refreshToken xavfsiz saqlash uchun cookie o'rnatish helper funktsiyasi
 function setAuthCookiesLocal(res: Response, accessToken: string, refreshToken: string) {
-  const isSameSiteLax = process.env.NODE_ENV === "development";
-  const domain = process.env.NODE_ENV === "production" ? ".savdo24.online" : undefined;
+  const isProd = process.env.NODE_ENV === "production";
+  const domain = isProd ? ".savdo24.online" : undefined;
 
   res.cookie("token", accessToken, {
     httpOnly: true,
-    secure: true, // ALWAYS true (we are on HTTPS in both dev/prod)
-    sameSite: isSameSiteLax ? "lax" : "strict",
+    secure: isProd,
+    sameSite: isProd ? "strict" : "lax",
     maxAge: 15 * 60 * 1000, // 15 minutes
     path: "/",
     domain: domain
@@ -1233,15 +936,15 @@ function setAuthCookiesLocal(res: Response, accessToken: string, refreshToken: s
 
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
-    secure: true, // ALWAYS true
-    sameSite: isSameSiteLax ? "lax" : "strict",
+    secure: isProd,
+    sameSite: isProd ? "strict" : "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     path: "/",
     domain: domain
   });
 }
 
-app.post("/api/auth/google", async (req: Request, res: Response) => {
+app.post("/api/auth/google", authLimiter, async (req: Request, res: Response) => {
   const { credential } = req.body;
   const clientId = await getDynamicGoogleClientId();
   if (!clientId) {
@@ -1301,13 +1004,15 @@ app.post("/api/auth/google", async (req: Request, res: Response) => {
 app.patch("/api/users/me", authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
-    const { name, role, avatarUrl, coverUrl } = req.body;
+    // XAVFSIZLIK: `role` bu yerdan qasddan qabul qilinmaydi. Foydalanuvchi o'zini
+    // shu endpoint orqali admin/vip roliga o'zgartira olmasligi kerak (privilege escalation).
+    // Rolni faqat /api/admin/users/:id/role (requireAdmin) orqaligina o'zgartirish mumkin.
+    const { name, avatarUrl, coverUrl } = req.body;
 
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
         name,
-        role,
         avatarUrl,
         coverUrl
       },
@@ -1421,10 +1126,14 @@ app.get("/api/users/me/reviews-received", authenticateToken, async (req: AuthReq
 app.post("/api/analytics/track", async (req: Request, res: Response) => {
   const { event, targetId, source, metadata } = req.body;
   // Get userId from token if exists
+  // MUHIM: loyihada autentifikatsiya `token` cookie orqali ishlaydi
+  // (authenticateToken'ga qarang), frontend HECH QACHON Authorization header
+  // yubormaydi — shuning uchun bu yerda faqat header tekshirilgani sabab
+  // kirgan foydalanuvchilarning analytics hodisalari ham doim userId=undefined
+  // bilan yozilardi — endi cookie ham tekshiriladi.
   let userId: number | undefined;
-  const authHeader = req.headers.authorization;
-  if (authHeader) {
-    const token = authHeader.split(' ')[1];
+  const token = req.cookies?.token || (req.headers.authorization && req.headers.authorization.split(' ')[1]);
+  if (token) {
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as any;
       userId = decoded.id;
@@ -1439,7 +1148,16 @@ app.post("/api/analytics/track", async (req: Request, res: Response) => {
 
 app.get("/api/ai/price-suggestion", async (req: Request, res: Response) => {
   const { category, features } = req.query;
-  const featuresList = typeof features === 'string' ? JSON.parse(features) : [];
+  let featuresList: any[] = [];
+  if (typeof features === 'string') {
+    try {
+      const parsed = JSON.parse(features);
+      if (Array.isArray(parsed)) featuresList = parsed;
+    } catch {
+      // Yaroqsiz JSON kelsa xato tashlamasdan bo'sh ro'yxat bilan davom etamiz
+      featuresList = [];
+    }
+  }
 
   try {
     const similar = await prisma.startup.findMany({
@@ -1470,176 +1188,14 @@ app.get("/api/ai/price-suggestion", async (req: Request, res: Response) => {
   }
 });
 
-// --- ESCROW SYSTEM ---
+// --- ESCROW (126-bosqich: src/routes/escrow.ts'ga ko'chirildi) ---
+import escrowRouter from "./src/routes/escrow";
+app.use("/api", escrowRouter);
 
-app.get("/api/escrow/my-purchases", authenticateToken, async (req: AuthRequest, res: Response) => {
-  try {
-    const escrows = await prisma.escrowPayment.findMany({
-      where: { payment: { userId: req.user?.id } },
-      include: { payment: true }
-    });
-    res.json(escrows);
-  } catch (err) {
-    res.status(500).json({ error: "Escrow ma'lumotlarini yuklashda xatolik." });
-  }
-});
-
-app.post("/api/escrow/release", authenticateToken, async (req: AuthRequest, res: Response) => {
-  const { paymentId } = req.body;
-  try {
-    const escrow = await prisma.escrowPayment.findUnique({
-      where: { paymentId },
-      include: { payment: { include: { startup: true } } }
-    });
-
-    if (!escrow || escrow.payment.userId !== req.user?.id) {
-      return res.status(403).json({ error: "Ruxsat etilmagan." });
-    }
-
-    if (escrow.status !== "held") {
-      return res.status(400).json({ error: "Escrow holati noto'g'ri." });
-    }
-
-    const updated = await prisma.escrowPayment.updateMany({
-      where: { id: escrow.id, status: "held" },
-      data: { status: "released", releasedAt: new Date() }
-    });
-
-    if (updated.count === 0) {
-      return res.status(409).json({ error: "Bu mablag' allaqachon ozod qilingan yoki holati o'zgargan." });
-    }
-
-    // Notify seller
-    if (escrow.payment.startup?.userId) {
-      await createNotification(
-        escrow.payment.startup.userId,
-        "SYSTEM",
-        "Mablag' ozod qilindi!",
-        `Sizning "${escrow.payment.startup.name}" loyihangiz uchun mablag' xaridor tomonidan tasdiqlandi va ozod qilindi.`,
-        `/profile`
-      );
-    }
-
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: "Mablag'ni ozod qilishda xatolik." });
-  }
-});
-
-app.post("/api/escrow/dispute", authenticateToken, async (req: AuthRequest, res: Response) => {
-  const { paymentId, reason, evidence } = req.body;
-  try {
-    const escrow = await prisma.escrowPayment.findUnique({
-      where: { paymentId },
-      include: { payment: true }
-    });
-
-    if (!escrow || escrow.payment.userId !== req.user?.id) {
-      return res.status(403).json({ error: "Ruxsat etilmagan." });
-    }
-
-    await prisma.$transaction([
-      prisma.escrowPayment.update({
-        where: { id: escrow.id },
-        data: { status: "disputed" }
-      }),
-      prisma.disputeResolution.create({
-        data: {
-          escrowId: escrow.id,
-          reason,
-          evidence: JSON.stringify(evidence || [])
-        }
-      })
-    ]);
-
-    // 5-MUAMMO: Hardcoded admin ID (1) o'rniga barcha haqiqiy adminlarni topib, ularga bildirishnoma yuborish
-    const admins = await prisma.user.findMany({ where: { role: "Admin" } });
-    await Promise.all(admins.map((admin: any) =>
-      createNotification(
-        admin.id,
-        "SYSTEM",
-        "Yangi Escrow Nizosi",
-        `To'lov #${paymentId} bo'yicha nizo ochildi.`,
-        `/admin/disputes`
-      )
-    ));
-
-    res.json({ success: true, message: "Nizo qabul qilindi. Admin ko'rib chiqadi." });
-  } catch (err) {
-    res.status(500).json({ error: "Nizo ochishda xatolik." });
-  }
-});
-
-// --- B2B WHOLESALE ---
-
-app.post("/api/b2b/onboard", authenticateToken, async (req: AuthRequest, res: Response) => {
-  const { companyName, taxId } = req.body;
-  try {
-    const b2b = await prisma.b2BAccount.create({
-      data: {
-        userId: req.user?.id || 0,
-        companyName,
-        taxId,
-        verified: false, // Admin needs to verify
-        discount: 20
-      }
-    });
-
-    // 5-MUAMMO: Hardcoded admin ID (1) o'rniga barcha haqiqiy adminlarni topib, ularga bildirishnoma yuborish
-    const admins = await prisma.user.findMany({ where: { role: "Admin" } });
-    await Promise.all(admins.map((admin: any) =>
-      createNotification(
-        admin.id,
-        "SYSTEM",
-        "Yangi B2B So'rov",
-        `"${companyName}" kompaniyasi B2B hisob uchun so'rov yubordi.`,
-        `/admin/b2b`
-      )
-    ));
-
-    res.json(b2b);
-  } catch (err) {
-    res.status(500).json({ error: "B2B hisob yaratishda xatolik." });
-  }
-});
-
-app.get("/api/b2b/profile", authenticateToken, async (req: AuthRequest, res: Response) => {
-  try {
-    const b2b = await prisma.b2BAccount.findUnique({
-      where: { userId: req.user?.id || 0 },
-      include: { orders: true }
-    });
-    if (!b2b) return res.status(404).json({ error: "B2B hisob topilmadi." });
-    res.json(b2b);
-  } catch (err) {
-    res.status(500).json({ error: "B2B ma'lumotlarini yuklashda xatolik." });
-  }
-});
-
-// --- ADMIN B2B ---
-app.patch("/api/admin/b2b/:id/verify", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  const { verified } = req.body;
-
-  try {
-    const b2b = await prisma.b2BAccount.update({
-      where: { id },
-      data: { verified }
-    });
-
-    await createNotification(
-      b2b.userId,
-      "SYSTEM",
-      verified ? "B2B hisobingiz tasdiqlandi!" : "B2B hisobingiz bekor qilindi.",
-      verified ? "Endi siz ulgurji chegirmalardan foydalanishingiz mumkin." : "Qo'shimcha ma'lumot uchun admin bilan bog'laning.",
-      `/profile`
-    );
-
-    res.json(b2b);
-  } catch (err) {
-    res.status(500).json({ error: "B2B tasdiqlashda xatolik." });
-  }
-});
+// --- B2B WHOLESALE (111-bosqich: src/routes/b2b.ts'ga ko'chirildi) ---
+import b2bRouter, { adminB2bRouter } from "./src/routes/b2b";
+app.use("/api/b2b", b2bRouter);
+app.use("/api/admin/b2b", adminB2bRouter);
 
 app.get("/api/social-proof", async (req: Request, res: Response) => {
   try {
@@ -1759,115 +1315,11 @@ app.post("/api/listings/:id/upgrade", authenticateToken, async (req: AuthRequest
   }
 });
 
-// POST /api/referrals/generate — Unique kod yaratish
-app.post("/api/referrals/generate", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (!req.user) return res.status(401).json({ error: "Avtorizatsiyadan o'ting." });
+// 114-bosqich: referrals route'lari src/routes/referrals.ts'ga ko'chirildi.
+import referralsRouter, { adminReferralsRouter } from "./src/routes/referrals";
+app.use("/api/referrals", referralsRouter);
+app.use("/api/admin/referrals", adminReferralsRouter);
 
-  try {
-    const existing = await prisma.referral.findFirst({
-      where: { referrerId: req.user.id, isActive: true }
-    });
-
-    if (existing) {
-      return res.json({ code: existing.code });
-    }
-
-    const referralCount = await prisma.referral.count({ where: { referrerId: req.user.id, refereeId: { not: null } } });
-    const tier = getReferralTier(referralCount);
-
-    const code = crypto.randomBytes(4).toString("hex").toUpperCase();
-    const referral = await prisma.referral.create({
-      data: {
-        referrerId: req.user.id,
-        code,
-        discountPercent: tier.discount,
-        commissionPercent: tier.commission,
-      }
-    });
-
-    res.json({ code: referral.code });
-  } catch (err) {
-    console.error("Referral generate error:", err);
-    res.status(500).json({ error: "Referral kod yaratishda xatolik." });
-  }
-});
-
-// GET /api/referrals/apply — Kodni tekshirish
-app.get("/api/referrals/apply", authenticateToken, async (req: AuthRequest, res: Response) => {
-  const code = req.query.code as string;
-  if (!code) return res.status(400).json({ error: "Kod yuborilmadi." });
-
-  try {
-    const referral = await prisma.referral.findUnique({
-      where: { code, isActive: true },
-      include: { referrer: true }
-    });
-
-    if (!referral) {
-      return res.status(404).json({ error: "Noto'g'ri yoki faol bo'lmagan referral kod." });
-    }
-
-    if (referral.referrerId === req.user?.id) {
-      return res.status(400).json({ error: "O'zingizning referral kodingizdan foydalana olmaysiz." });
-    }
-
-    res.json({ 
-      discountPercent: referral.discountPercent,
-      referrerName: referral.referrer.name
-    });
-  } catch (err) {
-    res.status(500).json({ error: "Kodni tekshirishda xatolik." });
-  }
-});
-
-// GET /api/referrals/my-stats — Foydalanuvchi stats
-app.get("/api/referrals/my-stats", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (!req.user) return res.status(401).json({ error: "Avtorizatsiyadan o'ting." });
-
-  try {
-    const referrals = await prisma.referral.findMany({
-      where: { referrerId: req.user.id },
-      include: {
-        _count: { select: { rewards: true } },
-        rewards: { where: { status: "earned" } }
-      }
-    });
-
-    const totalEarned = referrals.reduce((sum: number, r: any) => sum + r.rewards.reduce((s: number, rw: any) => s + rw.rewardAmount, 0), 0);
-    const referralCount = await prisma.referral.count({ where: { referrerId: req.user.id, refereeId: { not: null } } });
-    const tier = getReferralTier(referralCount);
-
-    res.json({
-      referralCount,
-      totalEarned,
-      tier,
-      referrals: referrals.map((r: any) => ({
-        code: r.code,
-        isActive: r.isActive,
-        rewardCount: r._count.rewards
-      }))
-    });
-  } catch (err) {
-    res.status(500).json({ error: "Ma'lumotlarni yuklashda xatolik." });
-  }
-});
-
-// GET /api/admin/referrals — Admin stats
-app.get("/api/admin/referrals", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  try {
-    const allReferrals = await prisma.referral.findMany({
-      include: {
-        referrer: { select: { name: true, email: true } },
-        referee: { select: { name: true, email: true } },
-        rewards: true
-      },
-      orderBy: { createdAt: "desc" }
-    });
-    res.json(allReferrals);
-  } catch (err) {
-    res.status(500).json({ error: "Admin ma'lumotlarini yuklashda xatolik." });
-  }
-});
 app.get("/api/admin/analytics", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const period = (req.query.period as string) || "day";
@@ -1907,231 +1359,68 @@ app.get("/api/admin/analytics", authenticateToken, requireAdmin, async (req: Aut
   }
 });
 
-// GET /api/admin/users — Barcha foydalanuvchilar (Admin)
-app.get("/api/admin/users", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  try {
-    const { search, page = 1, limit = 20 } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
-
-    const where: any = {};
-    if (search) {
-      const mode = isPostgres ? "insensitive" : undefined;
-      where.OR = [
-        { name: { contains: String(search), mode } },
-        { email: { contains: String(search), mode } }
-      ];
-    }
-
-    const [users, total] = await Promise.all([
-      prisma.user.findMany({
-        where,
-        include: {
-          _count: {
-            select: { startups: true, payments: true }
-          }
-        },
-        orderBy: { joinDate: "desc" },
-        skip,
-        take: Number(limit)
-      }),
-      prisma.user.count({ where })
-    ]);
-
-    res.json({
-      users: users.map((u: any) => ({
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        role: u.role,
-        joinDate: u.joinDate,
-        isBanned: u.isBanned,
-        totalStartups: u._count.startups,
-        totalPayments: u._count.payments
-      })),
-      total,
-      pages: Math.ceil(total / Number(limit))
-    });
-  } catch (err: any) {
-    console.error("Get admin users error:", err);
-    res.status(500).json({ error: "Foydalanuvchilarni yuklashda xatolik yuz berdi." });
-  }
-});
-
-// PATCH /api/admin/users/:id/ban — Foydalanuvchini bloklash/ochish (Admin)
-app.patch("/api/admin/users/:id/ban", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { isBanned } = req.body;
-
-    const user = await prisma.user.update({
-      where: { id: Number(id) },
-      data: { isBanned }
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        adminId: req.user!.id,
-        action: isBanned ? "ban_user" : "unban_user",
-        targetId: String(id),
-        details: `User ${user.email} was ${isBanned ? 'banned' : 'unbanned'}`
-      }
-    });
-
-    res.json({ success: true, isBanned: user.isBanned });
-  } catch (err: any) {
-    console.error("Ban user error:", err);
-    res.status(500).json({ error: "Amalni bajarishda xatolik yuz berdi." });
-  }
-});
-
-// GET /api/admin/users/:id — Foydalanuvchi haqida to'liq tafsilot (Admin)
-app.get("/api/admin/users/:id", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  try {
-    const { id } = req.params;
-    const user = await prisma.user.findUnique({
-      where: { id: Number(id) },
-      include: {
-        _count: {
-          select: { startups: true, payments: true }
-        }
-      }
-    });
-
-    if (!user) return res.status(404).json({ error: "Foydalanuvchi topilmadi." });
-
-    const auditLogs = await prisma.auditLog.findMany({
-      where: { targetId: String(id) },
-      orderBy: { createdAt: "desc" },
-      take: 10,
-      include: { admin: { select: { name: true } } }
-    });
-
-    const totalSoldAmount = await prisma.payment.aggregate({
-      where: {
-        startup: { userId: Number(id) },
-        status: "completed"
-      },
-      _sum: { amount: true }
-    });
-
-    const reviews = await prisma.review.findMany({
-      where: { sellerId: Number(id) }
-    });
-
-    const avgRating = reviews.length > 0
-      ? reviews.reduce((acc: number, r: any) => acc + r.rating, 0) / reviews.length
-      : 0;
-
-    res.json({
-      user: {
-        ...user,
-        password: "", // Hide password
-        totalStartups: user._count.startups,
-        totalPurchases: user._count.payments,
-        totalSoldAmount: totalSoldAmount._sum.amount || 0,
-        averageRating: avgRating,
-      },
-      auditLogs
-    });
-  } catch (err) {
-    console.error("Admin get user details error:", err);
-    res.status(500).json({ error: "Ma'lumotlarni yuklashda xatolik." });
-  }
-});
-
-// PATCH /api/admin/users/:id/vip — Qo'lda VIP berish (Admin)
-app.patch("/api/admin/users/:id/vip", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { isVip, vipExpiresAt } = req.body;
-    const user = await prisma.user.update({
-      where: { id: Number(id) },
-      data: { isVip, vipExpiresAt: vipExpiresAt ? new Date(vipExpiresAt) : null }
-    });
-    await prisma.auditLog.create({
-      data: {
-        adminId: req.user!.id,
-        action: "manual_vip_update",
-        targetId: String(id),
-        details: `User ${user.email} VIP set to ${isVip} until ${vipExpiresAt}`
-      }
-    });
-    res.json({ success: true, user });
-  } catch (err) {
-    res.status(500).json({ error: "VIP yangilashda xatolik." });
-  }
-});
-
-// PATCH /api/admin/users/:id/role — Rolni o'zgartirish (Admin)
-app.patch("/api/admin/users/:id/role", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { role } = req.body;
-
-    const allowedRoles = ["Sotuvchi", "Xaridor", "Admin"];
-    if (!allowedRoles.includes(role)) {
-      return res.status(400).json({ error: "Yaroqsiz rol qiymati. Ruxsat berilgan rollar: Sotuvchi, Xaridor, Admin" });
-    }
-
-    if (Number(id) === req.user!.id) {
-      return res.status(400).json({ error: "O'z rolingizni o'zgartira olmaysiz." });
-    }
-
-    const user = await prisma.user.update({
-      where: { id: Number(id) },
-      data: { role }
-    });
-    await prisma.auditLog.create({
-      data: {
-        adminId: req.user!.id,
-        action: "change_user_role",
-        targetId: String(id),
-        details: `User ${user.email} role changed to ${role}`
-      }
-    });
-    res.json({ success: true, user });
-  } catch (err) {
-    res.status(500).json({ error: "Rolni o'zgartirishda xatolik." });
-  }
-});
-
-// DELETE /api/admin/users/:id — Hisobni o'chirish (Admin)
-app.delete("/api/admin/users/:id", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  try {
-    const { id } = req.params;
-    const userId = parseInt(id, 10);
-    if (isNaN(userId)) return res.status(400).json({ error: "Yaroqsiz foydalanuvchi ID." });
-
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) return res.status(404).json({ error: "Foydalanuvchi topilmadi." });
-
-    await prisma.user.delete({ where: { id: userId } });
-
-    await prisma.auditLog.create({
-      data: {
-        adminId: req.user!.id,
-        action: "delete_user_account",
-        targetId: String(id),
-        details: `User ${user.email} account deleted permanently`
-      }
-    });
-    res.json({ success: true });
-  } catch (err) {
-    console.error("Delete user error:", err);
-    res.status(500).json({ error: "Hisobni o'chirishda xatolik." });
-  }
-});
+// 118-bosqich: admin/users route'lari src/routes/admin-users.ts'ga
+// ko'chirildi.
+import adminUsersRouter from "./src/routes/admin-users";
+app.use("/api/admin/users", adminUsersRouter);
 
 // JWT AUTH: Get Profile (Me), Refresh Token, Logout, and Resend Verification are handled by authRouter
 
 // GET /api/startups - barcha startaplarni olish (filter: kategoriya, status, qidiruv, listingType va sahifalash bo'yicha)
 app.get("/api/startups", async (req: Request, res: Response) => {
-  const { category, status, search, listingType, page, limit, onlyActive, isTop } = req.query;
+  const { category, status, search, listingType, page, limit, onlyActive, isTop, includeMine } = req.query;
+
+  // MUHIM (4-BOSQICH): bu endpoint hech qanday autentifikatsiyasiz, butunlay
+  // ochiq (public) — lekin `status` filtri berilmasa, moderatsiyadan
+  // o'tmagan ("pending") va rad etilgan ("rejected") e'lonlarni ham qaytarib
+  // yuborardi. Bu ma'lumotlar faqat Admin panelidagi moderatsiya ro'yxati
+  // uchun mo'ljallangan edi, lekin App.tsx uni HAR BIR tashrif buyuruvchi
+  // (mehmonlar ham) uchun cheklovsiz chaqiradi — natijada tasdiqlanmagan
+  // e'lonlar butun saytga (va Telegram bot orqali ham) oshkor bo'lardi.
+  // Endi faqat Admin (haqiqiy JWT token bilan) "pending"/"rejected"
+  // statusini so'rashi mumkin; qolgan barcha hollarda faqat "active"
+  // e'lonlar qaytariladi.
+  let isRequestingAdmin = false;
+  let requestingUserId: number | null = null;
+  try {
+    let adminCheckToken = req.cookies?.token;
+    if (!adminCheckToken) {
+      const authHeader = req.headers["authorization"];
+      adminCheckToken = authHeader && authHeader.split(" ")[1];
+    }
+    if (adminCheckToken) {
+      const decoded = jwt.verify(adminCheckToken, JWT_SECRET) as any;
+      if (decoded?.role === "Admin") isRequestingAdmin = true;
+      if (decoded?.id) requestingUserId = decoded.id;
+    }
+  } catch {
+    // Yaroqsiz/eskirgan token — mehmon sifatida davom etiladi (xato tashlanmaydi)
+  }
 
   try {
     const filter: any = {};
+    const andConditions: any[] = [];
     if (category) filter.category = category as string;
-    if (status) filter.status = status as string;
+    if (status && isRequestingAdmin) {
+      filter.status = status as string;
+    } else if (!isRequestingAdmin) {
+      // 45-MUAMMO: yuqoridagi (4/5-bosqich) fix "o'ziniki" e'lonlarni HAR QANDAY
+      // /api/startups chaqiruviga (parametrsiz ham) qo'shib yuborardi — bu
+      // Profilga mo'ljallangan edi, lekin BrowsePage.tsx ham xuddi shu
+      // endpointdan (o'z sahifalash/filtrlari bilan) foydalanganda, tizimga
+      // kirgan sotuvchining hali tasdiqlanmagan/rad etilgan e'loni hech qanday
+      // belgisiz umumiy ommaviy katalogga (va totalCount/totalPages'ga ham)
+      // aralashib qolardi. Endi "o'ziniki"ni qo'shish faqat aniq so'ralganda
+      // (includeMine=true — App.tsx buni Profil uchun yuboradi) ishlaydi;
+      // BrowsePage kabi ommaviy so'rovlar hamon faqat "active"ni ko'radi.
+      if (includeMine === "true" && requestingUserId) {
+        andConditions.push({
+          OR: [{ status: "active" }, { userId: requestingUserId }],
+        });
+      } else {
+        filter.status = "active";
+      }
+    }
     if (listingType && listingType !== "All") filter.listingType = listingType as string;
     if (onlyActive === "true") {
       filter.soldStatus = "sotuvda";
@@ -2154,13 +1443,18 @@ app.get("/api/startups", async (req: Request, res: Response) => {
       // 3. Prevent tiny empty string or whitespace queries
       if (sanitized.length >= 2) {
         const mode = isPostgres ? "insensitive" : undefined;
-        filter.OR = [
-          { name: { contains: sanitized, mode } },
-          { description: { contains: sanitized, mode } },
-          { category: { contains: sanitized, mode } },
-        ];
+        andConditions.push({
+          OR: [
+            { name: { contains: sanitized, mode } },
+            { description: { contains: sanitized, mode } },
+            { category: { contains: sanitized, mode } },
+            { id: { contains: sanitized, mode } },
+          ],
+        });
       }
     }
+
+    if (andConditions.length > 0) filter.AND = andConditions;
 
     const parsedPage = parseInt(page as string, 10);
     const pageNum = isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage;
@@ -2183,7 +1477,17 @@ app.get("/api/startups", async (req: Request, res: Response) => {
       include: { user: { select: { name: true, isVip: true, avatarUrl: true } } }
     });
 
-    const formatted = startupsList.map(formatStartup);
+    // XATO: formatStartup() deliveryUrl'ni HAMMA uchun (hatto egasi uchun ham)
+    // o'chirib tashlaydi — natijada SellPage'da "Tahrirlash" ochilganda sotuvchi
+    // o'zining saqlangan maxfiy yetkazish havolasini ko'ra olmasdi. Egasi yoki
+    // admin uchun bu maydon qaytarib tiklanadi.
+    const formatted = startupsList.map((s: any) => {
+      const f = formatStartup(s);
+      if (isRequestingAdmin || (requestingUserId && s.userId === requestingUserId)) {
+        f.deliveryUrl = s.deliveryUrl || '';
+      }
+      return f;
+    });
     res.json({ startups: formatted, totalCount, totalPages });
   } catch (err: any) {
     console.error("GET /api/startups error:", err);
@@ -2204,220 +1508,46 @@ app.get("/api/startups/:id", async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Startap topilmadi." });
     }
 
+    let currentUser = null;
+    let token = req.cookies?.token;
+    if (!token) {
+      const authHeader = req.headers["authorization"];
+      token = authHeader && authHeader.split(" ")[1];
+    }
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        currentUser = await prisma.user.findUnique({ where: { id: decoded.id } });
+      } catch (err) {}
+    }
+
+    const isOwner = !!(currentUser && currentUser.id === startupRecord.userId);
+    const isAdmin = !!(currentUser && currentUser.role === "Admin");
+
     // Visibility Check
     if (startupRecord.status !== "active") {
-      let currentUser = null;
-      let token = req.cookies?.token;
-      if (!token) {
-        const authHeader = req.headers["authorization"];
-        token = authHeader && authHeader.split(" ")[1];
-      }
-      if (token) {
-        try {
-          const decoded = jwt.verify(token, JWT_SECRET) as any;
-          currentUser = await prisma.user.findUnique({ where: { id: decoded.id } });
-        } catch (err) {}
-      }
-
-      const isOwner = currentUser && currentUser.id === startupRecord.userId;
-      const isAdmin = currentUser && currentUser.role === "Admin";
-
       if (!isOwner && !isAdmin) {
         return res.status(404).json({ error: "Startap topilmadi." }); // Return 404 for privacy
       }
     }
 
-    res.json(formatStartup(startupRecord));
+    // XATO: formatStartup() deliveryUrl'ni hamma uchun o'chiradi — egasi/admin
+    // uchun tiklanadi (Tahrirlash sahifasida ko'rinishi kerak).
+    const formatted = formatStartup(startupRecord);
+    if (isOwner || isAdmin) {
+      formatted.deliveryUrl = startupRecord.deliveryUrl || '';
+    }
+
+    res.json(formatted);
   } catch (err: any) {
     console.error("GET /api/startups/:id error:", err);
     res.status(500).json({ error: "Startapni yuklashda xatolik yuz berdi." });
   }
 });
 
-// GET /api/top-boost/price
-app.get("/api/top-boost/price", async (req: Request, res: Response) => {
-  const { days } = req.query;
-  if (!days) return res.status(400).json({ error: "Kunlar soni ko'rsatilmadi." });
-
-  // 6-MUAMMO: "days" parametrini validatsiya qilish (1 dan 365 gacha butun son bo'lishi kerak)
-  const daysNum = parseInt(days as string, 10);
-  if (!Number.isInteger(daysNum) || daysNum < 1 || daysNum > 365) {
-    return res.status(400).json({ error: "Kunlar soni 1 dan 365 gacha butun son bo'lishi kerak." });
-  }
-
-  const price = await calculateTopPrice(daysNum);
-  res.json({ price });
-});
-
-// POST /api/top-boost/create
-app.post("/api/top-boost/create", authenticateToken, async (req: AuthRequest, res: Response) => {
-  const { startupId, days } = req.body;
-  if (!startupId || !days) return res.status(400).json({ error: "StartupId va kunlar soni ko'rsatilmadi." });
-
-  // 6-MUAMMO: "days" parametrini validatsiya qilish (1 dan 365 gacha butun son bo'lishi kerak)
-  const daysNum = parseInt(days as string, 10);
-  if (!Number.isInteger(daysNum) || daysNum < 1 || daysNum > 365) {
-    return res.status(400).json({ error: "Kunlar soni 1 dan 365 gacha butun son bo'lishi kerak." });
-  }
-
-  try {
-    const startup = await prisma.startup.findUnique({ where: { id: startupId } });
-    if (!startup) return res.status(404).json({ error: "Startap topilmadi." });
-
-    const coingateToken = await getSetting("COINGATE_API_TOKEN");
-    const appUrlSetting = await getSetting("APP_URL") || "http://localhost:3000";
-
-    // 7-MUAMMO: COINGATE_API_TOKEN sozlanmagan bo'lsa va production bo'lsa, oldindan xatolik qaytarish (muvaffaqiyatsiz to'lov simulyatoriga tushib qolmaslik uchun)
-    if (process.env.NODE_ENV === "production" && !coingateToken) {
-      console.error("COINGATE_API_TOKEN sozlanmagan (production)");
-      return res.status(503).json({ error: "To'lov tizimi vaqtincha mavjud emas." });
-    }
-
-    const price = await calculateTopPrice(daysNum);
-    const orderId = `TOP-${daysNum}-` + crypto.randomBytes(4).toString('hex').toUpperCase();
-    const secureToken = crypto.randomBytes(24).toString('hex');
-
-    await prisma.payment.create({
-      data: {
-        id: orderId,
-        amount: price,
-        status: "pending",
-        source: "top_boost",
-        currency: "USDT",
-        userId: req.user!.id,
-        startupId: startupId,
-        callbackToken: secureToken,
-        platformFeeAmount: 0,
-        sellerPayoutAmount: 0
-      },
-    });
-
-    let paymentUrl = "";
-
-    if (coingateToken) {
-      try {
-        const response = await fetch("https://api.coingate.com/v2/orders", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Authorization": `Token ${coingateToken}`,
-          },
-          body: new URLSearchParams({
-            order_id: orderId,
-            price_amount: price.toFixed(2),
-            price_currency: "USD",
-            receive_currency: "USDT",
-            callback_url: `${appUrlSetting}/api/payments/webhook?token=${secureToken}`,
-            success_url: `${appUrlSetting}/checkout/success`,
-            cancel_url: `${appUrlSetting}/checkout/cancel`,
-            title: `TOP Boost: ${startup.name} (${daysNum} kun)`,
-          }),
-        });
-
-        if (response.ok) {
-          const orderData: any = await response.json();
-          paymentUrl = orderData.payment_url;
-        }
-      } catch (err) {
-        console.error("CoinGate error in top boost create:", err);
-      }
-    }
-
-    if (!paymentUrl) {
-      paymentUrl = `${appUrlSetting}/api/payments/coingate-simulator?orderId=${orderId}&token=${secureToken}&amount=${price.toFixed(2)}&title=${encodeURIComponent("TOP Boost: " + startup.name)}`;
-    }
-
-    res.json({ paymentUrl });
-  } catch (err) {
-    console.error("TOP boost create error:", err);
-    res.status(500).json({ error: "To'lov yaratishda xatolik." });
-  }
-});
-
-// POST /api/vip/create
-app.post("/api/vip/create", authenticateToken, async (req: AuthRequest, res: Response) => {
-  const { days } = req.body;
-  if (!days) return res.status(400).json({ error: "Kunlar soni ko'rsatilmadi." });
-
-  // 6-MUAMMO: "days" parametrini validatsiya qilish (1 dan 365 gacha butun son bo'lishi kerak)
-  const daysNum = parseInt(days as string, 10);
-  if (!Number.isInteger(daysNum) || daysNum < 1 || daysNum > 365) {
-    return res.status(400).json({ error: "Kunlar soni 1 dan 365 gacha butun son bo'lishi kerak." });
-  }
-
-  try {
-    const basePricePerDay = parseFloat(await getSetting("VIP_PRICE_PER_DAY") || "0.5");
-    const discountPercent = parseFloat(await getSetting("VIP_DISCOUNT_PERCENT") || "40");
-    const totalBasePrice = basePricePerDay * daysNum;
-    const price = Math.round(totalBasePrice * (1 - discountPercent / 100) * 100) / 100;
-
-    const coingateToken = await getSetting("COINGATE_API_TOKEN");
-    const appUrlSetting = await getSetting("APP_URL") || "http://localhost:3000";
-
-    // 7-MUAMMO: COINGATE_API_TOKEN sozlanmagan bo'lsa va production bo'lsa, oldindan xatolik qaytarish (muvaffaqiyatsiz to'lov simulyatoriga tushib qolmaslik uchun)
-    if (process.env.NODE_ENV === "production" && !coingateToken) {
-      console.error("COINGATE_API_TOKEN sozlanmagan (production)");
-      return res.status(503).json({ error: "To'lov tizimi vaqtincha mavjud emas." });
-    }
-
-    const orderId = `VIP-${daysNum}-` + crypto.randomBytes(4).toString('hex').toUpperCase();
-    const secureToken = crypto.randomBytes(24).toString('hex');
-
-    await prisma.payment.create({
-      data: {
-        id: orderId,
-        amount: price,
-        status: "pending",
-        source: "vip_subscription",
-        currency: "USDT",
-        userId: req.user!.id,
-        callbackToken: secureToken,
-        platformFeeAmount: 0,
-        sellerPayoutAmount: 0
-      },
-    });
-
-    let paymentUrl = "";
-
-    if (coingateToken) {
-      try {
-        const response = await fetch("https://api.coingate.com/v2/orders", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Authorization": `Token ${coingateToken}`,
-          },
-          body: new URLSearchParams({
-            order_id: orderId,
-            price_amount: price.toFixed(2),
-            price_currency: "USD",
-            receive_currency: "USDT",
-            callback_url: `${appUrlSetting}/api/payments/webhook?token=${secureToken}`,
-            success_url: `${appUrlSetting}/checkout/success`,
-            cancel_url: `${appUrlSetting}/checkout/cancel`,
-            title: `VIP Subscription (${daysNum} kun)`,
-          }),
-        });
-
-        if (response.ok) {
-          const orderData: any = await response.json();
-          paymentUrl = orderData.payment_url;
-        }
-      } catch (err) {
-        console.error("CoinGate error in vip create:", err);
-      }
-    }
-
-    if (!paymentUrl) {
-      paymentUrl = `${appUrlSetting}/api/payments/coingate-simulator?orderId=${orderId}&token=${secureToken}&amount=${price.toFixed(2)}&title=${encodeURIComponent("VIP Subscription")}`;
-    }
-
-    res.json({ paymentUrl });
-  } catch (err) {
-    console.error("VIP create error:", err);
-    res.status(500).json({ error: "To'lov yaratishda xatolik." });
-  }
-});
+// 115-bosqich: top-boost/vip route'lari src/routes/top-boost-vip.ts'ga ko'chirildi.
+import topBoostVipRouter from "./src/routes/top-boost-vip";
+app.use("/api", topBoostVipRouter);
 
 // Startups validation schemas
 const techStackPreprocess = z.preprocess((val) => {
@@ -2448,6 +1578,17 @@ const milestonesPreprocess = z.preprocess((val) => {
   return val;
 }, z.array(z.any()).max(20, "Bosqichlar ko'pi bilan 20 ta bo'lik bo'lishi kerak").optional().nullable());
 
+// Faqat http/https protokolli URL'larni qabul qiladi (javascript:, data: va h.k. XSS vektorlarini bloklaydi)
+const safeUrl = z.string().max(2000).refine((val) => {
+  if (!val) return true;
+  try {
+    const parsed = new URL(val);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}, { message: "Havola http:// yoki https:// bilan boshlanishi va to'g'ri formatda bo'lishi kerak." }).optional().nullable().or(z.literal(""));
+
 const createStartupSchema = z.object({
   name: z.string().min(1, "Nomi kamida 1 ta belgidan iborat bo'lishi kerak").max(150, "Nomi ko'pi bilan 150 ta belgidan iborat bo'lishi kerak"),
   
@@ -2468,9 +1609,9 @@ const createStartupSchema = z.object({
   
   listingType: z.string().optional().nullable(),
   techStack: techStackPreprocess,
-  demoUrl: z.string().optional().nullable().or(z.literal("")),
-  deliveryUrl: z.string().optional().nullable().or(z.literal("")),
-  githubUrl: z.string().optional().nullable().or(z.literal("")),
+  demoUrl: safeUrl,
+  deliveryUrl: safeUrl,
+  githubUrl: safeUrl,
   repoIncluded: z.union([z.boolean(), z.string()]).optional().nullable().transform((val) => val === true || val === "true"),
   image: z.string().optional().nullable(),
   gallery: galleryPreprocess,
@@ -2479,6 +1620,7 @@ const createStartupSchema = z.object({
   contactEmail: z.string().optional().nullable().or(z.literal("")),
   contactPhone: z.string().optional().nullable().or(z.literal("")),
   contactTelegram: z.string().optional().nullable().or(z.literal("")),
+  attributes: z.string().optional().nullable(),
 });
 
 const patchStartupSchema = createStartupSchema.partial();
@@ -2500,6 +1642,7 @@ app.post("/api/startups", authenticateToken, async (req: AuthRequest, res: Respo
     listingType,
     techStack,
     demoUrl,
+    githubUrl,
     repoIncluded,
     image,
     gallery,
@@ -2509,6 +1652,7 @@ app.post("/api/startups", authenticateToken, async (req: AuthRequest, res: Respo
     contactPhone,
     contactTelegram,
     deliveryUrl,
+    attributes,
   } = parsed.data;
 
   try {
@@ -2543,6 +1687,7 @@ app.post("/api/startups", authenticateToken, async (req: AuthRequest, res: Respo
         listingType: listingType || "To'liq loyiha (manba kodi bilan)",
         techStack: JSON.stringify(techStack || []),
         demoUrl: demoUrl || "",
+        githubUrl: githubUrl || "",
         deliveryUrl: deliveryUrl || "",
         repoIncluded: repoIncluded === true,
         soldStatus: "sotuvda",
@@ -2555,6 +1700,7 @@ app.post("/api/startups", authenticateToken, async (req: AuthRequest, res: Respo
         contactEmail: contactEmail || req.user?.email || "",
         contactPhone: contactPhone || "",
         contactTelegram: contactTelegram || "",
+        attributes: attributes || "{}",
         dateCreated: new Date().toISOString().split("T")[0],
         userId: req.user?.id,
       },
@@ -2595,6 +1741,7 @@ app.patch("/api/startups/:id", authenticateToken, async (req: AuthRequest, res: 
     if (validatedData.category !== undefined) updatedData.category = validatedData.category;
     if (validatedData.listingType !== undefined) updatedData.listingType = validatedData.listingType;
     if (validatedData.demoUrl !== undefined) updatedData.demoUrl = validatedData.demoUrl;
+    if (validatedData.githubUrl !== undefined) updatedData.githubUrl = validatedData.githubUrl;
     if (validatedData.image !== undefined) updatedData.image = validatedData.image;
     if (validatedData.gallery !== undefined) {
       updatedData.gallery = JSON.stringify(validatedData.gallery || []);
@@ -2612,6 +1759,13 @@ app.patch("/api/startups/:id", authenticateToken, async (req: AuthRequest, res: 
     if (validatedData.contactPhone !== undefined) updatedData.contactPhone = validatedData.contactPhone;
     if (validatedData.contactTelegram !== undefined) updatedData.contactTelegram = validatedData.contactTelegram;
     if (validatedData.deliveryUrl !== undefined) updatedData.deliveryUrl = validatedData.deliveryUrl;
+    if (validatedData.attributes !== undefined) updatedData.attributes = validatedData.attributes;
+    // 43-MUAMMO: SellPage.tsx tahrirlashda repoIncluded'ni ham yuborardi
+    // (listingType'dan hisoblanadi), lekin bu yerda updatedData'ga
+    // qo'shilmagani uchun bazada eskirgan qiymat qolib ketardi — listingType
+    // o'zgarsa ham "Repo + Kod" / "Faqat litsenziya" ko'rsatkichi eskicha
+    // qolardi (BrowsePage/DetailPage).
+    if (validatedData.repoIncluded !== undefined) updatedData.repoIncluded = validatedData.repoIncluded;
     
     // Agar faol bo'lsa, moderatsiyaga qaytarsin (Xavfsizlik)
     if (startup.status === "active") {
@@ -2670,7 +1824,7 @@ app.patch("/api/startups/:id/status", authenticateToken, async (req: AuthRequest
         await sendEmail(
           user.email,
           "Loyihangiz tasdiqlandi!",
-          `<p>Tabriklaymiz! <b>${updated.name}</b> loyihangiz admin tomonidan ko'rib chiqildi va tasdiqlandi.</p><p>Endi u platformada sotuvda ko'rinadi.</p>`
+          `<p>Tabriklaymiz! <b>${escapeHtml(updated.name)}</b> loyihangiz admin tomonidan ko'rib chiqildi va tasdiqlandi.</p><p>Endi u platformada sotuvda ko'rinadi.</p>`
         );
       }
     }
@@ -2701,10 +1855,16 @@ app.get("/api/ideas/top", async (req: Request, res: Response) => {
     const skip = (page - 1) * limit;
     const { category, time } = req.query;
 
-    const where: any = {};
+    const where: any = {
+      // XAVFSIZLIK: bu endpoint auth'siz ochiq — faqat tasdiqlangan (active)
+      // e'lonlarga tegishli g'oyalar ko'rsatiladi, aks holda pending/rejected
+      // startap nomi/kategoriyasi ommaviy reytingda oshkor bo'lib qolardi.
+      startup: { status: "active" },
+    };
 
     if (category && category !== "all") {
       where.startup = {
+        ...where.startup,
         category: category as string,
       };
     }
@@ -3062,7 +2222,11 @@ async function createPaymentOrder(userId: number, startupId: string, referralCod
   if (startupRecord.soldStatus === "sotildi") {
     throw new Error("Bu loyiha allaqachon sotilgan.");
   }
-  
+  // 91-band: o'z loyihasini sotib olishni oldini olish (soxta "sotilgan" holat/pul aylanishi)
+  if (startupRecord.userId === userId) {
+    throw new Error("O'z loyihangizni sotib ololmaysiz.");
+  }
+
   let realAmount = Number(startupRecord.price);
   let discountApplied = 0;
   let referralId = null;
@@ -3109,6 +2273,19 @@ async function createPaymentOrder(userId: number, startupId: string, referralCod
 
   const orderId = "CG-" + crypto.randomBytes(4).toString('hex').toUpperCase();
   const secureToken = crypto.randomBytes(24).toString('hex');
+
+  // MUHIM: har safar checkout sahifasi qayta ochilsa yoki referral kod
+  // qo'llanganda payment qayta yaratilsa, oldingi "pending" buyurtma
+  // hech qachon yopilmasdi — bazada abadiy "pending" holatda qolib
+  // ketardi (agar kimdir eski CoinGate havolasini keyinroq to'lasa,
+  // finalizeCompletedPayment uni "refund_required"ga o'tkazadi, ammo
+  // bu qo'lda qaytarish talab qiladi). Endi shu userId+startupId uchun
+  // eski "pending" buyurtmalar yangisi yaratilishidan oldin "cancelled"
+  // qilinadi.
+  await prisma.payment.updateMany({
+    where: { userId, startupId, status: "pending" },
+    data: { status: "cancelled" }
+  }).catch(() => {});
 
   await prisma.payment.create({
     data: {
@@ -3187,7 +2364,12 @@ async function createPaymentOrder(userId: number, startupId: string, referralCod
         paymentUrl = session.url!;
         await prisma.payment.update({
           where: { id: orderId },
-          data: { gateway: "stripe", id: session.id }
+          // NOTE: previously this also set `id: session.id`, which overwrote the
+          // payment's primary key. That broke /api/payments/status/:id polling on
+          // the frontend (CheckoutPage.tsx polls using the original orderId, so the
+          // lookup returned 404 the moment this ran). Keep orderId as the stable id;
+          // metadata.orderId already carries it through to Stripe for correlation.
+          data: { gateway: "stripe" }
         });
       } catch (stripeErr) {
         console.error("Stripe fallback error:", stripeErr);
@@ -3195,15 +2377,17 @@ async function createPaymentOrder(userId: number, startupId: string, referralCod
     }
   }
 
+  let apiKeysMissing = false;
   if (!paymentUrl) {
     const stripeKey = await getSetting("STRIPE_SECRET_KEY") || process.env.STRIPE_SECRET_KEY;
     if (!coingateToken && !stripeKey && process.env.NODE_ENV === "production") {
       throw new Error("To'lov tizimi vaqtincha mavjud emas, keyinroq urinib ko'ring.");
     }
+    apiKeysMissing = true;
     paymentUrl = `${appUrlSetting}/api/payments/coingate-simulator?orderId=${orderId}&token=${secureToken}&amount=${realAmount.toFixed(2)}&title=${encodeURIComponent(startupRecord.name)}`;
   }
 
-  return { orderId, paymentUrl, amount: realAmount };
+  return { orderId, paymentUrl, amount: realAmount, apiKeysMissing };
 }
 
 // POST /api/payments/create — to'lov buyurtmasi yaratish
@@ -3215,14 +2399,15 @@ app.post("/api/payments/create", authenticateToken, async (req: AuthRequest, res
   }
 
   try {
-    const { orderId, paymentUrl, amount } = await createPaymentOrder(req.user!.id, startupId, referralCode, "web");
+    const { orderId, paymentUrl, amount, apiKeysMissing } = await createPaymentOrder(req.user!.id, startupId, referralCode, "web");
 
     res.status(201).json({
       id: orderId,
       amount: amount,
       status: "pending",
       currency: "USDT",
-      paymentUrl
+      paymentUrl,
+      api_keys_missing: apiKeysMissing
     });
   } catch (err: any) {
     console.error("POST /api/payments/create error:", err);
@@ -3408,94 +2593,15 @@ app.get("/api/payments/coingate-simulator", async (req: Request, res: Response) 
   `);
 });
 
-function safeCompare(a: string, b: string): boolean {
-  if (!a || !b) return false;
-  try {
-    const bufA = Buffer.from(a, 'utf8');
-    const bufB = Buffer.from(b, 'utf8');
-    if (bufA.length !== bufB.length) return false;
-    return crypto.timingSafeEqual(bufA, bufB);
-  } catch {
-    return false;
-  }
-}
-
 // POST /api/payments/webhook — CoinGate webhook callback qabul qilish
-app.post("/api/payments/webhook", async (req: Request, res: Response) => {
-  const token = req.query.token as string;
-  const { order_id, status, price_amount, price_currency, id } = req.body;
-
-  if (!order_id || !status) {
-    return res.status(400).json({ error: "Missing required webhook parameters." });
-  }
-
-  try {
-    const payment = await prisma.payment.findUnique({ where: { id: order_id } });
-    if (!payment) {
-      return res.status(404).json({ error: "Payment order not found." });
-    }
-
-    // Kelgan token query parametrini bazadagi saqlangan callbackToken bilan constant-time solishtir
-    const savedToken = payment.callbackToken;
-    if (!token || !savedToken || !safeCompare(token, savedToken)) {
-      console.warn("Secure token verification failed for order_id:", order_id);
-      return res.status(401).json({ error: "Unauthorized: Token mismatch or missing." });
-    }
-
-    // Token mos kelsa ham, CoinGate'ning GET Order endpointiga qo'shimcha so'rov yuborib qayta tekshir
-    let verifiedStatus = status;
-    let verifiedAmount = price_amount;
-
-    const coingateToken = await getSetting("COINGATE_API_TOKEN");
-
-    if (coingateToken && id) {
-      try {
-        const checkResponse = await fetch(`https://api.coingate.com/v2/orders/${id}`, {
-          method: "GET",
-          headers: {
-            "Authorization": `Token ${coingateToken}`
-          }
-        });
-        if (checkResponse.ok) {
-          const checkData: any = await checkResponse.json();
-          verifiedStatus = checkData.status;
-          verifiedAmount = checkData.price_amount;
-          console.log("Verified Order via CoinGate API GET check:", checkData);
-        } else {
-          console.error("CoinGate GET Order check failed with status:", checkResponse.status);
-          return res.status(400).json({ error: "CoinGate API verification failed." });
-        }
-      } catch (apiErr: any) {
-        console.error("Failed to connect to CoinGate GET Order API:", apiErr.message);
-        return res.status(500).json({ error: "CoinGate API connection failed." });
-      }
-    }
-
-    // CoinGate statuses: paid or completed mean successful payment
-    const isCompleted = verifiedStatus === "paid" || verifiedStatus === "completed";
-
-    if (!isCompleted) {
-      const localStatus = (verifiedStatus === "expired" || verifiedStatus === "canceled" || verifiedStatus === "invalid") ? "failed" : "pending";
-      await prisma.payment.update({
-        where: { id: order_id },
-        data: { status: localStatus }
-      });
-      return res.json({ success: true, orderId: order_id, status: localStatus });
-    }
-
-    // Qayta tekshirilgan summa to'g'ri kelishini solishtir
-    if (Math.abs(parseFloat(verifiedAmount) - payment.amount) > 0.01) {
-      console.warn(`Payment amount mismatch. Expected: ${payment.amount}, Got: ${verifiedAmount}`);
-      return res.status(400).json({ error: "Payment amount mismatch." });
-    }
-
+async function finalizeCompletedPayment(payment: any): Promise<string> {
     let updatedStatus = "completed";
 
     if (payment.startupId) {
       const startup = await prisma.startup.findUnique({ where: { id: payment.startupId } });
       if (startup && startup.soldStatus === "sotildi") {
         updatedStatus = "refund_required";
-        console.log(`Startup ${payment.startupId} is already sold. Setting payment ${order_id} to 'refund_required'.`);
+        console.log(`Startup ${payment.startupId} is already sold. Setting payment ${payment.id} to 'refund_required'.`);
       }
     }
 
@@ -3504,7 +2610,7 @@ app.post("/api/payments/webhook", async (req: Request, res: Response) => {
     const sellerPayoutAmount = updatedStatus === "completed" ? numAmount * 0.95 : null;
 
     await prisma.payment.update({
-      where: { id: order_id },
+      where: { id: payment.id },
       data: { 
         status: updatedStatus,
         platformFeeAmount,
@@ -3517,6 +2623,11 @@ app.post("/api/payments/webhook", async (req: Request, res: Response) => {
         where: { id: payment.referralId }
       });
       if (referral) {
+        // Eslatma: refereeId shu yerda faqat "oxirgi referal qilingan
+        // foydalanuvchi" sifatida ma'lumot uchun yoziladi — bitta doimiy
+        // referral qatori ko'p marta ishlatilishi mumkinligi sabab, haqiqiy
+        // referal soni endi getReferralCount() (ReferralReward asosida)
+        // orqali hisoblanadi, bu maydon orqali emas.
         await prisma.referral.update({
           where: { id: referral.id },
           data: { refereeId: payment.userId || 0 }
@@ -3539,6 +2650,22 @@ app.post("/api/payments/webhook", async (req: Request, res: Response) => {
           `Tabriklaymiz! Sizning referralingiz orqali xarid amalga oshirildi. Sizga $${rewardAmount.toFixed(2)} miqdorida mukofot hisoblandi.`,
           `/profile`
         );
+
+        // 96-band: referralCount endi to'g'ri hisoblanadi (yuqoriga qarang),
+        // lekin referral qatoridagi discountPercent/commissionPercent hali ham
+        // faqat kod BIRINCHI marta yaratilganda (referralCount=0, Tier 1)
+        // o'rnatilib, keyin hech qachon yangilanmasdi — ya'ni 6/21+ referaldan
+        // keyin ham foydalanuvchi abadiy Tier 1 (5%) da qolib ketardi. Endi har
+        // bir muvaffaqiyatli referaldan so'ng daraja qayta hisoblanadi va
+        // o'zgargan bo'lsa (keyingi referallar uchun) yangilanadi.
+        const newReferralCount = await getReferralCount(referral.referrerId);
+        const newTier = getReferralTier(newReferralCount);
+        if (newTier.discount !== Number(referral.discountPercent) || newTier.commission !== Number(referral.commissionPercent)) {
+          await prisma.referral.update({
+            where: { id: referral.id },
+            data: { discountPercent: newTier.discount, commissionPercent: newTier.commission }
+          }).catch((tierErr: any) => console.error("Referral tier update error:", tierErr));
+        }
       }
     }
 
@@ -3555,7 +2682,9 @@ app.post("/api/payments/webhook", async (req: Request, res: Response) => {
       });
     }
 
-    if (updatedStatus === "completed") {
+    // FIX: TOP-/UPG- to'lovlarida ham startupId bor (boost/upgrade o'zi shu startap uchun),
+    // lekin bu "startapni sotib oldim" emas — email faqat haqiqiy xariddan keyin yuborilishi kerak.
+    if (updatedStatus === "completed" && !payment.id.startsWith("TOP-") && !payment.id.startsWith("UPG-")) {
       const buyer = await prisma.user.findUnique({ where: { id: payment.userId } });
       const startup = await prisma.startup.findUnique({ where: { id: payment.startupId }, include: { user: true } });
       
@@ -3564,24 +2693,24 @@ app.post("/api/payments/webhook", async (req: Request, res: Response) => {
         await sendEmail(
           buyer.email,
           "Xarid muvaffaqiyatli yakunlandi",
-          `<p>Tabriklaymiz! Siz <b>${startup.name}</b> loyihasini muvaffaqiyatli sotib oldingiz.</p><p>Loyiha fayllari va tafsilotlari tez orada sizga yetkaziladi.</p>`
+          `<p>Tabriklaymiz! Siz <b>${escapeHtml(startup.name)}</b> loyihasini muvaffaqiyatli sotib oldingiz.</p><p>Loyiha fayllari va tafsilotlari tez orada sizga yetkaziladi.</p>`
         );
         // To Seller
         if (startup.user) {
           await sendEmail(
             startup.user.email,
             "Loyihangiz sotildi!",
-            `<p>Tabriklaymiz! Sizning <b>${startup.name}</b> loyihangiz sotib olindi.</p><p>To'lov qabul qilindi. Tafsilotlar uchun dashboardni ko'ring.</p>`
+            `<p>Tabriklaymiz! Sizning <b>${escapeHtml(startup.name)}</b> loyihangiz sotib olindi.</p><p>To'lov qabul qilindi. Tafsilotlar uchun dashboardni ko'ring.</p>`
           );
         }
       }
     }
 
-    if (updatedStatus === "completed" && payment.startupId) {
+    if (updatedStatus === "completed" && payment.startupId && !payment.id.startsWith("TOP-") && !payment.id.startsWith("UPG-")) {
       await prisma.telegramDelivery.create({
         data: {
           token: crypto.randomBytes(24).toString('hex'),
-          paymentId: order_id,
+          paymentId: payment.id,
           startupId: payment.startupId,
           expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
         }
@@ -3622,12 +2751,21 @@ app.post("/api/payments/webhook", async (req: Request, res: Response) => {
         include: { tier: true }
       });
       if (subscription && payment.startupId) {
+        // MUHIM: eski expiresAt to'lov "pending" holatda yaratilgan paytda
+        // hisoblangan edi — to'lov (ayniqsa CoinGate) tasdiqlanishi soatlab
+        // cho'zilsa, sotib olingan muddat jimgina qisqarib qolardi. Endi
+        // muddat aynan to'lov tasdiqlangan shu paytdan hisoblanadi.
+        const realExpiresAt = new Date(Date.now() + subscription.tier.durationDays * 24 * 60 * 60 * 1000);
+        await prisma.listingSubscription.update({
+          where: { id: subscription.id },
+          data: { expiresAt: realExpiresAt }
+        });
         await prisma.startup.update({
           where: { id: payment.startupId },
           data: { 
             currentTier: subscription.tier.tier,
             isTop: subscription.tier.tier !== "standard",
-            topExpiresAt: subscription.expiresAt
+            topExpiresAt: realExpiresAt
           }
         });
         console.log(`Upgraded startup ${payment.startupId} to ${subscription.tier.tier}`);
@@ -3690,6 +2828,88 @@ app.post("/api/payments/webhook", async (req: Request, res: Response) => {
       }
     }
 
+  return updatedStatus;
+}
+
+app.post("/api/payments/webhook", async (req: Request, res: Response) => {
+  const token = req.query.token as string;
+  const { order_id, status, price_amount, price_currency, id } = req.body;
+
+  if (!order_id || !status) {
+    return res.status(400).json({ error: "Missing required webhook parameters." });
+  }
+
+  try {
+    const payment = await prisma.payment.findUnique({ where: { id: order_id } });
+    if (!payment) {
+      return res.status(404).json({ error: "Payment order not found." });
+    }
+
+    // Kelgan token query parametrini bazadagi saqlangan callbackToken bilan constant-time solishtir
+    const savedToken = payment.callbackToken;
+    if (!token || !savedToken || !safeCompare(token, savedToken)) {
+      console.warn("Secure token verification failed for order_id:", order_id);
+      return res.status(401).json({ error: "Unauthorized: Token mismatch or missing." });
+    }
+
+    // IDEMPOTENTLIK: to'lov tizimlari (CoinGate/Stripe) bir xil webhook'ni bir necha marta
+    // qayta yuborishi mumkin (retry). Agar bu buyurtma allaqachon yakuniy holatga o'tgan
+    // bo'lsa, butun jarayonni qayta ishlamasdan darhol muvaffaqiyatli javob qaytaramiz —
+    // aks holda referral mukofoti, email/bildirishnomalar va TOP/VIP muddati har safar
+    // qayta hisoblanib, foydalanuvchiga bir necha marta pul/bonus berilib ketishi mumkin edi.
+    if (payment.status === "completed" || payment.status === "refund_required") {
+      return res.json({ success: true, orderId: order_id, status: payment.status, idempotent: true });
+    }
+
+    // Token mos kelsa ham, CoinGate'ning GET Order endpointiga qo'shimcha so'rov yuborib qayta tekshir
+    let verifiedStatus = status;
+    let verifiedAmount = price_amount;
+
+    const coingateToken = await getSetting("COINGATE_API_TOKEN");
+
+    if (coingateToken && id) {
+      try {
+        const checkResponse = await fetch(`https://api.coingate.com/v2/orders/${id}`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Token ${coingateToken}`
+          }
+        });
+        if (checkResponse.ok) {
+          const checkData: any = await checkResponse.json();
+          verifiedStatus = checkData.status;
+          verifiedAmount = checkData.price_amount;
+          console.log("Verified Order via CoinGate API GET check:", checkData);
+        } else {
+          console.error("CoinGate GET Order check failed with status:", checkResponse.status);
+          return res.status(400).json({ error: "CoinGate API verification failed." });
+        }
+      } catch (apiErr: any) {
+        console.error("Failed to connect to CoinGate GET Order API:", apiErr.message);
+        return res.status(500).json({ error: "CoinGate API connection failed." });
+      }
+    }
+
+    // CoinGate statuses: paid or completed mean successful payment
+    const isCompleted = verifiedStatus === "paid" || verifiedStatus === "completed";
+
+    if (!isCompleted) {
+      const localStatus = (verifiedStatus === "expired" || verifiedStatus === "canceled" || verifiedStatus === "invalid") ? "failed" : "pending";
+      await prisma.payment.update({
+        where: { id: order_id },
+        data: { status: localStatus }
+      });
+      return res.json({ success: true, orderId: order_id, status: localStatus });
+    }
+
+    // Qayta tekshirilgan summa to'g'ri kelishini solishtir
+    if (Math.abs(parseFloat(verifiedAmount) - payment.amount) > 0.01) {
+      console.warn(`Payment amount mismatch. Expected: ${payment.amount}, Got: ${verifiedAmount}`);
+      return res.status(400).json({ error: "Payment amount mismatch." });
+    }
+
+    const updatedStatus = await finalizeCompletedPayment(payment);
+
     res.json({ success: true, orderId: order_id, status: updatedStatus });
   } catch (err: any) {
     console.error("Webhook processing error:", err);
@@ -3697,284 +2917,16 @@ app.post("/api/payments/webhook", async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/telegram/link — User hisobini bot bilan bog'lash
-app.post("/api/telegram/link", async (req: Request, res: Response) => {
-  try {
-    const secret = req.headers["x-telegram-bot-secret"];
-    const internalSecret = await getSetting("TELEGRAM_BOT_INTERNAL_SECRET") || process.env.TELEGRAM_BOT_INTERNAL_SECRET;
-    if (!internalSecret || !secret || typeof secret !== "string" || !safeCompare(secret, internalSecret)) {
-      return res.status(403).json({ error: "Ruxsat etilmagan." });
-    }
-
-    const { code, telegramUserId } = req.body;
-    if (!code || !telegramUserId) {
-      return res.status(400).json({ error: "Kod va telegramUserId majburiy." });
-    }
-
-    const user = await prisma.user.findFirst({
-      where: { telegramLinkCode: code }
-    });
-
-    if (!user) {
-      return res.status(404).json({ error: "Noto'g'ri kod." });
-    }
-
-    if (user.telegramLinkCodeExpires && new Date() > user.telegramLinkCodeExpires) {
-      return res.status(400).json({ error: "Kodning amal qilish muddati tugagan." });
-    }
-
-    // Foydalanuvchini yangilash
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        telegramUserId: telegramUserId.toString(),
-        telegramLinkCode: null,
-        telegramLinkCodeExpires: null,
-        verified: true,
-        emailVerified: true
-      }
-    });
-
-    res.json({ success: true, name: user.name });
-  } catch (err: any) {
-    console.error("Telegram link error:", err);
-    res.status(500).json({ error: "Hisobni bog'lashda xatolik yuz berdi." });
-  }
-});
-
-// GET /api/telegram/user-stats/:telegramUserId — Bot uchun user stats
-app.get("/api/telegram/user-stats/:telegramUserId", async (req: Request, res: Response) => {
-  const { telegramUserId } = req.params;
-  const secret = req.headers["x-telegram-bot-secret"];
-
-  const internalSecret = await getSetting("TELEGRAM_BOT_INTERNAL_SECRET") || process.env.TELEGRAM_BOT_INTERNAL_SECRET;
-  if (!internalSecret || !secret || typeof secret !== "string" || !safeCompare(secret, internalSecret)) {
-    return res.status(403).json({ error: "Ruxsat etilmagan." });
-  }
-
-  try {
-    const user = await prisma.user.findFirst({
-      where: { telegramUserId: telegramUserId.toString() },
-      include: {
-        referrals: {
-          include: { rewards: { where: { status: "earned" } } }
-        }
-      }
-    });
-
-    if (!user) return res.status(404).json({ error: "Foydalanuvchi topilmadi." });
-
-    const referral = await prisma.referral.findFirst({ where: { referrerId: user.id, isActive: true } });
-    const referralCount = await prisma.referral.count({ where: { referrerId: user.id, refereeId: { not: null } } });
-    const totalEarned = user.referrals.reduce((sum: number, r: any) => sum + r.rewards.reduce((s: number, rw: any) => s + rw.rewardAmount, 0), 0);
-
-    res.json({
-      name: user.name,
-      email: user.email,
-      balance: user.balance,
-      referralCode: referral?.code,
-      referralCount,
-      totalEarned
-    });
-  } catch (err) {
-    res.status(500).json({ error: "Xatolik yuz berdi." });
-  }
-});
-
-// GET /api/telegram/verify/:token
-app.get("/api/telegram/verify/:token", async (req: Request, res: Response) => {
-  try {
-    const { token } = req.params;
-    const delivery = await prisma.telegramDelivery.findUnique({ where: { token } });
-    if (!delivery || delivery.used || new Date() > delivery.expiresAt) {
-      return res.status(400).json({ error: "Havola eskirgan yoki noto'g'ri" });
-    }
-    res.json({ success: true, startupId: delivery.startupId });
-  } catch (err: any) {
-    console.error("Verify telegram token error:", err);
-    res.status(500).json({ error: "Havolani tasdiqlashda xatolik yuz berdi." });
-  }
-});
-
-// GET /api/telegram/sponsor-channels
-app.get("/api/telegram/sponsor-channels", async (req: Request, res: Response) => {
-  try {
-    const channels = await prisma.sponsorChannel.findMany({ where: { isActive: true } });
-    res.json(channels);
-  } catch (err: any) {
-    console.error("Get sponsor channels error:", err);
-    res.status(500).json({ error: "Sponsor kanallarni yuklashda xatolik yuz berdi." });
-  }
-});
-
-// POST /api/telegram/deliver/:token
-app.post("/api/telegram/deliver/:token", async (req: Request, res: Response) => {
-  try {
-    const { token } = req.params;
-    const { telegramUserId } = req.body;
-    const delivery = await prisma.telegramDelivery.findUnique({ where: { token } });
-    if (!delivery || delivery.used || new Date() > delivery.expiresAt) {
-      return res.status(400).json({ error: "Havola eskirgan yoki noto'g'ri" });
-    }
-    // Mark as used
-    await prisma.telegramDelivery.update({
-      where: { token },
-      data: { used: true, telegramUserId: String(telegramUserId) }
-    });
-    // Get delivery URL
-    const startup = await prisma.startup.findUnique({ where: { id: delivery.startupId } });
-    res.json({ deliveryUrl: startup?.deliveryUrl });
-  } catch (err: any) {
-    console.error("Deliver telegram error:", err);
-    res.status(500).json({ error: "Loyiha havolasini yuborishda xatolik yuz berdi." });
-  }
-});
+// 116-bosqich: telegram-integratsiya route'lari
+// src/routes/telegram-integration.ts'ga ko'chirildi.
+import telegramIntegrationRouter from "./src/routes/telegram-integration";
+app.use("/api/telegram", telegramIntegrationRouter);
 
 
-// POST /api/conversations — yangi suhbat boshlash
-app.post("/api/conversations", authenticateToken, async (req: AuthRequest, res: Response) => {
-  try {
-    const { startupId, sellerId } = req.body;
-    const buyerId = req.user!.id;
-    const sellerIdNum = parseInt(sellerId, 10);
-
-    if (isNaN(sellerIdNum)) {
-      return res.status(400).json({ error: "Yaroqsiz sotuvchi ID." });
-    }
-
-    if (buyerId === sellerIdNum) {
-      return res.status(400).json({ error: "O'zingiz bilan suhbat ocha olmaysiz." });
-    }
-
-    // Check if startup and seller exist
-    const startup = await prisma.startup.findUnique({ where: { id: startupId } });
-    if (!startup) {
-      return res.status(404).json({ error: "Loyiha topilmadi." });
-    }
-    const seller = await prisma.user.findUnique({ where: { id: sellerIdNum } });
-    if (!seller) {
-      return res.status(404).json({ error: "Sotuvchi topilmadi." });
-    }
-
-    let conversation = await prisma.conversation.findUnique({
-      where: { startupId_buyerId_sellerId: { startupId, buyerId, sellerId: sellerIdNum } }
-    });
-    if (!conversation) {
-      conversation = await prisma.conversation.create({
-        data: { startupId, buyerId, sellerId: sellerIdNum }
-      });
-    }
-    res.json(conversation);
-  } catch (err: any) {
-    console.error("Create conversation error:", err);
-    res.status(500).json({ error: "Suhbat boshlashda xatolik yuz berdi." });
-  }
-});
-
-// GET /api/conversations — barcha suhbatlar
-app.get("/api/conversations", authenticateToken, async (req: AuthRequest, res: Response) => {
-  try {
-    const userId = req.user!.id;
-    const conversations = await prisma.conversation.findMany({
-      where: { OR: [{ buyerId: userId }, { sellerId: userId }] },
-      include: { buyer: true, seller: true, startup: true },
-      orderBy: { lastMessageAt: "desc" }
-    });
-    res.json(conversations);
-  } catch (err: any) {
-    console.error("Get conversations error:", err);
-    res.status(500).json({ error: "Suhbatlarni yuklashda xatolik yuz berdi." });
-  }
-});
-
-// GET /api/conversations/:id/messages — suhbat tarixi
-app.get("/api/conversations/:id/messages", authenticateToken, async (req: AuthRequest, res: Response) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user!.id;
-
-    const conversation = await prisma.conversation.findUnique({ where: { id } });
-    if (!conversation || (conversation.buyerId !== userId && conversation.sellerId !== userId)) {
-      return res.status(403).json({ error: "Siz bu suhbat ishtirokchisi emassiz." });
-    }
-
-    const messages = await prisma.message.findMany({
-      where: { conversationId: id },
-      orderBy: { createdAt: "desc" },
-      take: 50
-    });
-    res.json(messages.reverse());
-  } catch (err: any) {
-    console.error("Get messages error:", err);
-    res.status(500).json({ error: "Xabarlarni yuklashda xatolik yuz berdi." });
-  }
-});
-
-// POST /api/conversations/:id/messages — yangi xabar yuborish
-app.post("/api/conversations/:id/messages", authenticateToken, rateLimit({ windowMs: 60 * 1000, max: 20 }), async (req: AuthRequest, res: Response) => {
-  try {
-    const { id } = req.params;
-    
-    const messageSchema = z.object({
-      content: z.string().trim().min(1, "Xabar matni bo'sh bo'lishi mumkin emas").max(3000, "Xabar matni 3000 ta belgidan oshmasligi kerak")
-    });
-
-    const parsed = messageSchema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({ error: parsed.error.issues[0].message });
-    }
-    const { content } = parsed.data;
-    const senderId = req.user!.id;
-    
-    const conversation = await prisma.conversation.findUnique({ where: { id }, include: { buyer: true, seller: true } });
-    if (!conversation || (conversation.buyerId !== senderId && conversation.sellerId !== senderId)) return res.status(403).json({ error: "Siz bu suhbat ishtirokchisi emassiz" });
-    
-    const message = await prisma.message.create({
-      data: { conversationId: id, senderId, content }
-    });
-    await prisma.conversation.update({ where: { id }, data: { lastMessageAt: new Date() } });
-    
-    const recipientId = senderId === conversation.buyerId ? conversation.sellerId : conversation.buyerId;
-    io.to(`user:${recipientId}`).emit("new_message", message);
-
-    // Create persistent notification for new message
-    const senderName = senderId === conversation.buyerId ? conversation.buyer.name : conversation.seller.name;
-    await createNotification(
-      recipientId, 
-      "MESSAGE",
-      "Yangi xabar", 
-      `${senderName} sizga yangi xabar yubordi: "${content.substring(0, 30)}${content.length > 30 ? '...' : ''}"`, 
-      `/messages`
-    );
-    
-    res.json(message);
-  } catch (err: any) {
-    console.error("Post message error:", err);
-    res.status(500).json({ error: "Xabar yuborishda xatolik yuz berdi." });
-  }
-});
-
-// PATCH /api/conversations/:id/read — xabarlarni o'qilgan deb belgilash
-app.patch("/api/conversations/:id/read", authenticateToken, async (req: AuthRequest, res: Response) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user!.id;
-
-    const conversation = await prisma.conversation.findUnique({ where: { id } });
-    if (!conversation || (conversation.buyerId !== userId && conversation.sellerId !== userId)) {
-      return res.status(403).json({ error: "Siz bu suhbat ishtirokchisi emassiz." });
-    }
-
-    await prisma.message.updateMany({
-      where: { conversationId: id, senderId: { not: userId }, readAt: null },
-      data: { readAt: new Date() }
-    });
-    res.json({ success: true });
-  } catch (err: any) {
-    console.error("Read messages error:", err);
-    res.status(500).json({ error: "Xabarlarni o'qilgan deb belgilashda xatolik yuz berdi." });
-  }
-});
+// 117-bosqich: conversations/messaging route'lari
+// src/routes/conversations.ts'ga ko'chirildi.
+import conversationsRouter from "./src/routes/conversations";
+app.use("/api/conversations", conversationsRouter);
 
 // GET /api/payments/status/:id — to'lov holatini tekshirish
 app.get("/api/payments/status/:id", authenticateToken, paymentStatusLimiter, async (req: AuthRequest, res: Response) => {
@@ -4013,736 +2965,34 @@ app.get("/api/payments/status/:id", authenticateToken, paymentStatusLimiter, asy
   }
 });
 
-// POST /api/reviews — Sharh qoldirish
-app.post("/api/reviews", authenticateToken, async (req: AuthRequest, res: Response) => {
-  const { rating, comment, startupId } = req.body;
+// 113-bosqich: reviews route'lari src/routes/reviews.ts'ga ko'chirildi.
+import reviewsRouter from "./src/routes/reviews";
+app.use("/api", reviewsRouter);
 
-  if (!rating || !comment || !startupId) {
-    return res.status(400).json({ error: "Barcha maydonlarni to'ldiring." });
-  }
+// 112-bosqich: disputes route'lari src/routes/disputes.ts'ga ko'chirildi.
+import disputesRouter from "./src/routes/disputes";
+app.use("/api/disputes", disputesRouter);
 
-  const ratingInt = parseInt(rating, 10);
-  if (isNaN(ratingInt) || ratingInt < 1 || ratingInt > 5) {
-    return res.status(400).json({ error: "Reyting 1 dan 5 gacha bo'lishi kerak." });
-  }
-
-  try {
-    // Check if the buyer indeed completed a payment for this startup
-    const completedPayment = await prisma.payment.findFirst({
-      where: {
-        startupId,
-        userId: req.user?.id,
-        status: "completed"
-      }
-    });
-
-    if (!completedPayment) {
-      return res.status(403).json({ error: "Siz ushbu loyihani sotib olmagansiz yoki to'lov yakunlanmagan. Sharh qoldira olmaysiz." });
-    }
-
-    // Check if they already left a review for this startup to prevent duplicates
-    const existingReview = await prisma.review.findFirst({
-      where: {
-        startupId,
-        buyerId: req.user?.id
-      }
-    });
-
-    if (existingReview) {
-      return res.status(409).json({ error: "Siz ushbu loyiha uchun allaqachon sharh qoldirgansiz." });
-    }
-
-    const startup = await prisma.startup.findUnique({
-      where: { id: startupId }
-    });
-
-    if (!startup || !startup.userId) {
-      return res.status(404).json({ error: "Loyiha yoki uning sotuvchisi topilmadi." });
-    }
-
-    const review = await prisma.review.create({
-      data: {
-        rating: ratingInt,
-        comment,
-        startupId,
-        buyerId: req.user!.id,
-        sellerId: startup.userId
-      }
-    });
-
-    // Notify seller
-    await createNotification(
-      startup.userId, 
-      "REVIEW",
-      "Yangi sharh", 
-      `"${startup.name}" loyihangiz uchun yangi ${ratingInt} yulduzli sharh qoldirildi.`, 
-      `/profile?tab=sales`
-    );
-
-    const seller = await prisma.user.findUnique({ where: { id: startup.userId } });
-    if (seller) {
-      await sendEmail(
-        seller.email,
-        "Yangi sharh qoldirildi",
-        `<p>Sizning <b>${startup.name}</b> loyihangizga yangi sharh qoldirildi:</p><blockquote>${comment}</blockquote><p>Reyting: ${ratingInt} ball</p>`
-      );
-    }
-
-    // Recalculate seller's rating metrics
-    const sellerReviews = await prisma.review.findMany({
-      where: { sellerId: startup.userId }
-    });
-
-    const totalReviews = sellerReviews.length;
-    const sum = sellerReviews.reduce((acc: number, r: any) => acc + r.rating, 0);
-    const averageRating = totalReviews > 0 ? parseFloat((sum / totalReviews).toFixed(1)) : 0;
-
-    await prisma.user.update({
-      where: { id: startup.userId },
-      data: {
-        averageRating,
-        totalReviews
-      }
-    });
-
-    res.status(201).json(review);
-  } catch (err: any) {
-    console.error("Create review error:", err);
-    res.status(500).json({ error: "Sharh yozishda xatolik yuz berdi." });
-  }
-});
-
-// GET /api/users/:id/reviews — Foydalanuvchining sharhlarini olish
-app.get("/api/users/:id/reviews", async (req: Request, res: Response) => {
-  const sellerId = parseInt(req.params.id, 10);
-  if (isNaN(sellerId)) {
-    return res.status(400).json({ error: "Yaroqsiz foydalanuvchi ID." });
-  }
-
-  try {
-    const reviews = await prisma.review.findMany({
-      where: { sellerId },
-      include: {
-        buyer: {
-          select: {
-            id: true,
-            name: true,
-            avatarUrl: true
-          }
-        },
-        startup: {
-          select: {
-            id: true,
-            name: true
-          }
-        }
-      },
-      orderBy: { createdAt: "desc" }
-    });
-
-    const user = await prisma.user.findUnique({
-      where: { id: sellerId },
-      select: {
-        averageRating: true,
-        totalReviews: true,
-        name: true
-      }
-    });
-
-    res.json({
-      reviews,
-      averageRating: user?.averageRating || 0,
-      totalReviews: user?.totalReviews || 0,
-      sellerName: user?.name || "Noma'lum"
-    });
-  } catch (err: any) {
-    console.error("Get reviews error:", err);
-    res.status(500).json({ error: "Sharhlarni olishda xatolik yuz berdi." });
-  }
-});
-
-// POST /api/disputes — Nizo ochish
-app.post("/api/disputes", authenticateToken, async (req: AuthRequest, res: Response) => {
-  const { paymentId, reason, description } = req.body;
-
-  if (!paymentId || !reason || !description) {
-    return res.status(400).json({ error: "Barcha maydonlarni to'ldiring." });
-  }
-
-  try {
-    const payment = await prisma.payment.findUnique({
-      where: { id: paymentId }
-    });
-
-    if (!payment || payment.userId !== req.user?.id) {
-      return res.status(403).json({ error: "Siz faqat o'zingiz to'lagan buyurtmalar bo'yicha nizo ocha olasiz." });
-    }
-
-    if (payment.status !== "completed") {
-      return res.status(400).json({ error: "Nizo ochish uchun to'lov to'liq muvaffaqiyatli amalga oshirilgan bo'lishi shart." });
-    }
-
-    const existingDispute = await prisma.dispute.findFirst({
-      where: { paymentId }
-    });
-
-    if (existingDispute) {
-      return res.status(409).json({ error: "Ushbu buyurtma bo'yicha allaqachon nizo ochilgan." });
-    }
-
-    const dispute = await prisma.dispute.create({
-      data: {
-        paymentId,
-        buyerId: req.user!.id,
-        reason,
-        description,
-        status: "open"
-      }
-    });
-
-    res.status(201).json(dispute);
-  } catch (err: any) {
-    console.error("Create dispute error:", err);
-    res.status(500).json({ error: "Nizo ochishda xatolik yuz berdi." });
-  }
-});
-
-// GET /api/disputes — Barcha nizolarni olish (Admin)
-app.get("/api/disputes", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  try {
-    const page = parseInt(req.query.page as string || "1");
-    const limit = parseInt(req.query.limit as string || "20");
-    const safeLimit = Math.min(100, Math.max(1, limit));
-    const skip = (Math.max(1, page) - 1) * safeLimit;
-
-    const [disputes, total] = await Promise.all([
-      prisma.dispute.findMany({
-        include: {
-          buyer: {
-            select: {
-              id: true,
-              name: true,
-              email: true
-            }
-          },
-          payment: {
-            include: {
-              startup: {
-                select: {
-                  id: true,
-                  name: true,
-                  price: true
-                }
-              }
-            }
-          }
-        },
-        orderBy: { createdAt: "desc" },
-        take: safeLimit,
-        skip
-      }),
-      prisma.dispute.count()
-    ]);
-
-    res.json({
-      data: disputes,
-      total,
-      page,
-      totalPages: Math.ceil(total / safeLimit)
-    });
-  } catch (err: any) {
-    console.error("Get disputes error:", err);
-    res.status(500).json({ error: "Nizolarni olishda xatolik yuz berdi." });
-  }
-});
-
-// PATCH /api/disputes/:id — Nizoni yangilash (Admin)
-app.patch("/api/disputes/:id", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  const disputeId = parseInt(req.params.id, 10);
-  if (isNaN(disputeId)) {
-    return res.status(400).json({ error: "Yaroqsiz Nizo ID." });
-  }
-  const { status, adminNote } = req.body;
-
-  if (!status) {
-    return res.status(400).json({ error: "Status ko'rsatilishi lozim." });
-  }
-
-  try {
-    const updated = await prisma.dispute.update({
-      where: { id: disputeId },
-      data: {
-        status,
-        adminNote: adminNote || null,
-        resolvedAt: status === "resolved" || status === "rejected" ? new Date() : null
-      },
-      include: {
-        payment: { include: { startup: true } }
-      }
-    });
-
-    // Notify both parties about dispute resolution
-    const disputeTitle = "Nizo hal qilindi";
-    const disputeMsg = `"${updated.payment.startup?.name}" bo'yicha nizo ${status === 'resolved' ? 'hal qilindi' : 'rad etildi'}. Admin izohi: ${adminNote || 'Izohsiz'}`;
-    
-    if (updated.buyerId) await createNotification(updated.buyerId, "SYSTEM", disputeTitle, disputeMsg, `/profile?tab=purchases`);
-    if (updated.sellerId) await createNotification(updated.sellerId, "SYSTEM", disputeTitle, disputeMsg, `/profile?tab=sales`);
-
-    // Send Emails
-    const buyer = await prisma.user.findUnique({ where: { id: updated.buyerId } });
-    const sellerUserId = updated.payment.startup?.userId;
-    const seller = sellerUserId ? await prisma.user.findUnique({ where: { id: sellerUserId } }) : null;
-    
-    if (buyer) await sendEmail(buyer.email, disputeTitle, `<p>${disputeMsg}</p>`);
-    if (seller) await sendEmail(seller.email, disputeTitle, `<p>${disputeMsg}</p>`);
-
-    await prisma.auditLog.create({
-      data: {
-        adminId: req.user?.id || 0,
-        action: status === "resolved" ? "resolve_dispute" : "reject_dispute",
-        targetId: String(disputeId),
-        details: adminNote ? `Nizo statusi: ${status}. Izoh: ${adminNote}` : `Nizo statusi: ${status}`
-      }
-    }).catch((e: any) => console.error("Audit log error:", e));
-
-    res.json(updated);
-  } catch (err: any) {
-    console.error("Update dispute error:", err);
-    res.status(500).json({ error: "Nizoni yangilashda xatolik yuz berdi." });
-  }
-});
-
-// GET /api/admin/audit-logs — Admin amallari tarixi (Admin)
-app.get("/api/admin/audit-logs", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  try {
-    const page = parseInt(req.query.page as string || "1");
-    const limit = parseInt(req.query.limit as string || "20");
-    const safeLimit = Math.min(100, Math.max(1, limit));
-    const skip = (Math.max(1, page) - 1) * safeLimit;
-
-    const [logs, total] = await Promise.all([
-      prisma.auditLog.findMany({
-        orderBy: { createdAt: "desc" },
-        take: safeLimit,
-        skip,
-        include: { admin: { select: { name: true } } }
-      }),
-      prisma.auditLog.count()
-    ]);
-
-    res.json({
-      data: logs,
-      total,
-      page,
-      totalPages: Math.ceil(total / safeLimit)
-    });
-  } catch (err: any) {
-    console.error("Get audit logs error:", err);
-    res.status(500).json({ error: "Audit loglarni olishda xatolik yuz berdi." });
-  }
-});
-
-// GET /api/admin/stats — Platforma komissiyasi va sotuvlar statistikasi (Admin)
-app.get("/api/admin/stats", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  try {
-    const now = new Date();
-    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-    const [
-      totalUsers,
-      totalActiveStartups,
-      stats,
-      monthlyStats,
-      lastDisputes,
-      lastReports
-    ] = await Promise.all([
-      prisma.user.count(),
-      prisma.startup.count({ where: { status: "active", soldStatus: "sotuvda" } }),
-      prisma.payment.aggregate({
-        where: { status: "completed" },
-        _sum: { amount: true, platformFeeAmount: true },
-        _count: true
-      }),
-      prisma.payment.aggregate({ 
-        where: { 
-          status: "completed",
-          createdAt: { gte: firstDayOfMonth }
-        },
-        _sum: { platformFeeAmount: true }
-      }),
-      prisma.dispute.findMany({
-        take: 5,
-        orderBy: { createdAt: "desc" },
-        include: { buyer: true }
-      }),
-      prisma.report.findMany({
-        take: 5,
-        orderBy: { createdAt: "desc" }
-      })
-    ]);
-
-    const totalVolume = stats._sum.amount || 0;
-    const totalCommission = stats._sum.platformFeeAmount || 0;
-    const monthlyCommission = monthlyStats._sum.platformFeeAmount || 0;
-
-    const openDisputes = await prisma.dispute.count({ where: { status: "open" } });
-
-    res.json({
-      totalUsers,
-      totalActiveStartups,
-      totalCompletedSales: stats._count || 0,
-      totalCommission,
-      monthlyCommission,
-      totalVolume,
-      openDisputes,
-      lastDisputes: lastDisputes.map((d: any) => ({
-        id: d.id,
-        buyer: d.buyer?.name,
-        reason: d.reason,
-        status: d.status,
-        date: d.createdAt
-      })),
-      lastReports: lastReports.map((r: any) => ({
-        id: r.id,
-        targetType: r.targetType,
-        reason: r.reason,
-        status: r.status,
-        date: r.createdAt
-      })),
-      systemStatus: {
-        coingateConfigured: !!(process.env.COINGATE_API_TOKEN),
-        isProduction: process.env.NODE_ENV === "production",
-        envWarnings: (process.env.NODE_ENV === "production" && !process.env.COINGATE_API_TOKEN) ? ["To'lov tizimi sozlanmagan (COINGATE_API_TOKEN topilmadi)"] : []
-      }
-    });
-  } catch (err: any) {
-    console.error("Get stats error:", err);
-    res.status(500).json({ error: "Statistikani olishda xatolik yuz berdi." });
-  }
-});
+// 120-bosqich: audit-logs+stats route'lari src/routes/admin-audit.ts'ga ko'chirildi.
+import adminAuditRouter from "./src/routes/admin-audit";
+app.use("/api/admin", adminAuditRouter);
 
 
 // DELETE /api/admin/startups/:id — E'lonni o'chirish (Admin)
-app.delete("/api/admin/startups/:id", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  
-  try {
-    // Use transaction for atomic deletion of all cascading relations
-    await prisma.$transaction(async (tx: any) => {
-      // 1. Delete reviews
-      await tx.review.deleteMany({ where: { startupId: id } });
-      
-      // 2. Delete ideas and their votes
-      const ideas = await tx.idea.findMany({ where: { startupId: id } });
-      const ideaIds = ideas.map((i: any) => i.id);
-      await tx.ideaVote.deleteMany({ where: { ideaId: { in: ideaIds } } });
-      await tx.idea.deleteMany({ where: { startupId: id } });
-      
-      // 3. Get all payments for this startup
-      const payments = await tx.payment.findMany({ where: { startupId: id } });
-      const paymentIds = payments.map((p: any) => p.id);
-      
-      // 4. Delete disputes
-      await tx.dispute.deleteMany({ where: { paymentId: { in: paymentIds } } });
-      
-      // 5. Delete escrow payments
-      await tx.escrowPayment.deleteMany({ where: { paymentId: { in: paymentIds } } });
-      
-      // 6. Delete messages in conversations
-      const conversations = await tx.conversation.findMany({ where: { startupId: id } });
-      for (const conv of conversations) {
-        await tx.message.deleteMany({ where: { conversationId: conv.id } });
-      }
-      
-      // 7. Delete conversations
-      await tx.conversation.deleteMany({ where: { startupId: id } });
-      
-      // 8. Delete listing subscriptions
-      await tx.listingSubscription.deleteMany({ where: { startupId: id } });
-      
-      // 9. Delete top boosts
-      await tx.topBoost.deleteMany({ where: { startupId: id } });
-      
-      // 10. Delete payments
-      await tx.payment.deleteMany({ where: { startupId: id } });
-      
-      // 11. Finally delete startup
-      await tx.startup.delete({ where: { id } });
-    });
-    
-    // Audit log
-    await prisma.auditLog.create({
-      data: {
-        adminId: req.user?.id || 0,
-        action: "delete_startup",
-        targetId: id,
-        details: `Startup and all related records deleted`
-      }
-    }).catch((e: any) => console.error("Audit log error:", e));
-    
-    res.json({ success: true, message: "Loyiha va unga tegishli barcha ma'lumotlar muvaffaqiyatli o'chirildi." });
-  } catch (err: any) {
-    console.error("Delete startup error:", err);
-    res.status(500).json({ error: "E'lonni o'chirishda xatolik yuz berdi." });
-  }
-});
+// 121-bosqich: admin startup/idea delete route'lari src/routes/admin-delete.ts'ga
+// ko'chirildi (sponsor-channels.ts naqshi bilan bir xil).
+import adminDeleteRouter from "./src/routes/admin-delete";
+app.use("/api/admin", adminDeleteRouter);
 
-// DELETE /api/admin/ideas/:id — G'oya/Izohni o'chirish (Admin)
-app.delete("/api/admin/ideas/:id", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  const id = parseInt(req.params.id, 10);
-  if (isNaN(id)) {
-    return res.status(400).json({ error: "Yaroqsiz ID." });
-  }
-  try {
-    await prisma.ideaVote.deleteMany({ where: { ideaId: id } });
-    await prisma.idea.delete({ where: { id } });
+// 119-bosqich: admin/settings route'lari src/routes/admin-settings.ts'ga
+// ko'chirildi.
+import adminSettingsRouter from "./src/routes/admin-settings";
+app.use("/api/admin/settings", adminSettingsRouter);
 
-    await prisma.auditLog.create({
-      data: {
-        adminId: req.user?.id || 0,
-        action: "delete_idea",
-        targetId: String(id),
-        details: `Idea ${id} and its votes deleted`
-      }
-    }).catch((e: any) => console.error("Audit log error:", e));
-
-    res.json({ success: true, message: "Izoh muvaffaqiyatli o'chirildi." });
-  } catch (err) {
-    console.error("Admin delete idea error:", err);
-    res.status(500).json({ error: "Izohni o'chirishda xatolik yuz berdi." });
-  }
-});
-
-function maskValue(val: string): string {
-  if (!val) return "";
-  if (val.length <= 4) return "••••";
-  return "••••••••" + val.slice(-4);
-}
-
-// GET /api/admin/settings — Barcha sozlamalarni qisman yashirgan holda olish (Admin)
-app.get("/api/admin/settings", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  const ALL_KEYS = [
-    "COINGATE_API_TOKEN",
-    "CONTABO_S3_ENDPOINT",
-    "CONTABO_ACCESS_KEY",
-    "CONTABO_SECRET_KEY",
-    "CONTABO_BUCKET_NAME",
-    "CDN_DOMAIN",
-    "SMTP_HOST",
-    "SMTP_PORT",
-    "SMTP_USER",
-    "SMTP_PASS",
-    "TELEGRAM_BOT_TOKEN",
-    "TELEGRAM_STORAGE_CHANNEL_ID",
-    "TELEGRAM_BACKUP_CHAT_ID",
-    "BACKUP_GITHUB_TOKEN",
-    "BACKUP_GITHUB_REPO",
-    "BACKUP_GITHUB_EMAIL",
-    "BACKUP_GITHUB_NAME",
-    "APP_URL"
-  ];
-
-  try {
-    const results = [];
-    for (const key of ALL_KEYS) {
-      const val = await getSetting(key);
-      results.push({
-        key,
-        value: val ? maskValue(val) : "",
-        hasValue: !!val
-      });
-    }
-    res.json(results);
-  } catch (err: any) {
-    console.error("Get admin settings error:", err);
-    res.status(500).json({ error: "Sozlamalarni olishda xatolik yuz berdi." });
-  }
-});
-
-// PUT /api/admin/settings/:key — Sozlama qiymatini yangilash (Admin)
-app.put("/api/admin/settings/:key", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  const { key } = req.params;
-  const { value } = req.body;
-
-  const ALL_KEYS = [
-    "COINGATE_API_TOKEN",
-    "CONTABO_S3_ENDPOINT",
-    "CONTABO_ACCESS_KEY",
-    "CONTABO_SECRET_KEY",
-    "CONTABO_BUCKET_NAME",
-    "CDN_DOMAIN",
-    "SMTP_HOST",
-    "SMTP_PORT",
-    "SMTP_USER",
-    "SMTP_PASS",
-    "TELEGRAM_BOT_TOKEN",
-    "TELEGRAM_STORAGE_CHANNEL_ID",
-    "TELEGRAM_BACKUP_CHAT_ID",
-    "BACKUP_GITHUB_TOKEN",
-    "BACKUP_GITHUB_REPO",
-    "BACKUP_GITHUB_EMAIL",
-    "BACKUP_GITHUB_NAME",
-    "APP_URL"
-  ];
-
-  if (!ALL_KEYS.includes(key)) {
-    return res.status(400).json({ error: "Noto'g'ri sozlama kaliti." });
-  }
-
-  if (value === undefined || value === null) {
-    return res.status(400).json({ error: "Qiymat kiritilishi shart." });
-  }
-
-  try {
-    const encrypted = encryptSecret(value);
-    
-    await prisma.setting.upsert({
-      where: { key },
-      update: {
-        value: encrypted,
-        updatedById: req.user?.id || 0
-      },
-      create: {
-        key,
-        value: encrypted,
-        updatedById: req.user?.id || 0
-      }
-    });
-
-    const adminName = req.user?.name || `Admin #${req.user?.id}`;
-    await prisma.auditLog.create({
-      data: {
-        adminId: req.user?.id || 0,
-        action: "update_setting",
-        targetId: key,
-        details: `Admin ${adminName}, ${key} sozlamasini yangiladi.`
-      }
-    }).catch((e: any) => console.error("Audit log error:", e));
-
-    res.json({ success: true, key, value: maskValue(value) });
-  } catch (err: any) {
-    console.error(`Save setting error for ${key}:`, err);
-    res.status(500).json({ error: "Sozlamani saqlashda xatolik yuz berdi." });
-  }
-});
-
-// GET /api/admin/sponsor-channels — Barcha sponsor kanallarni olish (Admin)
-app.get("/api/admin/sponsor-channels", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  try {
-    const channels = await prisma.sponsorChannel.findMany({
-      orderBy: { createdAt: "desc" }
-    });
-    res.json(channels);
-  } catch (err: any) {
-    console.error("Get sponsor channels error:", err);
-    res.status(500).json({ error: "Sponsor kanallarni olishda xatolik yuz berdi." });
-  }
-});
-
-// POST /api/admin/sponsor-channels — Yangi sponsor kanal qo'shish (Admin)
-app.post("/api/admin/sponsor-channels", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  const { channelId, channelUsername, displayName, advertiserContact, pricePerMonth, startDate, endDate } = req.body;
-
-  if (!channelId || !channelUsername || !displayName) {
-    return res.status(400).json({ error: "Kanal ID, username va ko'rinadigan nom majburiy." });
-  }
-
-  try {
-    const channel = await prisma.sponsorChannel.create({
-      data: {
-        channelId,
-        channelUsername,
-        displayName,
-        advertiserContact,
-        pricePerMonth: pricePerMonth ? parseFloat(pricePerMonth) : null,
-        startDate: startDate ? new Date(startDate) : null,
-        endDate: endDate ? new Date(endDate) : null,
-        isActive: true
-      }
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        adminId: req.user?.id || 0,
-        action: "create_sponsor_channel",
-        targetId: String(channel.id),
-        details: `Yangi sponsor kanal qo'shildi: ${displayName} (@${channelUsername})`
-      }
-    }).catch((e: any) => console.error("Audit log error:", e));
-
-    res.status(201).json(channel);
-  } catch (err: any) {
-    console.error("Create sponsor channel error:", err);
-    res.status(500).json({ error: "Sponsor kanalni qo'shishda xatolik yuz berdi." });
-  }
-});
-
-// PATCH /api/admin/sponsor-channels/:id — Sponsor kanalni yangilash (Admin)
-app.patch("/api/admin/sponsor-channels/:id", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  const id = parseInt(req.params.id, 10);
-  if (isNaN(id)) {
-    return res.status(400).json({ error: "Yaroqsiz Sponsor Kanal ID." });
-  }
-  const { isActive, channelId, channelUsername, displayName, advertiserContact, pricePerMonth, startDate, endDate } = req.body;
-
-  try {
-    const updated = await prisma.sponsorChannel.update({
-      where: { id },
-      data: {
-        isActive: isActive !== undefined ? isActive : undefined,
-        channelId,
-        channelUsername,
-        displayName,
-        advertiserContact,
-        pricePerMonth: pricePerMonth !== undefined ? (pricePerMonth ? parseFloat(pricePerMonth) : null) : undefined,
-        startDate: startDate !== undefined ? (startDate ? new Date(startDate) : null) : undefined,
-        endDate: endDate !== undefined ? (endDate ? new Date(endDate) : null) : undefined
-      }
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        adminId: req.user?.id || 0,
-        action: "update_sponsor_channel",
-        targetId: String(id),
-        details: `Sponsor kanal yangilandi (ID: ${id})`
-      }
-    }).catch((e: any) => console.error("Audit log error:", e));
-
-    res.json(updated);
-  } catch (err: any) {
-    console.error("Update sponsor channel error:", err);
-    res.status(500).json({ error: "Sponsor kanalni yangilashda xatolik yuz berdi." });
-  }
-});
-
-// DELETE /api/admin/sponsor-channels/:id — Sponsor kanalni o'chirish (Admin)
-app.delete("/api/admin/sponsor-channels/:id", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  const id = parseInt(req.params.id, 10);
-  if (isNaN(id)) {
-    return res.status(400).json({ error: "Yaroqsiz Sponsor Kanal ID." });
-  }
-
-  try {
-    await prisma.sponsorChannel.delete({
-      where: { id }
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        adminId: req.user?.id || 0,
-        action: "delete_sponsor_channel",
-        targetId: String(id),
-        details: `Sponsor kanal o'chirildi (ID: ${id})`
-      }
-    }).catch((e: any) => console.error("Audit log error:", e));
-
-    res.json({ success: true });
-  } catch (err: any) {
-    console.error("Delete sponsor channel error:", err);
-    res.status(500).json({ error: "Sponsor kanalni o'chirishda xatolik yuz berdi." });
-  }
-});
+// 110-bosqich: sponsor-channels routes src/routes/sponsor-channels.ts'ga
+// ko'chirildi (auth.ts/support.ts naqshi bilan bir xil).
+import sponsorChannelsRouter from "./src/routes/sponsor-channels";
+app.use("/api/admin/sponsor-channels", sponsorChannelsRouter);
 
 async function seedSettings() {
   const defaults = [
@@ -4812,8 +3062,15 @@ async function start() {
         const lastBackupFileId = await getSetting("last_backup_file_id");
         const fallbackPath = path.join(process.cwd(), 'last_backup.json');
         const hasFallback = fs.existsSync(fallbackPath);
-        
-        if (!lastBackupFileId && !hasFallback) {
+        // 69-MUAMMO: bu yerda faqat Telegram manbalari (last_backup_file_id/
+        // last_backup.json) tekshirilardi — faqat Contabo S3 sozlangan
+        // loyihalarda (Telegram sozlanmagan) bu ikkalasi ham hech qachon
+        // yozilmaydi, shu sabab haqiqiy zaxira mavjud bo'lsa ham "toza
+        // o'rnatish" deb xato xulosaga kelinardi. Endi S3 sozlamalari ham
+        // tekshiriladi.
+        const hasS3Config = !!(await getSetting("CONTABO_S3_ENDPOINT")) && !!(await getSetting("CONTABO_BUCKET_NAME"));
+
+        if (!lastBackupFileId && !hasFallback && !hasS3Config) {
           console.log("ℹ️ No previous backup file ID found in settings or fallback. This is a clean installation. Proceeding with clean database.");
           return;
         }
@@ -4952,9 +3209,15 @@ app.delete("/api/admin/categories/:id", authenticateToken, requireAdmin, async (
 // --- SECURITY SETTINGS ---
 app.get("/api/auth/sessions", authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
+    // XAVFSIZLIK: avval butun qator (shu jumladan haqiqiy `token` qiymati —
+    // amal qiluvchi refresh token, bazada oddiy matn holida saqlanadi)
+    // to'g'ridan-to'g'ri javobga qaytarilardi — bu seans o'g'irlash uchun
+    // ishlatsa bo'ladigan maxfiy tokenni frontendga (va Network panyeliga)
+    // oshkor qilardi. Endi faqat xavfsiz metama'lumotlar tanlanadi.
     const sessions = await prisma.refreshToken.findMany({
       where: { userId: req.user!.id },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
+      select: { id: true, userAgent: true, ip: true, expiresAt: true, createdAt: true }
     });
     res.json(sessions);
   } catch (err) {
@@ -5005,12 +3268,7 @@ app.get("/sitemap.xml", async (req: Request, res: Response) => {
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>${appUrl}/browse</loc>
-    <changefreq>daily</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>${appUrl}/ideas</loc>
+    <loc>${appUrl}/ideas-rating</loc>
     <changefreq>weekly</changefreq>
     <priority>0.5</priority>
   </url>`;
@@ -5081,13 +3339,24 @@ app.get("/startup/:id", async (req, res, next) => {
     let html = fs.readFileSync(indexPath, "utf8");
     const appUrl = await getSetting("APP_URL") || "https://savdo24.online";
 
-    const title = `${startup.name} — Savdo24`;
-    const description = startup.description.substring(0, 160).replace(/"/g, "&quot;");
-    let image = startup.image || "https://savdo24.online/og-image.png";
-    if (image.startsWith("/")) {
-      image = `${appUrl}${image}`;
+    // XAVFSIZLIK: startup.name/description/image bazadan kelayotgan foydalanuvchi
+    // kiritgan matn (sotuvchi tomonidan yozilgan) — bu HTML sahifasiga to'g'ridan-to'g'ri
+    // qo'yilishidan oldin ALBATTA escape qilinishi shart, aks holda loyiha nomiga
+    // </title><script>...</script> kabi kod kiritilib, ushbu sahifaga kirgan HAR BIR
+    // (production'dagi barcha, botlar ham, oddiy foydalanuvchilar ham) tashrif
+    // buyuruvchida ishga tushadigan saqlanadigan (stored) XSS hosil bo'lardi.
+    const rawTitle = `${startup.name} — Savdo24`;
+    const rawDescription = startup.description.substring(0, 160);
+    let rawImage = startup.image || "https://savdo24.online/og-image.png";
+    if (rawImage.startsWith("/")) {
+      rawImage = `${appUrl}${rawImage}`;
     }
-    const url = `${appUrl}/startup/${id}`;
+    const rawUrl = `${appUrl}/startup/${id}`;
+
+    const title = escapeHtml(rawTitle);
+    const description = escapeHtml(rawDescription);
+    const image = escapeHtml(rawImage);
+    const url = escapeHtml(rawUrl);
 
     // Replace Title
     html = html.replace(/<title>.*?<\/title>/g, `<title>${title}</title>`);
@@ -5184,6 +3453,22 @@ app.get("/startup/:id", async (req, res, next) => {
       console.log("[CRON] Daily backup completed successfully.");
     } catch (err) {
       console.error("[CRON] Daily backup failed:", err);
+    }
+  });
+
+  // 70-MUAMMO: export-to-github.ts o'zini "Weekly Data Export" deb atardi va
+  // BACKUP_GITHUB_* sozlamalari mavjud bo'lsa ham, uni hech qanday cron
+  // chaqirmasdi — faqat "npm run export-github" orqali qo'lda ishga
+  // tushirilardi. Haftalik statistik zaxira hech qachon avtomatik
+  // yuborilmasdi. Endi har yakshanba soat 02:00 da avtomatik ishga tushadi.
+  cron.schedule("0 2 * * 0", async () => {
+    console.log("[CRON] Running weekly GitHub stats export...");
+    try {
+      const { exportToGithub } = await import("./scripts/export-to-github");
+      await exportToGithub();
+      console.log("[CRON] Weekly GitHub export completed.");
+    } catch (err) {
+      console.error("[CRON] Weekly GitHub export failed:", err);
     }
   });
 }

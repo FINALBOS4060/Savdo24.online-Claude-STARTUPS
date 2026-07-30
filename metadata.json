@@ -1,6 +1,6 @@
 {
   "name": "Savdo24",
-  "description": "A modern startup equity and investment marketplace for Central Asia, connecting founders with verified investors.",
+  "description": "Savdo24 — Markaziy Osiyo uchun startaplar, AI promptlar, botlar, saytlar va boshqa raqamli mahsulotlarni xarid qilish va sotish bozori.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -28,6 +28,10 @@ export default function BrowsePage({
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [subFilters, setSubFilters] = useState<Record<string, any>>({});
   const [newsletterEmail, setNewsletterEmail] = useState('');
+  // 84-band: Newsletter obuna formasida submit paytida disabled/loading
+  // holati yo'q edi (ProfilePage/SellPage/SupportPage/MessagesPage'dagi
+  // 60/74/76/83-band bilan bir xil muammo turi).
+  const [isSubscribing, setIsSubscribing] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [onlyActive, setOnlyActive] = useState<boolean>(true);
   const [listingTypeFilter, setListingTypeFilter] = useState<string>('All');
@@ -84,7 +88,16 @@ export default function BrowsePage({
     }
   }, []);
 
+  // 65-band: bu yerda so'rovlar orasida "poyga sharoiti" (race condition) bor edi —
+  // filtrlar tez-tez o'zgartirilsa (masalan bir necha kategoriya ustma-ust bosilsa),
+  // bir necha /api/startups so'rovi parallel yuborilardi va sekinroq (eskiroq)
+  // javob keyinroq kelib, yangi filtrning natijalarini eski/noto'g'ri ma'lumot
+  // bilan almashtirib qo'yishi mumkin edi. Endi har bir so'rovga tartib raqami
+  // beriladi, faqat eng so'nggi so'rovning javobi state'ga yoziladi.
+  const latestRequestIdRef = useRef(0);
+
   const fetchFilteredStartups = async () => {
+    const requestId = ++latestRequestIdRef.current;
     setLocalIsLoading(true);
     try {
       const params = new URLSearchParams();
@@ -102,6 +115,7 @@ export default function BrowsePage({
       const res = await fetch(`/api/startups?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
+        if (requestId !== latestRequestIdRef.current) return;
         setStartups(data.startups || []);
         setTotalCount(data.totalCount || 0);
         setTotalPages(data.totalPages || 0);
@@ -109,11 +123,30 @@ export default function BrowsePage({
     } catch (err) {
       console.error("Fetch filtered startups error:", err);
     } finally {
-      setLocalIsLoading(false);
+      if (requestId === latestRequestIdRef.current) setLocalIsLoading(false);
     }
   };
 
+  const prevFiltersRef = useRef({ selectedCategory, debouncedSearch, listingTypeFilter, onlyActive });
+
   useEffect(() => {
+    const prev = prevFiltersRef.current;
+    const filtersChanged =
+      prev.selectedCategory !== selectedCategory ||
+      prev.debouncedSearch !== debouncedSearch ||
+      prev.listingTypeFilter !== listingTypeFilter ||
+      prev.onlyActive !== onlyActive;
+
+    prevFiltersRef.current = { selectedCategory, debouncedSearch, listingTypeFilter, onlyActive };
+
+    // Agar filtr o'zgargan bo'lsa va hozir 1-sahifada bo'lmasak, avval sahifani
+    // 1ga qaytaramiz — bu effekt currentPage o'zgarganda qayta ishga tushadi va
+    // o'sha safar haqiqiy fetch qiladi (eski sahifa raqami bilan ortiqcha so'rov yubormaslik uchun).
+    if (filtersChanged && currentPage !== 1) {
+      setCurrentPage(1);
+      return;
+    }
+
     fetchFilteredStartups();
   }, [selectedCategory, debouncedSearch, listingTypeFilter, onlyActive, currentPage]);
 
@@ -126,10 +159,8 @@ export default function BrowsePage({
     };
   }, []);
 
-  // Reset page to 1 when filters change (except for currentPage itself) and scroll smoothly
+  // Scroll to listings smoothly whenever filters change
   useEffect(() => {
-    setCurrentPage(1);
-
     const timer = setTimeout(() => {
       const listingsElement = document.getElementById('listings-title');
       if (listingsElement) {
@@ -146,7 +177,8 @@ export default function BrowsePage({
       onActionToast("Iltimos, yaroqli elektron pochta manzili kiriting.");
       return;
     }
-    
+    if (isSubscribing) return;
+    setIsSubscribing(true);
     try {
       const res = await fetch('/api/newsletter/subscribe', {
         method: 'POST',
@@ -162,6 +194,8 @@ export default function BrowsePage({
       }
     } catch (err) {
       onActionToast("Xatolik yuz berdi. Iltimos qayta urinib ko'ring.");
+    } finally {
+      setIsSubscribing(false);
     }
   };
 
@@ -170,6 +204,28 @@ export default function BrowsePage({
     setSelectedStartupId(id);
     setView('detail');
   };
+
+  // Qo'shimcha kategoriya filtrlari (subFilters) avval hech qayerda qo'llanilmasdi —
+  // foydalanuvchi ularni tanlasa ham natijalar o'zgarmasdi. Bu filtrlar dinamik
+  // (kategoriyaga qarab har xil) bo'lgani uchun serverga so'rov sifatida yuborish
+  // o'rniga, allaqachon yuklab olingan e'lonlarning `attributes` maydoni bo'yicha
+  // klient tomonda filtrlaymiz.
+  const visibleStartups = startups.filter((startup) => {
+    const activeFilters = Object.entries(subFilters).filter(([, v]) => v !== '' && v !== false && v !== undefined);
+    if (activeFilters.length === 0) return true;
+
+    let attrs: Record<string, any> = {};
+    try {
+      attrs = startup.attributes ? JSON.parse(startup.attributes) : {};
+    } catch {
+      attrs = {};
+    }
+
+    return activeFilters.every(([key, value]) => {
+      if (typeof value === 'boolean') return !!attrs[key] === value;
+      return String(attrs[key] ?? '').toLowerCase().includes(String(value).toLowerCase());
+    });
+  });
 
   return (
     <div className="space-y-12 animate-fade-in">
@@ -452,7 +508,7 @@ export default function BrowsePage({
               </div>
             ))}
           </div>
-        ) : (startups.length === 0) ? (
+        ) : (visibleStartups.length === 0) ? (
           <div className="text-center py-16 border border-dashed border-outline-variant/20 rounded-xl bg-white/5 max-w-lg mx-auto flex flex-col items-center p-8">
             <span className="material-symbols-outlined text-5xl text-on-primary-container mb-3">folder_open</span>
             <p className="text-on-primary-container font-semibold mb-4 text-base">
@@ -486,7 +542,7 @@ export default function BrowsePage({
             ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in"
             : "flex flex-col gap-4 animate-fade-in"
           }>
-            {startups.map((startup) => {
+            {visibleStartups.map((startup) => {
               if (viewMode === 'list') {
                 return (
                   <div
@@ -538,7 +594,7 @@ export default function BrowsePage({
                           {categories.find(c => c.id === startup.category)?.name || startup.category}
                         </span>
                         <span className="px-2.5 py-1 bg-white/5 rounded-lg border border-white/5 text-[10px]">{startup.listingType}</span>
-                        <span className="text-secondary-container font-black text-sm">${startup.price ? startup.price.toLocaleString() : "Kelishilgan holda"} USDT</span>
+                        <span className="text-secondary-container font-black text-sm">${startup.price ? `${startup.price.toLocaleString()} USDT` : "Kelishilgan holda"}</span>
                       </div>
                     </div>
                     
@@ -644,7 +700,14 @@ export default function BrowsePage({
           </div>
         )}
 
-        {totalPages > 1 && (
+        {/* MUHIM: subFilters (kategoriya bo'yicha qo'shimcha filtrlar) klient
+            tomonda, faqat joriy sahifadagi 12 ta natija ustida ishlaydi —
+            server esa buni bilmay, filtrsiz umumiy totalPages'ni qaytaradi.
+            Shu sababli subFilter faol bo'lganda paginatsiya tugmalarini
+            ko'rsatish chalkash/noto'g'ri bo'lardi (masalan "Keyingi"ga bosilsa,
+            keyingi 12 ta unfiltered elementdan yana filtrlanib, 0 ta chiqishi
+            mumkin edi, lekin sahifalar soni hamon eskisidek ko'rinardi). */}
+        {totalPages > 1 && Object.values(subFilters).every((v) => v === '' || v === false || v === undefined) && (
           <div className="flex items-center justify-center gap-2 mt-8 animate-fade-in">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
@@ -709,13 +772,15 @@ export default function BrowsePage({
             placeholder="Elektron pochtangizni kiriting"
             value={newsletterEmail}
             onChange={(e) => setNewsletterEmail(e.target.value)}
+            disabled={isSubscribing}
             aria-label="Elektron pochta manzili"
           />
           <button
             type="submit"
-            className="bg-primary-container text-white px-8 py-3 rounded-xl font-bold text-sm hover:opacity-90 active:scale-95 transition-all whitespace-nowrap shadow-md"
+            disabled={isSubscribing}
+            className="bg-primary-container text-white px-8 py-3 rounded-xl font-bold text-sm hover:opacity-90 active:scale-95 transition-all whitespace-nowrap shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Obuna bo'lish
+            {isSubscribing ? 'Yuborilmoqda...' : "Obuna bo'lish"}
           </button>
         </form>
       </section>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Send } from 'lucide-react';
-import { UserProfileData, Notification } from '../types';
+import { Send, MessageCircle } from 'lucide-react';
+import { UserProfileData, Notification, ProfileTab } from '../types';
 import { apiFetch as fetch } from '../lib/api';
 
 interface NavbarProps {
@@ -15,6 +15,7 @@ interface NavbarProps {
   notifications: Notification[];
   setNotifications: React.Dispatch<React.SetStateAction<Notification[]>>;
   setSelectedStartupId?: (id: string) => void;
+  setProfileTab?: (tab: ProfileTab) => void;
 }
 
 export default function Navbar({
@@ -29,6 +30,7 @@ export default function Navbar({
   notifications,
   setNotifications,
   setSelectedStartupId,
+  setProfileTab,
 }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
@@ -149,6 +151,21 @@ export default function Navbar({
           <Send className="w-4 h-4" />
         </a>
 
+        {/* MUHIM: MessagesPage /messages yo'lida mavjud edi, lekin uni ochish uchun
+            HECH QANDAY menyu/tugma yo'q edi (faqat bildirishnoma orqali topish mumkin
+            edi) — endi bu yerga doimiy kirish tugmasi qo'shildi. */}
+        {user.name !== 'Mehmon' && (
+          <button
+            onClick={() => setView('messages')}
+            className={`p-2 transition-colors rounded-lg bg-white/5 ${
+              currentView === 'messages' ? 'text-secondary-container' : 'text-on-primary-container hover:text-secondary-container'
+            }`}
+            title="Xabarlar"
+          >
+            <MessageCircle className="w-4 h-4" />
+          </button>
+        )}
+
         {/* Notifications */}
         {user.name !== 'Mehmon' && (
           <div className="relative">
@@ -199,8 +216,23 @@ export default function Navbar({
                               if (setSelectedStartupId) setSelectedStartupId(startupId);
                               setView('detail');
                             } else {
-                              const path = notif.link.replace(/^\//, '');
-                              setView(path);
+                              // MUHIM: server ba'zi bildirishnomalarni `/profile?tab=sales`
+                              // kabi query-param bilan yuboradi, lekin bu param hech qayerda
+                              // o'qilmasdi — bosilganda doim standart tabga tushirardi.
+                              // Endi `tab` qiymati o'qilib, setProfileTab chaqiriladi.
+                              const [rawPath, query] = notif.link.replace(/^\//, '').split('?');
+                              if (rawPath === 'profile' && query && setProfileTab) {
+                                const tab = new URLSearchParams(query).get('tab');
+                                if (tab) setProfileTab(tab as ProfileTab);
+                                setView(rawPath);
+                              } else {
+                                // 93-band: profile'dan boshqa sahifalar (masalan AdminPage)
+                                // o'z tabini App.tsx orqali emas, to'g'ridan-to'g'ri URL
+                                // query'dan o'qiydi — shu sabab query qismini
+                                // tashlab yubormaslik kerak (avval faqat rawPath
+                                // uzatilardi, ?tab=... har doim yo'qolib ketardi).
+                                setView(rawPath + (query ? `?${query}` : ''));
+                              }
                             }
                           }
                         }}

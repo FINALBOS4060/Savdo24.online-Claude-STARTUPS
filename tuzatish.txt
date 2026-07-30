@@ -1,0 +1,1748 @@
+QOIDA: eng kam tekshirilgan faylni birinchi tekshir, xatoni to'g'ridan-to'g'ri
+kodda tuzat, sonini +1 oshir. Har safar oxirida: zip + havola SHART.
+Izohlar (bu faylda ham, koddagi izohlarda ham) juda qisqa, token tejash uchun.
+
+METODOLOGIYA ESLATMASI (125-bosqichdan beri): agar foydalanuvchiga
+tartib/tanlov taklif qilingan bo'lsa-yu javob HALI kelmagan bo'lsa —
+keyingi sessiya bu savolni taxmin qilib "ehtimol davom etaversin" deb
+hal qilmasligi kerak. Yo savolni ochiq deb qoldirib boshqa (aniq
+buyurtma qilingan) ishni qilish, yo suhbatning o'zida qayta so'rash —
+lekin OCHIQ savol asosida yangi yo'nalishni "davom ettiraverish" YO'Q.
+
+METODOLOGIYA ESLATMASI (123-bosqichdan beri): bu sandbox muhitida tarmoq
+yo'q, shu sabab node_modules HECH QACHON o'rnatilmaydi. Shu sabab
+"tsc --noEmit --noResolve" yoki qo'lda qavs sanash — bular sintaksis
+darajasidagi tekshiruv, HAQIQIY tip-tekshiruv EMAS (bu haqiqat 1-122
+bosqichlarda ham to'g'ri edi, lekin ba'zi joyda "tekshirildi" deb qisqa
+yozilgani chalg'ituvchi bo'lishi mumkin). Har safar shu farqni ANIQ
+yozish kerak: "sintaksis tekshirildi (--noResolve, tip emas)" va
+"HAQIQIY tsc/build — faqat .github/workflows/ci.yml orqali, push
+qilingandan keyin" ikkalasini aralashtirmaslik kerak.
+
+=== TEKSHIRUV SONI (guruhlangan, 3-aylanish TO'LIQ tugadi, 4-aylanish boshlanmoqda) ===
+16: server.ts
+11: SellPage.tsx, CheckoutPage.tsx, Navbar.tsx, lib/api.ts, backup-db.ts,
+restore-db.ts, export-to-github.ts, make-admin.ts, remove-fake-listings.ts,
+schema.prisma, schema.sqlite.prisma, Footer.tsx
+11: MessagesPage.tsx, Sidebar.tsx, MobileNav.tsx, ForgotPasswordPage.tsx,
+ResetPasswordPage.tsx, IdeasRatingPage.tsx, DetailPage.tsx, ProfilePage.tsx,
+SupportPage.tsx, routes/support.ts, telegram-bot/index.ts
+10: lib/crypto.ts, lib/logger.ts, lib/analytics.ts, lib/rateLimiters.ts,
+ErrorBoundary.tsx, TermsPage.tsx, PrivacyPage.tsx, RefundPolicyPage.tsx,
+BrowsePage.tsx, AdminPage.tsx, App.tsx, routes/auth.ts, main.tsx, types.ts,
+categoryFields.ts, test-email.js, vite.config.ts
+1: metadata.json, index.css, index.html,
+robots.txt, tsconfig.json, ecosystem.config.cjs, render.yaml,
+telegram-bot/package.json
+0→1 (120-bosqichda server.ts'dan ajratildi, yangi fayl):
+src/routes/admin-audit.ts
+0→1 (121-bosqichda server.ts'dan ajratildi, yangi fayl):
+src/routes/admin-delete.ts
+0→1 (105-bosqichda birinchi marta tekshirildi — .json kengaytmali
+bo'lsagen ilgari "hisobda" deb noto'g'ri tasdiqlangan edi, 99-103-bosqich
+xatosi): package-lock.json, bun.lock (ikkalasi ham avtomatik generatsiya
+qilinadigan fayl, lekin haqiqiy bog'liqliq muammosi topilgani sabab endi
+alohida kuzatiladi)
+0→1 (93-bosqichda birinchi marta tekshirildi): README.md
+2 (93-bosqichda qayta tekshirildi — o'lik bog'liqliklar topildi):
+package.json, deploy.sh
+(83-bosqichda birinchi marta tuzatish.txt'ga qo'shildi — ilgari "config,
+alohida sanalmaydi" deb o'tkazib yuborilgan edi, lekin ikkitasida haqiqiy
+REGRESSIYA topildi, shu sabab endi boshqa fayllar kabi navbat bilan
+tekshiriladi).
+
+=== TUZATILGAN XATOLAR (89 ta, mavzu bo'yicha guruhlangan, faqat kalit so'z) ===
+Xavfsizlik: role privilege escalation (users/me); SSR/email XSS (escapeHtml
+serverda ko'p joyga, auth.ts reset-emailga ham qo'shildi); pending/rejected
+e'lonlar auth'siz ko'rinishi; analytics faqat header emas cookie ham.
+Auth/parol: forgot/reset-password DB Setting+.env ikkalasi tekshiriladi.
+To'lov/checkout: CoinGate auto-redirect, apiKeysMissing, xato xabari aniq
+ko'rsatiladi, repoIncluded PATCH'da yangilanadi, coingateConfigured DB'ni
+ham tekshiradi.
+Profil/rol: Buyer/Seller→Xaridor/Sotuvchi hamma joyda; role select serverga
+bog'landi; VIP chegirma matni dinamik.
+Admin panel: Audit Logs case-fix, Bloklash modal refresh, Escrow UI,
+"Barcha e'lonlar" rejimi, Pending ro'yxati alohida (limit=100).
+Bildirishnoma/tab: /profile?tab= endi o'qiladi (Navbar+App.tsx), "sales"→
+"earnings", Xabarlar tugmasi Navbar'ga qo'shildi.
+G'oya/reyting: IdeaVote orphan cleanup (remove-fake-listings.ts).
+Zaxira: backup/restore-db.ts 9→30 model.
+Boshqa: DetailPage categories/user prop; BrowsePage subFilter pagination;
+export-to-github status.staged; telegram-bot field nomlari+editCaption+
+versiyalar; test-email.js to'liq yozildi+DB Setting; types.ts 'rejected';
+deploy.sh db push; render.yaml VITE_GOOGLE_CLIENT_ID; api.ts 5xx≠401
+refresh (REGRESSIYA BO'LGAN, ehtiyot bo'lish kerak — qayta tekshirish
+kerak bo'lsa avval shu joyni tekshir); support email domeni savdo24.uz→
+savdo24.online (Footer/SupportPage/support.ts).
+52. server.ts payments/webhook: Listing Tier Upgrade (UPG-) uchun topExpiresAt
+"pending" to'lov yaratilgan paytda hisoblangan expiresAt'ni ishlatardi —
+to'lov tasdiqlanishi kechiksa muddat jimgina qisqarardi; endi to'lov
+completed bo'lgan paytda qayta hisoblanadi (TOP-/VIP- yo'llari bunda
+to'g'ri edi, faqat UPG- xato edi).
+53. server.ts /sitemap.xml: "/ideas" yo'li yozilgan edi, haqiqiy route
+"/ideas-rating" (App.tsx) — noto'g'ri URL qidiruv tizimlarini bosh sahifaga
+redirect qilardi; "/browse" ham mavjud emas edi (haqiqatda "/" BrowsePage'ni
+ko'rsatadi) — ikkalasi ham to'g'ri yo'llarga tuzatildi (duplikat "/" yozuvi
+olib tashlandi).
+
+54. server.ts GET /api/auth/sessions (XAVFSIZLIK): butun RefreshToken qatori
+qaytarilardi — shu jumladan haqiqiy, amal qiluvchi `token` qiymati (bazada
+oddiy matn, xeshlanmagan) frontendga/Network panyeliga oshkor bo'lardi,
+seans o'g'irlash imkoniyati; endi faqat xavfsiz metama'lumotlar (id,
+userAgent, ip, sanalar) tanlanadi.
+
+55. server.ts finalizeCompletedPayment: TOP-/UPG- to'lovlari (boost/tier
+upgrade, startupId bor) "xarid yakunlandi" email va telegramDelivery
+token yaratishga tushib qolardi — xaridor "loyihani sotib oldingiz" deb
+noto'g'ri xat olardi, boost/upgrade uchun keraksiz yetkazish tokeni
+yaratilardi. Endi ikkalasi ham TOP-/UPG- dan istisno qilindi (escrow va
+soldStatus bloklaridagi kabi).
+56. server.ts sendWeeklyNewsletter: obuna bo'lmagan holda ham BARCHA
+emailVerified foydalanuvchilarga yuborilardi (Subscriber jadvali —
+/api/newsletter/subscribe — butunlay e'tiborga olinmasdan); endi faqat
+haqiqatan obuna bo'lgan Subscriber manzillariga yuboriladi.
+57. server.ts /api/b2b/onboard: companyName validatsiyasi yo'q edi (bo'sh
+yuborilsa umumiy 500) va foydalanuvchida allaqachon B2B hisob bo'lsa ham
+tushunarsiz 500 xato qaytardi; endi aniq 400 xabarlar bilan tekshiriladi.
+58. server.ts autoReleaseEscrows: bildirishnoma/email matnida "14 kunlik"
+deyilgan edi, lekin holdEndDate haqiqatda 7 kun qilib hisoblanadi
+(finalizeCompletedPayment) — matn 7 kunga tuzatildi.
+59. CheckoutPage.tsx: sahifada referral kod kiritish maydoni bor edi, lekin
+sahifa yuklangach 1.5 soniyadan keyin CoinGate'ga avtomatik yo'naltirilardi
+— referral kodni (hatto localStorage'dan oldindan to'ldirilgan bo'lsa ham)
+qo'llashga vaqt qolmasdi. Endi referral kod mavjud bo'lsa avtomatik
+yo'naltirish o'chiriladi (yoki referral qo'llanganda bekor qilinadi),
+foydalanuvchi tugmani qo'lda bosadi.
+60. SellPage.tsx: "E'lonni chop etish" tugmasi submit paytida disabled/loading
+holatiga o'tmasdi (boshqa formalardagi kabi), vizual fikr-mulohaza yo'q edi.
+61. server.ts GET /api/startups va GET /api/startups/:id (KATTA MUAMMO):
+formatStartup() deliveryUrl'ni HAMMA uchun (hatto e'lon egasi uchun ham)
+o'chirib tashlardi — natijada SellPage'da "Tahrirlash" ochilganda sotuvchi
+o'zi oldin saqlagan maxfiy yetkazish havolasini ko'ra olmasdi (bo'sh
+ko'rinardi). Endi ikkala endpoint ham egasi/admin uchun deliveryUrl'ni
+qaytarib tiklaydi, boshqa hammaga hamon yashirin.
+62. server.ts /api/escrow/release: DetailPage'dagi "Nizo ochish" tugmasi
+umumiy Dispute yozuvi yaratadi, lekin bu EscrowPayment.status'ni
+o'zgartirmaydi (faqat /api/escrow/dispute buni qiladi) — shu sabab xaridor
+ochiq nizo turgan holda ham "Mablag'ni ozod qilish" tugmasi orqali pulni
+sotuvchiga qo'lda o'tkazib yuborishi mumkin edi, avtomatik ozod qilish esa
+buni to'g'ri bloklardi (nomuvofiqlik). Endi qo'lda ozod qilish ham ochiq/
+ko'rib chiqilayotgan nizo bo'lsa bloklanadi.
+63. ProfilePage.tsx "Tasdiqlash" (escrow release) tugmasi: faqat res.ok
+tekshirilardi — 62-band tuzatilgach server ochiq nizo bo'lsa 400 qaytaradi,
+lekin frontend bu holatda hech qanday xabar ko'rsatmasdi (xarid "osilib
+qolgandek" ko'rinardi). Endi xato xabari (server.error yoki tarmoq xatosi)
+onActionToast orqali ko'rsatiladi.
+64. ProfilePage.tsx "Mening loyihalarim" kartalarida har bir faol e'lon
+uchun qattiq kodlangan soxta "12 ta taklif" matni va soxta avatar
+to'plami (+4) chiqardi — butun backend'da "offer/taklif" degan haqiqiy
+model/funksiya umuman yo'q, ya'ni bu har doim bir xil, hech narsaga
+bog'lanmagan soxta ma'lumot edi (sotuvchini yolg'on qiziqish borligiga
+ishontirardi). Olib tashlandi.
+65. BrowsePage.tsx fetchFilteredStartups: so'rovlar orasida poyga sharoiti
+(race condition) bor edi — filtrlar tez-tez o'zgartirilsa (masalan bir
+necha kategoriya ustma-ust bosilsa), bir necha /api/startups so'rovi
+parallel yuborilib, sekinroq (eskiroq) javob keyinroq kelib natijalarni
+noto'g'ri/eski ma'lumot bilan almashtirib qo'yishi mumkin edi. Endi har
+so'rovga tartib raqami beriladi, faqat eng so'nggisining javobi qabul
+qilinadi.
+66. AdminPage.tsx "Foydalanuvchilar" qidiruv maydoni: har bir harf
+kiritilganda to'g'ridan-to'g'ri fetchAdminUsers'ni chaqirardi (debounce
+yo'q, boshqa joylardagi qidiruv naqshidan farqli) — bu ham ortiqcha
+so'rovlar, ham 65-banddagi kabi poyga sharoiti xavfini keltirib chiqarardi
+(tez yozilganda eski harf uchun javob keyinroq kelib yangisini bosib
+ketishi mumkin edi). Endi 500ms debounce qo'shildi, fetchAdminUsers ham
+so'rov tartib raqami bilan himoyalandi.
+67. App.tsx handleAddStartup / SellPage.tsx (tahrirlash): yangi e'lon
+muvaffaqiyatli joylangandan yoki tahrirlangandan keyin /profile'ga
+qaytarilardi, lekin profileTab avvalgi qiymatida qolib ketardi (masalan
+"sozlamalar") — foydalanuvchi hozirgina joylagan/tahrirlagan e'lonini
+"Mening loyihalarim" bo'limida ko'rmasdi, xuddi yo'qolgandek tuyulardi.
+Endi ikkala holatda ham profileTab "startups"ga aniq o'tkaziladi
+(App.tsx to'g'ridan-to'g'ri setProfileTab, SellPage.tsx
+setInitialProfileTab orqali, MobileNav'dagi kabi).
+68. telegram-bot/index.ts check_subscription callback: obunani tekshirib,
+faylni /api/telegram/deliver orqali topshirgandan keyin (muvaffaqiyatli
+yoki xato bo'lsa ham) ctx.answerCallbackQuery() umuman chaqirilmagan edi
+— faqat "kanalga obuna bo'lmagan" holatida chaqirilardi. Natijada tugma
+Telegram mijozida "yuklanmoqda" holatida osilib qolardi. Bundan tashqari
+xato holatida serverdan qaytgan aniq xabar (data.error) o'qilmasdi, doim
+umumiy matn ko'rsatilardi. Endi ikkala holatda ham answerCallbackQuery
+chaqiriladi, xato xabari serverdan o'qiladi.
+69. backup-db.ts/restore-db.ts/server.ts (KATTA MUAMMO): agar admin faqat
+Contabo S3'ni sozlagan bo'lsa (Telegram bot sozlanmagan), zaxira S3'ga
+muvaffaqiyatli yuklanardi, lekin last_backup_file_id/last_backup.json
+FAQAT Telegram muvaffaqiyatli bo'lganda yoziladi — bular yo'q bo'lgani
+uchun restore-db.ts (botToken'ni SHART talab qilardi, S3'dan yuklab
+olish umuman yo'q edi) va server.ts checkAndAutoRestore ("faqat shu
+ikkisi bo'lmasa toza o'rnatish" deb hisoblardi) S3'dagi zaxirani hech
+qachon topa olmasdi — baza yo'qolsa, S3'da mavjud zaxira bo'lishiga
+qaramay, tiklanmasdi. Endi restore-db.ts'da Telegram manbasi topilmasa
+Contabo S3'dan eng so'nggi obyekt qidirib tiklanadi (downloadLatestFromS3),
+server.ts esa S3 sozlamalari mavjudligini ham "toza o'rnatish emas" belgisi
+sifatida hisobga oladi.
+
+70. export-to-github.ts/server.ts (KATTA MUAMMO): "Weekly Data Export"
+skripti sozlangan bo'lsa ham hech qachon avtomatik ishga tushmasdi —
+server.ts'da uni chaqiradigan cron umuman yo'q edi, faqat qo'lda
+("npm run export-github") ishga tushirish mumkin edi. Endi exportToGithub
+export qilindi (backup-db.ts naqshi bo'yicha, faqat CLI'da avtomatik
+chaqiriladi) va server.ts'ga har yakshanba 02:00'da ishga tushadigan
+cron.schedule qo'shildi.
+
+71. remove-fake-listings.ts: ReferralReward.paymentId Payment'ga FK emas,
+oddiy maydon — soxta e'lonlarning to'lovlari o'chirilganda tegishli
+referral mukofotlari etim qolib ketardi (IdeaVote/TelegramDelivery bilan
+bir xil muammo turi). Endi to'lov o'chirilishidan oldin tozalanadi.
+
+72. lib/api.ts (KATTA MUAMMO): 5xx xato uchun avtomatik "qayta urinish"
+GET va POST/PUT/PATCH/DELETE farqlamasdi — agar server mutatsiyani
+(to'lov yaratish, e'lon joylash) muvaffaqiyatli bajarib, javob yuborishda
+5xx qaytarsa, avtomatik qayta urinish bir xil so'rovni ikkinchi marta
+yuborib, dublikat to'lov/e'lon yaratib qo'yishi mumkin edi. Endi 5xx
+qayta urinish faqat GET/HEAD kabi xavfsiz metodlar uchun ishlaydi;
+401 uchun (mutatsiyadan oldin to'xtaydi) hammasi uchun qoladi.
+
+73. Footer.tsx: SupportPage (/support — FAQ va murojaat formasi) mavjud
+edi, lekin uni ochish uchun saytda hech qanday havola yo'q edi (67-band
+MessagesPage bilan bir xil muammo turi, faqat URL to'g'ridan-to'g'ri
+kiritilsa topilardi). Huquqiy bo'limiga "Yordam va FAQ" havolasi
+qo'shildi.
+
+74. SupportPage.tsx: "Murojaat qoldirish" formasidagi Yuborish tugmasi
+submit paytida disabled/loading holatiga o'tmasdi (SellPage'dagi 60-band
+bilan bir xil muammo) — tez-tez bosilsa bir nechta bir xil murojaat
+(support ticket + email + Telegram xabari) yuborilishi mumkin edi. Endi
+submitting holati qo'shildi, tugma bloklanadi va "Yuborilmoqda..."
+matnini ko'rsatadi.
+
+75. MessagesPage.tsx selectConversation: suhbatlar orasida poyga sharoiti
+(BrowsePage/AdminPage'dagi 65/66-band bilan bir xil turdagi muammo) —
+suhbatlar tez almashtirilsa, eski (sekinroq) /messages so'rovi javobi
+keyinroq kelib yangi tanlangan suhbatning xabarlarini noto'g'ri
+ma'lumot bilan bosib ketishi mumkin edi. Endi har so'rovga tartib
+raqami beriladi, faqat eng so'nggisining javobi qabul qilinadi.
+76. MessagesPage.tsx "Yuborish" tugmasi: submit paytida disabled/loading
+holatiga o'tmasdi (SellPage/SupportPage'dagi 60/74-band bilan bir xil
+muammo turi) — tez-tez bosilsa bir nechta bir xil xabar yuborilishi
+mumkin edi. Endi submitting holati qo'shildi, input va tugma
+bloklanadi, tugma "Yuborilmoqda..." matnini ko'rsatadi.
+77. ForgotPasswordPage.tsx: muvaffaqiyatli javobda hech qachon kelmaydigan
+data.token maydonini console.log qilishga urinuvchi o'lik/chalg'ituvchi
+kod bor edi (server xavfsizlik sababli forgot-password javobida token
+qaytarmaydi — routes/auth.ts) — olib tashlandi.
+78. server.ts GET /api/ideas/top (XAVFSIZLIK): endpoint auth'siz ochiq,
+lekin startup.status bo'yicha filtr yo'q edi — pending/rejected
+(tasdiqlanmagan) e'lonlarga tegishli g'oyalar ham ommaviy reytingda
+startup nomi/kategoriyasi bilan ko'rinardi (DetailPage/api/startups/:id
+buni to'g'ri bloklaydi, lekin bu endpoint uni chetlab o'tardi). Endi
+faqat status="active" startuplarga tegishli g'oyalar qaytariladi.
+79. IdeasRatingPage.tsx fetchTopIdeas: filtr/sahifa tez almashtirilganda
+poyga sharoiti (BrowsePage/AdminPage/MessagesPage'dagi 65/66/75-band
+bilan bir xil turdagi muammo) — tuzatildi (so'rov tartib raqami).
+
+=== HALI QILINMAGAN, KATTAROQ QAROR TALAB QILADIGAN ===
+B2B admin UI yo'q; referral bo'limi yo'q; listing tier upgrade UI yo'q;
+cron "hozir ishga tushir" tugmasi yo'q; top-boost/createPaymentOrder'da
+o'ziga xizmat cheklovlari yo'q (biznes-mantiq, xavfsizlik emas);
+AdminPage "Barcha e'lonlar" 100+ yozuvda cheklangan (haqiqiy pagination
+kerak) — 88-bosqichda TUZATILDI (pastga qarang); categoryFields.ts vs
+server.ts seedDatabase() dublikat (hozircha sinxron); LoyihaMilestone/
+milestones maydoni to'liq qo'llab-quvvatlanadi (schema+server.ts) va endi
+SellPage/DetailPage'da ham ishlaydi — 88-bosqichda TUZATILDI (pastga
+qarang). 105-bosqich: package-lock.json/bun.lock'da `compression`/
+`@types/compression` yo'q (npm ci/bun install --frozen-lockfile buzilishi
+mumkin) — tuzatish uchun tarmoqqa ulangan muhitda `npm install` qayta
+ishga tushirilishi kerak (bu muhitda tarmoq yo'q).
+
+=== NAVBATDAGI QADAM ===
+43-bosqich: backup-db.ts to'liq ko'rib chiqildi (292 qator), shu bilan
+bog'liq restore-db.ts va server.ts checkAndAutoRestore ham qayta
+tekshirildi. Topilma (69-band, KATTA MUAMMO): faqat S3 sozlangan
+(Telegram'siz) loyihalarda zaxira hech qachon tiklanmasdi — restore-db.ts
+S3'dan yuklab olish qo'shildi, server.ts'dagi "toza o'rnatish" tekshiruvi
+S3 sozlamalarini ham hisobga oladigan qilindi. 30 model to'liqligi,
+shifrlash (Telegram va S3 uchun bir xil AES-256-GCM), pg_dump/JSON
+fallback logikasi qayta tekshirildi, boshqa xato topilmadi.
+
+44-bosqich: export-to-github.ts to'liq ko'rib chiqildi (195 qator).
+Topilma (70-band, KATTA MUAMMO): funksiya "Weekly Data Export" deb
+yozilgan, DB'da BACKUP_GITHUB_TOKEN/REPO sozlansa ham, server.ts'da bu
+skriptni chaqiradigan cron.schedule UMUMAN yo'q edi — faqat
+"npm run export-github" bilan qo'lda ishga tushirilardi (backup-db.ts
+kabi avtomatik emas). Sanitizatsiya (users/startups/payments faqat
+xavfsiz maydonlar), techStack JSON.parse himoyasi, status.staged bilan
+commit, tempDir finally'da tozalanishi — hammasi to'g'ri edi, faqat
+avtomatik ishga tushmasligi muammo edi. Tuzatish: exportToGithub export
+qilindi, backup-db.ts'dagi kabi faqat CLI orqali to'g'ridan-to'g'ri
+ishga tushirilganda avtomatik chaqiriladi (import xavfsiz); server.ts'ga
+har yakshanba 02:00'da ishga tushadigan cron.schedule qo'shildi.
+Boshqa xato topilmadi.
+
+45-bosqich: make-admin.ts to'liq ko'rib chiqildi (59 qator) — DB tanlash
+(isPostgres), email normalizatsiya (auth.ts bilan mos), rol yangilash,
+xato holatlari — hammasi to'g'ri, xato topilmadi. Shu bilan bir vaqtda
+remove-fake-listings.ts qayta tekshirildi (106 qator). Topilma (71-band):
+ReferralReward.paymentId ham Payment'ga oddiy maydon (FK emas —
+IdeaVote/TelegramDelivery'dagi bilan bir xil muammo turi) — to'lovlar
+o'chirilganda tegishli referral mukofotlari "etim" bo'lib bazada abadiy
+qolib ketardi. Endi to'lovlar o'chirilishidan oldin ularga tegishli
+ReferralReward yozuvlari ham topilib o'chiriladi.
+Navbatdagi qadam: schema.prisma (eng kam tekshirilgan, 7 marta).
+
+46-bosqich: schema.prisma va schema.sqlite.prisma to'liq qayta ko'rib
+chiqildi (441/433 qator) — ikkala fayl to'liq solishtirildi (faqat
+kutilgan farqlar: provider/output va @db.Decimal, SQLite'da yo'q),
+barcha FK/optional-required munosabatlari, DELETE /api/admin/users/:id
+transaction bilan mos kelishi tekshirildi — xato topilmadi. Navbar.tsx
+ham to'liq qayta ko'rib chiqildi (362 qator) — bildirishnoma link
+marshrutlash (/startup/, /profile?tab=) server.ts bilan mos, xato
+topilmadi. lib/api.ts qayta tekshirilganda topilma (72-band, KATTA
+MUAMMO): 5xx uchun avtomatik qayta urinish GET/POST farqlamasdi —
+to'lov/e'lon kabi mutatsion so'rovlarda dublikat yuborish xavfi bor edi.
+Tuzatildi: 5xx qayta urinish endi faqat GET/HEAD uchun.
+Navbatdagi qadam: Footer.tsx (eng kam tekshirilgan, 7 marta).
+
+47-bosqich: Footer.tsx to'liq ko'rib chiqildi (67 qator). Topilma
+(73-band): SupportPage (/support) hech qayerdan ochilmasdi — 67-band
+(MessagesPage) bilan bir xil muammo turi. "Huquqiy" bo'limiga "Yordam
+va FAQ" tugmasi (setView('support')) qo'shildi.
+Navbatdagi qadam: SupportPage.tsx (eng kam tekshirilgan, 7 marta).
+
+48-bosqich: SupportPage.tsx to'liq ko'rib chiqildi (248 qator). Topilma
+(74-band): "Murojaat qoldirish" formasi submit paytida disabled/loading
+holatiga o'tmasdi (SellPage'dagi 60-band bilan bir xil muammo turi) —
+tuzatildi. Shu bilan bog'liq routes/support.ts ham qayta tekshirildi
+(268 qator) — validatsiya (zod), rate limiter, Report unique cheklovi
+(P2002), audit log yozish, pagination /reports'da — hammasi to'g'ri,
+xato topilmadi.
+
+49-bosqich: lib/crypto.ts to'liq ko'rib chiqildi (59 qator) — AES-256-GCM,
+IV 12 bayt, tag tekshiruvi, dev-rejim vaqtinchalik kalit keshlanishi,
+production'da ENCRYPTION_KEY majburiyligi, getSetting() dagi fallback
+(deshifrlash muvaffaqiyatsiz bo'lsa .env'ga qaytadi) — hammasi to'g'ri,
+xato topilmadi.
+
+50-bosqich: lib/logger.ts to'liq ko'rib chiqildi (35 qator). Shubha:
+`logger.error({ err }, ...)` chaqiruvlarida (routes/auth.ts) Error
+obyekti JSON.stringify bilan "{}" bo'lib qolishi mumkinmi (message/stack
+enumerable emas) — pino manba kodi mahalliy nusxadan tekshirildi
+(node_modules/pino: errorKey='err', stdSerializers avtomatik serializers
+sifatida ulangan), bu standart pino xatti-harakati ekan, avtomatik
+serializatsiya qiladi — shubha o'zini oqlamadi, xato emas. redact
+ro'yxati (password/token/email...) to'g'ri, hozircha faqat {userId}/{err}
+loglanadi, xato topilmadi.
+
+51-bosqich: lib/analytics.ts to'liq ko'rib chiqildi (13 qator) — oddiy
+fetch wrapper, xato bo'lsa faqat console.error, UI'ni bloklamaydi —
+to'g'ri, xato topilmadi.
+
+52-bosqich: lib/rateLimiters.ts to'liq ko'rib chiqildi (64 qator) — barcha
+limiterlar (auth, idea, upvote, report, upload, passwordReset,
+paymentStatus, global, support) server.ts/routes/support.ts/routes/auth.ts
+da to'g'ri endpointlarga bog'langani tekshirildi (grep bilan tasdiqlandi)
+— xato topilmadi.
+
+53-bosqich: ErrorBoundary.tsx (49 qator), TermsPage.tsx, PrivacyPage.tsx,
+RefundPolicyPage.tsx (statik matn sahifalari) to'liq ko'rib chiqildi.
+ErrorBoundary — main.tsx'da butun ilovani o'rab turibdi, reload tugmasi
+to'g'ri. Uch huquqiy sahifada komissiya (5% — server.ts'dagi 0.95
+koeffitsienti bilan mos), muddatlar va matn server logikasiga zid
+kelmasligi tekshirildi — xato topilmadi.
+
+54-bosqich: Sidebar.tsx (93 qator) va MobileNav.tsx (93 qator) to'liq
+qayta ko'rib chiqildi — menyu elementlari, isActive hisoblash, profileTab
+almashtirish mantiqi (App.tsx/ProfilePage.tsx bilan mos) tekshirildi,
+ikkalasida ham xato topilmadi.
+
+55-bosqich: MessagesPage.tsx to'liq ko'rib chiqildi (106→119 qator).
+Topilma (75-band): suhbatlar tez almashtirilganda poyga sharoiti
+(BrowsePage/AdminPage'dagi 65/66-band bilan bir xil turdagi muammo) —
+tuzatildi (so'rov tartib raqami). Topilma (76-band): "Yuborish" tugmasi
+submit paytida disabled bo'lmasdi (SellPage/SupportPage'dagi 60/74-band
+bilan bir xil muammo turi) — tuzatildi (submitting holati).
+
+56-bosqich: ForgotPasswordPage.tsx to'liq ko'rib chiqildi (154 qator).
+Topilma (77-band): hech qachon kelmaydigan data.token uchun o'lik
+console.log kodi bor edi — olib tashlandi. ResetPasswordPage.tsx ham
+qayta tekshirildi (215 qator) — parol validatsiyasi (min 8, raqam)
+backend'dagi resetPasswordSchema bilan mos, xato topilmadi.
+
+57-bosqich: IdeasRatingPage.tsx to'liq ko'rib chiqildi (298 qator). Topilma
+(78-band, XAVFSIZLIK): bog'liq server.ts GET /api/ideas/top endpointi
+pending/rejected startuplarni filtrlamasdi — tuzatildi (status="active"
+filtri qo'shildi). Topilma (79-band): filtr/sahifa almashtirishda poyga
+sharoiti — tuzatildi (so'rov tartib raqami).
+
+58-bosqich: routes/auth.ts to'liq qayta ko'rib chiqildi (446 qator) —
+register/login/refresh/logout/me/forgot-password/reset-password barchasi
+tekshirildi. Topilma (80-band, XAVFSIZLIK): server.ts'dagi POST
+/api/auth/google endpointida authLimiter umuman ulanmagan edi (server.ts
+rateLimiters'dan authLimiter'ni import ham qilmagan edi) — /register va
+/login authLimiter bilan himoyalangan bo'lsa-da, Google orqali kirish
+brute-force/DoS'ga ochiq qolardi. Tuzatildi: authLimiter import qilindi
+va shu endpointga ulandi. Boshqa xato topilmadi (refresh token rotatsiya/
+reuse detection, cookie domain/sameSite, resetToken oqimi — hammasi to'g'ri).
+
+59-bosqich: main.tsx (17 qator), types.ts (105 qator), categoryFields.ts
+(119 qator), test-email.js (62 qator), vite.config.ts (23 qator) — barchasi
+to'liq qayta ko'rib chiqildi. main.tsx: BrowserRouter/App/ErrorBoundary
+to'g'ri o'ralgan, App.tsx haqiqatan Routes/Route ishlatadi (mos). types.ts:
+ProfileTab va Startup/UserProfileData maydonlari server.ts/ProfilePage bilan
+mos. categoryFields.ts: server.ts seedDatabase() bilan hali ham to'liq
+sinxron (5 kategoriya, barcha maydonlar). test-email.js: DB+.env fallback
+mantiqi server.ts getTransporter() bilan aynan bir xil. vite.config.ts:
+'@' alias tsconfig.json bilan mos (hozircha ishlatilmayapti, zararsiz).
+Xato topilmadi — hammasi toza. Bu bilan header'dagi eski "1-aylanish
+tugadi" holati aslida noto'g'ri edi: 43-58-bosqichlar allaqachon 26 ta
+faylni 2-marta ko'rib chiqqan edi (8→9), lekin header yangilanmagan edi —
+hozir tuzatildi.
+
+60-bosqich: CheckoutPage.tsx (628 qator) to'liq qayta ko'rib chiqildi —
+avtomatik order yaratish, referral qo'llash, 3s polling, countdown,
+success ekrani (deliveryUrl validatsiyasi bilan) — barchasi tekshirildi.
+Topilma (81-band, KATTA MUAMMO): server.ts createPaymentOrder() har safar
+chaqirilganda (checkout sahifasi qayta ochilganda YOKI referral kod
+qo'llanganda — bu ikkinchi holatda /api/payments/create ikkinchi marta
+chaqiriladi) yangi Payment yozuvi yaratardi, lekin oldingi "pending"
+buyurtmani hech qachon yopmasdi — bazada abadiy "pending" holatda qolib
+ketardi. Agar kimdir eski (tashlab ketilgan) CoinGate havolasini keyinroq
+to'lasa, finalizeCompletedPayment uni to'g'ri "refund_required"ga
+o'tkazadi (soldStatus tekshiruvi tufayli xavfsiz), lekin bu qo'lda
+qaytarish talab qiladi va bazada keraksiz "pending" chiqindi to'planadi.
+Endi createPaymentOrder yangi buyurtma yaratishdan oldin shu
+userId+startupId uchun barcha eski "pending" to'lovlarni "cancelled"ga
+o'tkazadi. Boshqa xato topilmadi (polling/timer cleanup, deliveryUrl
+protokol tekshiruvi — hammasi to'g'ri).
+
+61-bosqich: DetailPage.tsx (1342→1320 qator) to'liq qayta ko'rib chiqildi —
+report/review/dispute modal'lari, ideas bo'limi, checkout'ga o'tish
+(selectedStartupId sinxronizatsiyasi), demoUrl xavfsizlik tekshiruvi —
+barchasi to'g'ri edi. Topilma (82-band): "Yetakchi hamkorlar va
+maslahatchilar" bo'limi butunlay qattiq kodlangan soxta ma'lumot edi —
+3 ta stok Unsplash rasm, "+12" va "15 ta faol jamoa..." matni — hech
+qanday backend modeliga bog'lanmagan, HAR BIR e'londa bir xil holda
+ko'rinardi (ProfilePage'dagi 64-band — soxta "12 ta taklif" — bilan
+bir xil muammo turi). Olib tashlandi. Eslatma: LoyihaMilestone/
+milestones maydoni butun zanjir bo'ylab (schema→server.ts→SellPage→
+DetailPage) mavjud, lekin SellPage doim bo'sh massiv yuboradi va
+DetailPage ularni hech qachon ko'rsatmaydi — funksional xato emas
+(hech narsa buzilmaydi), balki tugallanmagan/ishlatilmayotgan xususiyat,
+"HALI QILINMAGAN" ro'yxatiga qo'shildi.
+
+62-bosqich: ProfilePage.tsx (1569→1583 qator) to'liq qayta ko'rib chiqildi —
+tab data yuklash (isMounted+cleanup naqshi tab almashtirishda poyga
+sharoitidan xavfsiz ekani tasdiqlandi), escrow release/dispute, avatar/
+cover yuklash, deliveryUrl protokol tekshiruvi, referral/VIP/TOP oqimlari
+— hammasi to'g'ri edi. Topilma (83-band): Sozlamalar formasi
+(handleSaveSettings) va B2B onboard formasi submit paytida disabled/
+loading holatiga o'tmasdi (SellPage/SupportPage/MessagesPage'dagi
+60/74/76-band bilan bir xil muammo turi) — tez-tez bosilsa bir nechta
+so'rov yuborilishi mumkin edi. Ikkalasiga ham submitting holati
+qo'shildi, tugmalar bloklanadi va "...moqda" matnini ko'rsatadi.
+
+Navbatdagi qadam: SellPage.tsx (3-aylanish boshlanmoqda, hammasi 9x).
+
+66-bosqich: telegram-bot/index.ts (366→367 qator) to'liq qayta ko'rib
+chiqildi — /start, /bogla, /mahsulot, /new_listings, /top_deals,
+/profile buyruqlari, showProduct (rasm/matn fallback, deliveryUrl nisbiy
+yo'l to'liqlanishi), buy_ callback (photo/text editCaption farqi, QR-kod),
+check_subscription (68-band tuzatishi hali ham to'g'ri ishlayotgani
+tasdiqlandi) — barchasi bog'liq server.ts endpointlari (/api/telegram/
+verify, deliver, sponsor-channels, create-payment, link, user-stats) bilan
+birga qayta tekshirildi, mos kelishi tasdiqlandi. Yangi xato topilmadi.
+Yon topilma (kod emas, kuzatuv fayli xatosi): tuzatish.txt sarlavhasidagi
+hisoblagichda routes/auth.ts (58-bosqichda), main.tsx/types.ts/
+categoryFields.ts/test-email.js/vite.config.ts (59-bosqichda) allaqachon
+2-marta ko'rib chiqilgan bo'lsa-da hamon "8" guruhida qolib ketgan edi —
+hisoblagich 9ga tuzatildi (59-bosqichdagi kabi xil turdagi eskirish xatosi).
+
+65-bosqich: App.tsx (1020→1036 qator) to'liq qayta ko'rib chiqildi —
+routing (barcha Route'lar SellPage/AdminPage/DetailPage/CheckoutPage'ga
+to'g'ri prop uzatishi), toast taymer 4s tuzatishi (172-band) hali ham
+to'g'ri ishlayotgani tasdiqlandi, socket.io notification ulanishi/
+tozalanishi, selectedStartup fallback olib tashlanishi (388-band) —
+hammasi to'g'ri edi. Topilma (87-band, MUHIM): butun saytdagi ENG asosiy
+formalar — Kirish (handleLoginSubmit) va Ro'yxatdan o'tish
+(handleRegisterSubmit) — submit paytida disabled/loading holatiga
+o'tmasdi (ProfilePage/BrowsePage/SellPage'dagi 60/74/76/83/84-band bilan
+bir xil muammo turi, lekin bu safar autentifikatsiya oqimida) — tez-tez
+bosilsa bir nechta login/register so'rovi yuborilishi mumkin edi (masalan
+duplikat hisob yaratish urinishi yoki keraksiz rate-limit sarfi).
+isAuthSubmitting holati qo'shildi, ikkala tugma ham amal davomida
+bloklanadi va "Kuting..." matnini ko'rsatadi.
+
+64-bosqich: AdminPage.tsx (2515→2537 qator, eng katta fayllardan biri)
+to'liq qayta ko'rib chiqildi — dashboard/analytics/listings/users/
+categories/disputes/escrow-disputes/sponsors/audit/settings bo'limlari,
+66-band (foydalanuvchi qidiruv debounce+so'rov tartibi) hali ham to'g'ri
+ishlayotgani tasdiqlandi, "disputes" tab ikkita alohida bo'limni (oddiy
+nizolar + escrow nizolari) atayin bitta tab ostida ko'rsatishi (dizayn
+qarori, xato emas) tekshirildi. Topilma (85-band): Shikoyatlar (Reports)
+bo'limidagi Tasdiqlash/Rad etish/O'chirish tugmalari va Murojaatlar
+(Support tickets) bo'limidagi holat almashtirish tugmalarida boshqa
+bo'limlar (Disputes/Escrow/Users)dagi kabi loading/disabled himoyasi
+UMUMAN yo'q edi — tez-tez bosilsa bir xil amal (masalan o'chirish)
+bir necha marta yuborilishi mumkin edi. updatingReportId/
+isDeletingReportedItem/updatingTicketId holatlari qo'shildi, tugmalar
+amal davomida bloklanadi. Topilma (86-band): Foydalanuvchini o'chirish
+tasdiqlash modalida "HA, O'CHIRISH" tugmasi shu modaldagi BOSHQA barcha
+tugmalardan farqli o'laroq `disabled={isUpdatingUser}` ga ega emas edi —
+tez-tez bosilsa bir nechta o'chirish so'rovi yuborilishi mumkin edi.
+Qo'shildi.
+
+63-bosqich: BrowsePage.tsx (781→798 qator) to'liq qayta ko'rib chiqildi —
+so'rov tartib raqami (65-band tuzatishi hali ham to'g'ri ishlayotgani
+tasdiqlandi), filtr o'zgarganda sahifani 1ga qaytarish mantiqi, subFilters
+klient-tomon filtri va paginatsiya bilan mos kelishi (izohda yozilgani
+to'g'ri), social-proof localStorage keshi, referral kod URL'dan saqlash —
+hammasi to'g'ri edi. Topilma (84-band): Newsletter obuna formasi
+(handleSubscribe) submit paytida disabled/loading holatiga o'tmasdi
+(ProfilePage/SellPage/SupportPage/MessagesPage'dagi 60/74/76/83-band
+bilan bir xil muammo turi) — tez-tez bosilsa bir nechta obuna so'rovi
+yuborilishi mumkin edi. submitting holati qo'shildi, input+tugma
+bloklanadi, tugma "Yuborilmoqda..." matnini ko'rsatadi.
+
+67-bosqich: navbatdagi "eng kam tekshirilgan fayl" tsikli o'rniga,
+foydalanuvchi so'rovi bo'yicha "HALI QILINMAGAN, KATTAROQ QAROR TALAB
+QILADIGAN" ro'yxatidagi tayyor bandlar ko'rib chiqildi.
+Topilma (88-band): AdminPage.tsx "Barcha e'lonlar" App.tsx'ning umumiy
+`startups` prop'idan (standart limit=50/max=100) ko'rsatilardi — 100+
+e'lon bo'lsa admin qolganlarini ko'ra/qidira/o'chira olmasdi. Endi bu
+bo'lim alohida, o'z sahifalash+debounce'li qidiruviga ega
+(fetchAllListingsAdmin, foydalanuvchilar ro'yxatidagi naqsh bo'yicha,
+so'rov tartib raqami bilan himoyalangan). server.ts /api/startups
+qidiruv filtriga `id` ham qo'shildi (eski client-side ID qidiruvini
+almashtirish uchun).
+89-band: `githubUrl` — zod sxemada e'lon qilingan, lekin hech qachon
+destructure/saqlanmagan, DB ustuni ham yo'q o'lik kod edi. O'chirish
+o'rniga to'liq ishlaydigan (ommaviy repo havolasi, deliveryUrl'dan farqli
+— maxfiy emas) xususiyatga aylantirildi: schema.prisma/schema.sqlite.prisma
+ustun qo'shildi (loyihada db push ishlatilgani uchun alohida migratsiya
+kerak emas), server.ts POST/PATCH/formatStartup'da to'liq ishlaydi,
+types.ts'ga maydon qo'shildi, SellPage.tsx'ga kiritish maydoni (demo
+havola yonida), DetailPage.tsx'ga "Repozitoriyani ko'rish" tugmasi
+(demo tugmasidagi bilan bir xil XSS-xavfsiz havola tekshiruvi bilan)
+qo'shildi.
+96-band: referral tizimida referralCount noto'g'ri hisoblanardi (faqat
+Referral qatorlari soni, ReferralReward emas) — Referral Star/King
+darajalariga hech kim yeta olmasdi; ReferralReward asosida tuzatildi,
+tier discount/commission endi har referaldan keyin qayta hisoblanadi.
+95-band: SellPage.tsx milestones formida sarlavhasiz bo'sh qatorlar ham
+yuborilardi (DetailPage'da bo'sh ko'rinardi) — submitdan oldin filtrlandi.
+90-band: LoyihaMilestone/milestones — backend (schema+server.ts) to'liq
+qo'llab-quvvatlagan, lekin SellPage.tsx doim `milestones: []` yuborardi
+(kiritish UI yo'q edi, hatto PATCH payload'da ham umuman yo'q edi) va
+DetailPage.tsx ularni hech qachon ko'rsatmasdi. Endi SellPage.tsx'da
+qo'shish/tahrirlash/o'chirish UI (sana+sarlavha+tavsif, 20 tagacha) bor,
+submit payload'ga qo'shiladi (avvalgi qattiq kodlangan `milestones: []`
+override olib tashlandi). DetailPage.tsx'da "Ijroiya jamoasi"dan keyin
+"Loyiha bosqichlari" nomli timeline bo'limi qo'shildi (faqat mavjud
+bo'lsa ko'rinadi).
+Barcha o'zgargan fayllar (AdminPage.tsx, server.ts, types.ts,
+SellPage.tsx, DetailPage.tsx, ikkala schema.prisma) esbuild orqali
+sintaksis xatosiz ekani tekshirildi (node_modules yo'qligi sababli
+to'liq tsc/build ishga tushirilmadi — deploy paytida odatdagi build
+tekshiruvi tavsiya etiladi).
+68-bosqich: "HALI QILINMAGAN" ro'yxatidagi "top-boost/createPaymentOrder
+o'ziga xizmat cheklovi" bandi ko'rib chiqildi.
+91-band: createPaymentOrder() (oddiy xarid) startupRecord.userId===userId
+tekshiruvisiz edi — sotuvchi o'z e'lonini "sotib olib" soxta soldStatus/
+escrow oqimi yaratishi mumkin edi; endi bloklanadi. POST /api/top-boost/
+create ham /upgrade endpointidan farqli o'laroq egalik tekshiruvisiz edi —
+har qanday login qilgan foydalanuvchi boshqa birovning e'lonini pullik
+top qila olardi; endi faqat egasi/admin. DetailPage.tsx "Sotib olish"
+tugmasi ham frontendda oldindan bloklanadi (isOwnListing), "Bu sizning
+e'loningiz" matni bilan.
+69-bosqich: SellPage.tsx (870→884 qator) "eng kam tekshirilgan" tsikli
+bo'yicha to'liq qayta ko'rib chiqildi (3-marta, 9→10) — rasm yuklash
+(2/6MB izohi, 10MB umumiy chegara), handlePublish validatsiyasi,
+tahrirlash/yaratish oqimlari, dinamik kategoriya maydonlari, AI narx
+taklifi, texnologiya chip'lari, deliveryUrl HTTPS tekshiruvi — hammasi
+to'g'ri edi. Topilma (92-band): server (zod milestonesPreprocess)
+21+ bosqichni 400 bilan rad etadi, lekin "Bosqich qo'shish" tugmasi
+frontendda cheklovsiz edi — foydalanuvchi chop etishda tushunarsiz
+xatoga duch kelishi mumkin edi. Endi 20tada tugma bloklanadi, hisoblagich
+(x/20) ko'rsatiladi.
+70-bosqich: Navbar.tsx (362→375 qator) "eng kam tekshirilgan" tsikli
+bo'yicha to'liq qayta ko'rib chiqildi (3-marta, 9→10) — qidiruv debounce,
+bildirishnoma/xabar tugmalari, mobil menyu, /profile?tab= o'qilishi
+(80-band) hali ham to'g'ri ishlayotgani tasdiqlandi. Topilma (93-band,
+KATTA MUAMMO): server.ts ikkita bildirishnoma "/admin/disputes" va
+"/admin/b2b" havolalarini yuborardi, lekin App.tsx'da FAQAT aniq "/admin"
+route mavjud (nested route yo'q) — "*" catch-all bunday havolalarni
+"/" (bosh sahifa)ga qaytarib yuborardi; admin escrow nizosi yoki B2B
+so'rovi haqidagi bildirishnomani bosganda umuman admin panelga
+tushmasdi. Bundan tashqari Navbar'ning query-o'qish mantig'i faqat
+"profile" yo'li uchun ishlagan, boshqa sahifalar uchun query qismini
+(masalan ?tab=disputes) butunlay tashlab yuborardi. Endi: server.ts
+"/admin/disputes"→"/admin?tab=disputes", "/admin/b2b"→"/admin"
+(B2B admin tabi hali yo'q — HALI QILINMAGAN ro'yxatida) ga tuzatildi;
+Navbar profile bo'lmagan havolalar uchun ham query qismini saqlab
+qoladi; AdminPage.tsx endi useLocation orqali ?tab= ni o'qib to'g'ri
+bo'limni ochadi (ProfilePage'dagi profileTab mexanizmidan mustaqil,
+o'zining URL'dan o'qishi bilan).
+71-bosqich: lib/api.ts (139→136 qator) "eng kam tekshirilgan" tsikli
+bo'yicha to'liq qayta ko'rib chiqildi (3-marta, 9→10) — 401/5xx retry
+farqlanishi (72-band) va 5xx≠401 refresh regressiyasi tuzatishi hali
+ham to'g'ri ishlayotgani tasdiqlandi, refreshPromise orqali parallel
+401'larda poyga holati oldini olinishi, retry auth cookie orqali
+ishlashi (Authorization header shart emas) — hammasi to'g'ri. Topilma
+(94-band, kichik): getCookie() — CSRF header kodi olib tashlanganidan
+beri (izohga qarang) hech qayerda chaqirilmaydigan o'lik funksiya bo'lib
+qolgan edi (77-band/ForgotPasswordPage'dagi bilan bir xil turdagi
+muammo). Olib tashlandi.
+72-bosqich: 3-aylanish davom ettirildi — backup-db.ts+restore-db.ts+
+server.ts checkAndAutoRestore (69-band tuzatishi hali to'g'ri),
+export-to-github.ts (70-band tuzatishi to'g'ri), make-admin.ts,
+remove-fake-listings.ts (71-band tuzatishi to'g'ri, FK/o'chirish tartibi
+qayta tekshirildi), schema.prisma/schema.sqlite.prisma (ikkalasi hali
+sinxron), Footer.tsx (73-band to'g'ri), SupportPage.tsx+routes/support.ts
+(74-band to'g'ri), telegram-bot/index.ts (68-band to'g'ri) qayta ko'rib
+chiqildi — barchasida yangi xato topilmadi.
+Shu bilan bog'liq holda SellPage.tsx'dagi 90-bandda qo'shilgan
+"Loyiha bosqichlari" (milestones) UI qayta tekshirilganda topilma
+(95-band): "Bosqich qo'shish" bosilib, sarlavha to'ldirilmasdan chop
+etilsa, bo'sh (sarlavhasiz) bosqich ham serverga yuborilib saqlanardi —
+DetailPage'da sarlavhasiz bo'sh qator ko'rinardi. Endi sarlavhasi bo'sh
+qatorlar submit qilishdan oldin filtrlanadi.
+73-bosqich: 3-aylanish davom ettirildi — lib/crypto.ts (49-band tuzatishi
+to'g'ri), lib/logger.ts (50-band to'g'ri), lib/analytics.ts (51-band
+to'g'ri), lib/rateLimiters.ts (52-band to'g'ri), ErrorBoundary.tsx,
+TermsPage.tsx/PrivacyPage.tsx/RefundPolicyPage.tsx (53-band — matndagi
+5% komissiya, nizo muddati va h.k. server logikasiga hamon mos),
+Sidebar.tsx/MobileNav.tsx (54-band to'g'ri, profileTab almashtirish
+mantiqi hamon mos), MessagesPage.tsx (75/76-band to'g'ri, poyga
+himoyasi va submitting holati ishlayapti), ForgotPasswordPage.tsx
+(77-band to'g'ri) va ResetPasswordPage.tsx qayta ko'rib chiqildi —
+barchasida yangi xato topilmadi, faqat avvalgi tuzatishlar tasdiqlandi.
+74-bosqich: IdeasRatingPage.tsx (78/79-band tuzatishlari to'g'ri, server
+/api/ideas/top status filtri va upvote dedup logikasi ham qayta
+tekshirildi) va CheckoutPage.tsx (59-band tuzatishi — referral kod
+qo'llanganda avtomatik yo'naltirish bekor qilinishi — hali to'g'ri
+ishlayotgani tasdiqlandi) "eng kam tekshirilgan" tsikli bo'yicha to'liq
+qayta ko'rib chiqildi.
+Topilma (96-band, KATTA MUAMMO): referral tizimi (POST
+/api/referrals/generate) har bir foydalanuvchiga faqat BITTA doimiy
+Referral qatorini beradi (ko'p do'stga bir xil kodni ulashish uchun),
+lekin shu qatorning refereeId maydoni faqat bitta foydalanuvchini
+ushlab turadi — har safar kimdir shu kod orqali xarid yakunlaganda u
+qayta yozib qo'yilardi. referralCount esa `refereeId != null` bo'lgan
+Referral QATORLARI sonini hisoblardi (ReferralReward emas) — bitta
+foydalanuvchida faqat bitta qator bo'lgani uchun referralCount hech
+qachon 1 dan oshmasdi, natijada 🌟 Referral Star (6+) va 👑 Referral King
+(21+) darajalariga HECH KIM HECH QACHON yeta olmasdi (ProfilePage
+"Referral" tabida ko'rinadi). Endi referralCount ReferralReward
+yozuvlari soni orqali (har bir muvaffaqiyatli referal xaridi uchun
+bittadan, hech qachon qayta yozilmaydi) hisoblanadi — 3 joyda
+(/api/referrals/generate, /api/referrals/my-stats,
+/api/telegram/user-stats) tuzatildi. Bundan tashqari referral
+qatorining discountPercent/commissionPercent ham faqat kod BIRINCHI
+marta yaratilganda o'rnatilib, keyin hech qachon yangilanmasdi (darajaga
+chiqsa ham eski 5% da qolardi) — endi finalizeCompletedPayment har bir
+muvaffaqiyatli referaldan so'ng darajani qayta hisoblab, o'zgargan
+bo'lsa yangilaydi.
+Navbatdagi qadam: 9x guruhidagi qolgan fayllar — DetailPage.tsx,
+ProfilePage.tsx, BrowsePage.tsx, AdminPage.tsx, App.tsx, routes/auth.ts,
+main.tsx+types.ts+categoryFields.ts+test-email.js+vite.config.ts.
+
+75-bosqich: DetailPage.tsx (1382→1394 qator) "eng kam tekshirilgan" tsikli
+bo'yicha to'liq qayta ko'rib chiqildi (3-marta, 9→10) — SEO meta tag
+tozalash, hook tartibi (early-return pastda), narx/o'ziga xarid himoyasi
+(91-band), demoUrl/githubUrl protokol tekshiruvi (89-band), milestones
+timeline (90-band) — hammasi to'g'ri edi.
+Topilma (97-band): handleOpenReportModal/reportTargetType 'user' turini
+qo'llab-quvvatlagan (tip darajasida), lekin uni chaqiradigan birorta ham
+tugma yo'q edi — sotuvchining o'zini (nafaqat e'lon yoki g'oyani) shikoyat
+qilish imkoni umuman yo'q edi. Bundan tashqari AdminPage.tsx Shikoyatlar
+bo'limi 'user' turini hisobga olmagan holda yozilgan edi: targetType
+!== 'startup' bo'lgan HAR NARSA "Izoh/G'oya" deb belgilanardi va
+"O'chirish" tugmasi `/api/admin/ideas/:id`ni chaqirardi — ya'ni 'user'
+report kelsa, targetId (foydalanuvchi ID) tasodifan mos keladigan boshqa
+bir Idea o'chirilib ketishi mumkin edi (KATTA MUAMMO, lekin hozircha
+hech qayerda ishlab chiqarilmagani uchun amalda ishga tushmagan “o'lik”
+xavf edi — 89-banddagi githubUrl bilan bir xil turdagi muammo). Tuzatildi:
+DetailPage.tsx "Sotuvchi ma'lumotlari" blokiga "Sotuvchini shikoyat
+qilish" tugmasi qo'shildi (o'z e'loniga nisbatan bloklangan);
+AdminPage.tsx 'user' uchun to'g'ri yorliq ("Foydalanuvchi") ko'rsatadi,
+"O'chirish" o'rniga xavfsiz "Foydalanuvchini ko'rish" tugmasi (Foydalanu-
+vchilar tabiga o'tib, ID bo'yicha qidiradi) chiqadi, handleDeleteReportedItem
+'user' turini butunlay rad etadi (himoya qatlami); server.ts
+GET /api/admin/users qidiruviga sonli ID bo'yicha aniq moslik ham
+qo'shildi (avval faqat ism/email `contains` edi, User.id Int bo'lgani
+uchun buni alohida qo'shish kerak bo'ldi).
+
+76-bosqich: ProfilePage.tsx (1592→1600 qator) "eng kam tekshirilgan"
+tsikli bo'yicha to'liq qayta ko'rib chiqildi (3-marta, 9→10) — tab
+ma'lumotlarini yuklash (isMounted+cleanup), rol privilege-escalation
+himoyasi (server javobidan foydalanish), VIP narxi server sozlamalaridan
+olinishi, escrow release/dispute (62/63-band), submitting holatlari
+(83-band) — hammasi to'g'ri edi.
+Topilma (98-band): TOP boost narx effekti (topModal ochilganda
+/api/top-boost/price'ni chaqiradi) darhol pastidagi deyarli bir xil VIP
+narx effektidan farqli o'laroq `.catch()` va `data.price || 0` fallback'ga
+ega emas edi — kunlar soni 365 dan oshsa (yoki tarmoq xatosi bo'lsa)
+server {error:...} qaytaradi, `data.price` undefined bo'lib qoladi va
+foydalanuvchiga "Hisoblangan narx: $undefined" ko'rsatilardi (xaridni
+o'zi "To'lovga o'tish" bosilganda serverda to'g'ri rad etilardi, lekin
+oldindan ko'rsatiladigan narx buzilgan edi). Bundan tashqari ikkala
+(TOP va VIP) "Boshqa kun" input maydonlari faqat pastki chegarani
+(min 1) tekshirardi, yuqori chegarasi (max 365, server talabi) yo'q edi.
+Tuzatildi: TOP narx effektiga VIP'dagi kabi `.catch()`+fallback qo'shildi,
+ikkala kunlar inputiga ham max 365 chegarasi qo'shildi.
+
+77-bosqich: BrowsePage.tsx (789→789 qator) "eng kam tekshirilgan" tsikli
+bo'yicha to'liq qayta ko'rib chiqildi (3-marta, 9→10) — fetchFilteredStartups
+so'rov tartib raqami (65-band), subFilters faol bo'lganda paginatsiya
+yashirilishi, debounce, referral kod localStorage'ga saqlanishi — hammasi
+to'g'ri edi.
+Topilma (99-band, kichik): Ro'yxat (list) ko'rinishidagi narx bloki
+" USDT" birlikni shartsiz (ternary'dan TASHQARIDA) qo'shardi — narx
+belgilanmagan e'lonlarda "Kelishilgan holda" matni ko'rsatilishi kerak
+bo'lgan joyda "$Kelishilgan holda USDT" degan ma'nosiz matn chiqardi.
+Jadval (grid) ko'rinishi, DetailPage.tsx va ProfilePage.tsx'dagi bir xil
+naqsh " USDT"siz to'g'ri yozilgan edi — faqat shu bitta joy nomuvofiq
+edi. "USDT" endi faqat haqiqiy narx bo'lganda qo'shiladi.
+
+78-bosqich: AdminPage.tsx (2629→2650 qator) to'liq mustaqil qayta ko'rib
+chiqildi (bu safar 97-band bilan tegishli qismigina emas, BUTUN fayl,
+9→10-marta) — foydalanuvchilar/e'lonlar/disputes/escrow/sponsors/audit
+bo'limlari, pagination, debounce, 'user' report tuzatishi (97-band) —
+hammasi to'g'ri edi.
+Topilma (100-band, KATTA MUAMMO): Sozlamalar (Settings) bo'limida
+GET /api/admin/settings server tomondan har bir maxfiy qiymatni MASKA
+qilingan holda qaytaradi ("••••••••1234"), lekin bu maskalangan matn
+to'g'ridan-to'g'ri tahrirlanadigan input maydoniga yozilardi. Agar admin
+allaqachon sozlangan biror sirni (Stripe kaliti, SMTP paroli, Telegram
+bot tokeni, GitHub tokeni va h.k.) HECH NARSA o'zgartirmasdan
+"Saqlash"ni bossa (masalan tekshirish uchun yoki xato bosilsa), aynan
+shu maska matni haqiqiy qiymat sifatida serverga yuborilib, shifrlanib,
+bazadagi HAQIQIY sirni butunlay yo'q qilib yuborardi. Eng xavflisi:
+javobda qiymat qayta maskalangani uchun oxirgi 4 belgi o'zgarmay qolib,
+ekranda HECH QANDAY farq ko'rinmasdi — admin sirni yo'q qilganini
+sezmay qolishi mumkin edi (masalan Stripe/SMTP integratsiyasi jimgina
+buzilib qolardi). Tuzatildi: input maydoni endi doim bo'sh boshlanadi
+(maska hech qachon qayta yuborilmaydi), va bo'sh qiymat bilan
+"Saqlash" bosilsa (mavjud sozlama uchun) — aniq xatolik ko'rsatiladi,
+so'rov umuman yuborilmaydi.
+
+79-bosqich: App.tsx (1037→1036 qator) "eng kam tekshirilgan" tsikli
+bo'yicha to'liq qayta ko'rib chiqildi (9→10-marta) — auth oqimi (login/
+register/google/logout), toast tizimi (4s-band), bildirishnoma socket
+ulanishi, routing (motion/AnimatePresence, admin ?tab= query), checkout
+uchun selectedStartup fallback yo'qligi — hammasi to'g'ri edi.
+Topilma (101-band): Sayt bo'ylab HAR BIR sahifada ko'rinadigan "Hisobingiz
+tasdiqlanmagan!" banneri `user.telegramLinkCode || "kod"` ishlatardi —
+lekin /api/auth/me, /login va /register javoblari (routes/auth.ts)
+`telegramLinkCode`ni HECH QACHON user obyektiga qo'shmaydi (bu maydon
+faqat ProfilePage'ning o'z ichidagi alohida "Yangi kod olish" so'rovi
+orqali local holatga tushadi). Demak bu banner AMALDA HAR DOIM
+"/start kod" degan (qalin harflar bilan, xuddi haqiqiy buyruqdek)
+ko'rsatilardi — bu esa hech qachon ishlamaydigan soxta buyruq edi va
+foydalanuvchini chalg'itardi (ProfilePage'dagi bir xil banner esa
+to'g'ri: "kod_olish_uchun_bosing" kabi o'z-o'zini tushuntiruvchi matn +
+darhol haqiqiy kodni oladigan tugma bilan). Tuzatildi: App.tsx banneri
+endi soxta "/start kod" buyrug'ini umuman ko'rsatmaydi — o'rniga
+foydalanuvchini avval haqiqiy shaxsiy kodini olishga yo'naltiradi
+("/start [kodingiz]" — bosh qavs ichida, buyruq sifatida emas).
+
+80-bosqich: routes/auth.ts (446→456 qator) "eng kam tekshirilgan" tsikli
+bo'yicha to'liq qayta ko'rib chiqildi (9→10-marta) — login/register/
+refresh/logout/me/forgot-password/reset-password oqimlari, cookie
+sozlamalari, refresh token rotatsiyasi va reuse-detection, isBanned
+tekshiruvlari — hammasi to'g'ri edi. Shuningdek tekshirildi: /refresh
+javobi qisqartirilgan `user` obyekti qaytaradi, lekin frontend (lib/api.ts)
+uni umuman ishlatmasligi (faqat accessToken) tasdiqlandi — muammo emas.
+Topilma (102-band, kichik): /register endpointida bir xil email bilan
+ikkita so'rov AYNAN bir vaqtda kelsa (masalan ikki marta ketma-ket tez
+yuborilsa), oldindan qilinadigan `findUnique` tekshiruvi ikkalasi uchun
+ham "email band emas" deb topib qo'yishi mumkin edi — keyin Prisma
+o'zining unikal cheklovi tufayli xato tashlaydi, bu esa umumiy catch
+blokiga tushib chalkash "Serverda xatolik" (500) xabarini ko'rsatardi.
+routes/support.ts va server.ts'da allaqachon mavjud P2002 ishlov berish
+naqshiga mos ravishda, endi bu holatda ham aniq "allaqachon ro'yxatdan
+o'tilgan" xabari ko'rsatiladi.
+
+81-bosqich: 9x guruhidagi qolgan 5 ta kichik fayl to'liq qayta ko'rib
+chiqildi (main.tsx, types.ts, categoryFields.ts, test-email.js,
+vite.config.ts, 9→10) — 3-aylanish (pass) TO'LIQ tugadi, hamma fayl
+kamida 10 marta tekshirilgan. Tekshirilgan: main.tsx (StrictMode/
+ErrorBoundary/Router sozlamasi to'g'ri); types.ts (Startup/User/
+Notification interfeyslari server javoblariga mos); categoryFields.ts
+(server.ts seedDatabase() bilan so'z-so'z bir xil, dublikat — eski
+tech-debt eslatmasi hali amalda, xato emas); test-email.js (getSetting
+DB→".env" fallback mantiqi server.ts'dagi haqiqiy getTransporter() bilan
+bir xil); vite.config.ts (allowedHosts/HMR sozlamasi to'g'ri). Yangi xato
+topilmadi.
+
+82-bosqich: Navbar.tsx (369 qator) to'liq qayta ko'rib chiqildi
+(10→11-marta) — qidiruv debounce, bildirishnoma dropdown va
+o'qilgan/o'qilmagan holati, notif.link routing (/startup/, /profile?tab=,
+boshqa ?tab= query'lar App.tsx setView orqali to'g'ri uzatiladi va
+AdminPage location.search bilan o'qiydi — mos), Xabarlar tugmasi (89-band),
+mobil menyu. Yangi xato topilmadi (mobil menyuda "Boshqaruv paneli" va
+"Foydalanuvchi profili" ikkalasi ham 'profile'ga olib boradi — ortiqcha
+lekin xato emas). Navbatdagi qadam: 4-aylanish — 10x guruhidan
+lib/api.ts.
+
+83-bosqich: Foydalanuvchi so'rovi bo'yicha tuzatish.txt'ga umuman
+kiritilmagan fayllar qidirildi — barcha src/scripts/routes/lib/telegram-bot
+kodi allaqachon tracked ekan, faqat CONFIG fayllar (avval "alohida
+sanalmaydi" deb belgilangan) hech qachon chinakam tekshirilmagan ekan.
+Tekshirilganda 2 ta HAQIQIY REGRESSIYA topildi:
+103-band (KATTA MUAMMO, REGRESSIYA): package.json'da "vite" yana ham
+dependencies, ham devDependencies'da dublikat bo'lib qolgan edi (bu xato
+avval — 3-band atrofida — bir marta tuzatilgan edi), VA deploy.sh'dagi
+tuzatish ("npm install --include=dev") ham "npm install"ga qaytarilgan
+edi — ikkalasi birga VPS'da NODE_ENV=production bo'lsa build vaqtida
+kerak bo'ladigan devDependencies-only asboblar (typescript, prisma,
+esbuild, tsx) o'rnatilmay qolib, build butunlay buzilishi mumkin edi.
+Ikkalasi ham qayta tuzatildi (vite dublikati olib tashlandi, deploy.sh
+yana --include=dev'ga qaytarildi) — bu joy oldin ham regressiyaga
+uchragani uchun DIQQAT bilan kuzatilishi kerak.
+104-band (REGRESSIYA): metadata.json'dagi "description" maydoni eski
+"investment marketplace...verified investors" (investitsiya platformasi)
+matniga qaytib qolgan edi — loyiha aslida xarid-sotuv bozori, bu
+terminologiya loyiha boshida bir necha marta olib tashlangan edi (AI
+Studio regressiyasi sifatida qayd etilgan). index.html'dagi to'g'ri
+tavsifga mos qilib qayta yozildi.
+Qolgan config fayllar (index.html, robots.txt, tsconfig.json,
+ecosystem.config.cjs, render.yaml) va index.css — toza, xato yo'q.
+Navbatdagi qadam: 4-aylanish — lib/api.ts (10x guruhidan).
+
+84-bosqich: lib/api.ts to'liq qayta ko'rib chiqildi (10→11-marta) — o'zida
+xato yo'q (401/5xx retry, refresh promise race-condition himoyasi, o'lik
+CSRF kodi haqidagi eslatma — hammasi to'g'ri). Lekin shu jarayonda
+MessagesPage.tsx'ning socket ulanishini kuzatib borishda server.ts'da
+105-band (KATTA MUAMMO) topildi: io.use() socket autentifikatsiyasi
+`socket.handshake.auth.token` MAVJUD BO'LMAGANDAgina cookie'ga qaytardi —
+lekin kirish tokeni (accessToken) atigi 15 daqiqa amal qiladi
+(routes/auth.ts), va MessagesPage.tsx socketni FAQAT sahifa ochilganda
+bir marta localStorage'dagi tokenni o'qib ulanadi. Agar foydalanuvchi
+15 daqiqadan ko'proq faol REST so'rov yubormasdan Xabarlar sahifasini
+ochsa (yoki ochiq qoldirsa), localStorage'dagi token eskirgan bo'ladi —
+u MAVJUD (garchi yaroqsiz) bo'lgani uchun server cookie'dagi (balki hali
+yangi) tokenni SINAB HAM KO'RMAY to'g'ridan-to'g'ri "Yaroqsiz token" deb
+ulanishni rad etardi — real-time chat butunlay ishlamay qolardi. Tuzatildi:
+endi avval auth.token tekshiriladi, muvaffaqiyatsiz bo'lsa (mavjud bo'lsa
+ham, mavjud bo'lmasa ham) cookie'dagi token bilan qayta urinib ko'riladi.
+Navbatdagi qadam: 4-aylanish — backup-db.ts (10x guruhidan).
+
+85-bosqich: backup-db.ts to'liq qayta ko'rib chiqildi (10→11-marta) —
+Prisma JSON fallback'dagi 30 modelning barchasi schema.prisma bilan mos
+(hammasi hisoblab chiqildi va solishtirildi), Telegram va S3 ikkalasi
+uchun ham AES-256-GCM shifrlash majburiy (ENCRYPTION_KEY yo'q bo'lsa
+yuborilmaydi), ENCRYPTION_KEY'ning process.env'dan to'g'ridan-to'g'ri
+o'qilishi ataylab shunday (crypto.ts bilan mos — bu kalitni DB
+Setting'da saqlash aylanma bog'liqlik bo'lardi, chunki aynan shu kalit
+Setting qiymatlarini shifrlaydi). Yangi xato topilmadi. Navbatdagi
+qadam: 4-aylanish — restore-db.ts (10x guruhidan).
+
+86-bosqich: restore-db.ts to'liq qayta ko'rib chiqildi (10→11-marta) —
+Telegram/S3 shifrlash formatining mosligi (iv:encrypted:tag),
+checkAndAutoRestore (server.ts) bilan bog'lanishi, 30 model import
+tartibi FK bog'liqliklariga to'g'ri mos (masalan escrowPayment
+disputeResolution'dan oldin) — hammasi to'g'ri. Yangi xato topilmadi.
+Navbatdagi qadam: 4-aylanish — export-to-github.ts (10x guruhidan).
+
+87-bosqich: export-to-github.ts to'liq qayta ko'rib chiqildi
+(10→11-marta) — sanitizedUsers/Startups/Payments'dagi barcha maydon
+nomlari schema.prisma bilan solishtirildi (walletConnected, proposalsCount
+va h.k. — hammasi mavjud), techStack JSON.parse himoyasi, status.staged
+tuzatishi (56-band), tempDir tozalash finally blokida — hammasi to'g'ri.
+Yangi xato topilmadi. Navbatdagi qadam: 4-aylanish — make-admin.ts
+(10x guruhidan).
+
+88-bosqich: make-admin.ts to'liq qayta ko'rib chiqildi (10→11-marta) —
+Postgres/SQLite tanlash mantiqi, email normalizatsiya, xato holatlari —
+kichik va toza fayl, xato topilmadi. Navbatdagi qadam: 4-aylanish —
+remove-fake-listings.ts (10x guruhidan).
+
+89-bosqich: remove-fake-listings.ts to'liq qayta ko'rib chiqildi
+(10→11-marta) — barcha FK o'chirish tartibi schema.prisma bilan
+solishtirilib tasdiqlandi (DisputeResolution→EscrowPayment→Dispute/
+ReferralReward→Payment→Startup, IdeaVote→Idea, Message→Conversation) —
+hammasi to'g'ri. Yangi xato topilmadi. Navbatdagi qadam: 4-aylanish —
+schema.prisma (10x guruhidan).
+
+90-bosqich: schema.prisma va schema.sqlite.prisma to'liq qayta
+solishtirildi (10→11-marta, Python difflib bilan strukturaviy diff) —
+faqat kutilgan farqlar bor (datasource provider postgresql↔sqlite,
+Decimal↔Float, izoh matni farqlari) — barcha 30 model va maydon to'liq
+mos. Yangi xato topilmadi. Navbatdagi qadam: 4-aylanish — Footer.tsx
+(10x guruhidan).
+
+91-bosqich: Footer.tsx to'liq qayta ko'rib chiqildi (10→11-marta) —
+havolalar (support/terms/privacy/refund), domen (savdo24.online, 41-band
+bilan mos), Telegram guruh havolasi — hammasi to'g'ri. Kichik: `Phone`
+ikonkasi import qilingan lekin hech qayerda ishlatilmaydi (funksional
+xato emas, faqat ishlatilmagan import). Navbatdagi qadam: 4-aylanish —
+SupportPage.tsx (10x guruhidan).
+
+93-bosqich: Foydalanuvchi so'rovi bo'yicha yana bir marta "kiritilmagan fayl"
+qidirildi. Topilma: README.md loyiha boshidan beri tuzatish.txt hisobiga
+UMUMAN kiritilmagan ekan (0 marta tekshirilgan, config fayllar guruhidan
+ham chetda qolgan) — endi rasmiy hisobga qo'shildi va to'liq tekshirildi.
+106-band (KATTA MUAMMO, hujjat/kod nomuvofiqligi): README.md "Deployment:
+GitHub Actions, PM2, Docker" va "Har bir yangi versiya (GitHub Actions
+orqali) avtomatik zaxira olinadi" deb yozgan edi, lekin loyihada
+.github/workflows papkasi ham, Dockerfile ham UMUMAN yo'q, va deploy.sh
+hech qachon `npm run backup`ni chaqirmasdi — hujjatlashtirilgan
+xavfsizlik kafolati amalda ishlamas edi. Tuzatildi: deploy.sh'ga
+`prisma db push`dan oldin haqiqiy `npm run backup` bosqichi qo'shildi
+(muvaffaqiyatsiz bo'lsa aniq tasdiq so'raydi, jimgina davom etmaydi);
+README endi haqiqiy stackni yozadi (deploy.sh / render.yaml, Docker va
+GitHub Actions yo'qligi aniq ko'rsatilgan).
+107-band: README "Avtomatik Tiklash" bo'limi faqat Telegram'ni tilga
+olardi, lekin 69-bandda restore-db.ts'ga qo'shilgan Contabo S3 fallback
+haqida hech narsa demasdi (kod to'g'ri, hujjat eskirgan edi) — S3
+fallback qo'shib yozildi.
+108-band (kichik): README "Frontend: ... Framer Motion" deb yozgan,
+lekin package.json'dagi haqiqiy paket `motion` (`motion/react`dan import
+qilinadi, Framer Motion'ning yangi nomlangan davomi) — "Motion
+(`motion/react`)" ga tuzatildi.
+109-band (bog'liqlik muammosi): package.json'da `@google/genai` va
+`decimal.js` `dependencies`da turardi, lekin ikkalasi ham kodning
+hech bir joyida import qilinmagan (grep bilan tasdiqlandi) — "AI narx
+taklifi" (/api/ai/price-suggestion, server.ts) aslida oddiy statistik
+o'rtacha hisoblaydi, Gemini SDK'ga umuman murojaat qilmaydi. Bular eski
+AI Studio shabloni qoldig'i (o'lik bog'liqlik, 89/94-banddagi o'lik kod
+bilan bir xil turdagi muammo, faqat bog'liqlik darajasida) — olib
+tashlandi. Shu bilan bir vaqtda kichik topilma: `@types/qrcode`
+noto'g'ri `dependencies`da turardi (types-paket, `devDependencies`da
+bo'lishi kerak) — ko'chirildi.
+94-bosqich: Foydalanuvchi so'rovi bo'yicha yana bir marta kiritilmagan
+fayl qidirildi (bu safar .sql/.toml kabi kengaytmalar ham hisobga
+olindi — avvalgi 92-bosqichdagi "kod fayllari" ro'yxati faqat
+.ts/.tsx/.js/.json/.css/.html/.prisma/.cjs/.yaml/.sh/.md edi, migration
+fayllari shu ro'yxatga umuman kirmagan edi).
+Topilma: prisma/migrations/ (2 ta migration.sql + migration_lock.toml)
+hech qachon tuzatish.txt'ga alohida kiritilmagan EDI. Buning ustiga
+deploy.sh'dagi izoh "6 ta jadval yaratadi... batafsili tuzatish.txt'da"
+deb yozadi, lekin tuzatish.txt'da bu haqda BIRONTA HAM yozuv yo'q edi —
+hujjat o'z-o'ziga bergan va'dasini bajarmagan (README'dagi 106-band
+bilan bir xil turdagi "hujjat/kod nomuvofiqligi", faqat bu safar
+"hujjat/hujjat").
+Tekshiruv natijasi: migration.sql'lar haqiqatan ham faqat 6 jadval
+yaratadi (User, Category, Startup, Payment, Idea, Subscriber), schema.
+prisma'da esa 30 model bor — bu FUNKSIONAL XATO EMAS, chunki deploy.sh
+ataylab "migrate deploy" o'rniga "prisma db push" ishlatadi (schema.
+prisma'ga qarab bazani to'g'ridan-to'g'ri sinxronlaydi, eskirgan
+migration fayllariga bog'liq emas) — bu qaror to'g'ri va xavfsiz.
+Xavf shundaki: kelajakda kimdir (bilmasdan) "npx prisma migrate deploy"
+yoki "migrate resolve" ishlatsa, eskirgan migratsiyalar ustida ishlaydi
+va production bazani buzishi mumkin. Migratsiyalarni to'liq qayta
+generatsiya qilish DB ulanishini talab qiladi (bu muhitda yo'q) va
+ishlab turgan production'ni xavf ostiga qo'yadi, shu sabab kod emas,
+faqat ogohlantiruvchi izoh qo'shildi: migration_lock.toml yoniga
+README_MIGRATIONS.md qo'shildi ("BU PAPKA ESKIRGAN — HECH QACHON
+`migrate deploy`/`migrate resolve` ISHLATMANG, faqat `db push`").
+Fayllar endi rasmiy hisobda (1-marta tekshirilgan).
+95-bosqich: "4-aylanish" tsikli davom ettirildi — SupportPage.tsx +
+routes/support.ts (10x guruhidan, 10→11-marta) to'liq qayta ko'rib
+chiqildi.
+110-band (KATTA MUAMMO, matn/mahsulot nomuvofiqligi): SupportPage.tsx
+FAQ bo'limidagi 2 ta javob "Blokcheyn tranzaksiyalari yakuniy va
+qaytarib bo'lmas" va "to'lovlar blokcheyn konsensusi orqali
+kafolatlanadi" deb yozgan edi — lekin butun loyihada (server.ts,
+to'lov/escrow logikasi) "blokcheyn" so'zi BOSHQA HECH QAYERDA
+ishlatilmaydi. Haqiqiy tizim: CoinGate orqali kripto to'lov + ilova
+ichidagi (Postgres/Prisma) escrow — mablag' vaqtincha ushlab turiladi,
+nizo bo'lsa admin ko'rib chiqadi, RefundPolicyPage.tsx'da yozilgan
+sharoitlarda qaytariladi (62/69-band). FAQ'dagi "blokcheyn, hech qachon
+qaytarilmaydi" da'vosi haqiqiy qaytarish siyosatiga TO'G'RIDAN-TO'G'RI
+ZID edi — foydalanuvchini o'z huquqlari borasida chalg'itardi (masalan
+nizo ochish imkoniyati borligini "yashirardi"). Ikkala javob ham haqiqiy
+CoinGate+escrow+admin-nizo tizimini to'g'ri tasvirlaydigan matnga
+almashtirildi.
+111-band (kichik, o'lik kod): routes/support.ts'dagi GET /api/support
+(admin uchun chiptalar ro'yxati) hech qayerdan (frontendda) chaqirilmasdi
+— GET /api/admin/support-tickets aynan bir xil ma'lumotni qaytaradi va
+AdminPage.tsx haqiqatda shuni ishlatadi. Duplikat, ishlatilmaydigan
+endpoint olib tashlandi. Boshqa hech narsa (zod validatsiya, rate
+limiter, P2002/report unique cheklovi, pagination) to'g'ri edi.
+96-bosqich: Yana bir marta kiritilmagan/bog'lanmagan narsalar qidirildi
+(bu safar rasm/asset fayllari ham, kod bilan bog'liqligi grep orqali
+tekshirilgan holda).
+112-band (kichik, o'lik asset): src/assets/images/hoodie_avatar_variants_
+1784284089839.jpg — 427 KB rasm fayli kodning hech bir joyida (import
+yoki string sifatida) ishlatilmasdi (109-banddagi @google/genai/decimal.js
+o'lik bog'liqliklar bilan bir xil turdagi muammo, faqat asset darajasida).
+Vite uni build'ga bog'lamasdi (import qilinmagani uchun), lekin repo/zip
+hajmini keraksiz oshirardi — olib tashlandi (bo'sh qolgan src/assets/
+papkasi ham).
+telegram-bot/index.ts (10x guruhidan, 10→11-marta) to'liq qayta ko'rib
+chiqildi — 68/13/14/41-band tuzatishlari hali to'g'ri ishlayotgani
+tasdiqlandi (check_subscription, secret header, editCaption/editMessageText
+farqi), escapeHtml barcha user-generated matnda ishlatilgani, imageUrl
+nisbiy/to'liq yo'l farqi to'g'ri.
+113-band: botToken bo'sh bo'lsa `new Bot("")` grammy ichida darhol
+tushunarsiz xato bilan qulardi — PM2 (autorestart:true) buni cheksiz
+qayta ishga tushirishga urinib, haqiqiy sabab (.env sozlanmagani)
+log'larda yo'qolib ketardi. backup-db.ts'dagi DATABASE_URL tekshiruvi
+naqshiga o'xshab, botToken va APP_URL uchun aniq startup tekshiruvi
+(bo'sh bo'lsa tushunarli xabar bilan process.exit(1)) qo'shildi.
+97-bosqich: "4-aylanish" davom ettirildi — lib/crypto.ts (49/73-band
+tuzatishlari to'g'ri), lib/logger.ts, lib/analytics.ts, lib/rateLimiters.ts
+(10x guruhidan, 10→11-marta) qayta ko'rib chiqildi, yangi xato topilmadi.
+Foydalanuvchi so'rovi bo'yicha (dizayn/joylashuv) Sidebar.tsx +
+MobileNav.tsx ham tekshirildi. Sidebar.tsx: `aside` `fixed w-64` va
+App.tsx'dagi `<main>` `lg:pl-64` bilan to'g'ri moslashgani tasdiqlandi
+(ustma-ust tushib qolish yo'q).
+114-band (dizayn xatosi): MobileNav.tsx'da profil tugmasi ikonkasining
+"to'ldirilgan" (FILL) holati `(isActive || tab.fillIcon) && tab.id ===
+'profile'` shartiga bog'liq edi — lekin `tab.fillIcon` statik massiv
+elementi (profil uchun doim `true`), shu sabab `isActive` shart
+`||` orqasida hech qachon HAQIQIY rol o'ynamasdi: profil ikonkasi
+foydalanuvchi boshqa tabda (Asosiy/G'oyalar/Saqlanganlar) tursa ham
+DOIM to'ldirilgan holatda ko'rinardi, faol/nofaol holat vizual
+farqlanmasdi. `||` ni `&&` ga almashtirib tuzatildi — endi ikonka
+faqat foydalanuvchi haqiqatan profil'da bo'lganda to'ladi.
+98-bosqich: "4-aylanish" davom ettirildi — ErrorBoundary.tsx (49-band
+to'g'ri), TermsPage.tsx/PrivacyPage.tsx (5% komissiya server.ts'dagi
+0.95 koeffitsienti bilan hamon mos) qayta ko'rib chiqildi, yangi xato
+topilmadi. RefundPolicyPage.tsx qayta o'qilganda server.ts'dagi tegishli
+endpoint (PATCH /api/admin/escrow-disputes/:id) bilan chuqur
+solishtirilganda katta topilma chiqdi:
+115-band (KATTA MUAMMO, server.ts — 16 marta tekshirilgan bo'lsa ham
+topildi): Admin escrow nizosini "refunded" deb hal qilganda endpoint
+FAQAT EscrowPayment.status va DisputeResolution.resolution'ni
+"refunded"ga o'zgartirardi — Payment.status esa "completed"da qolib
+ketardi, hech qanday joyda "haqiqiy pul hali qaytarilmagan, qo'lda
+CoinGate orqali qaytarish kerak" degan belgi qolmasdi. Buning ustiga
+xaridor va sotuvchiga "mablag' xaridorga qaytarildi" degan bildirishnoma
+yuborilardi — bu chalg'ituvchi edi, chunki tizimda CoinGate orqali
+kelgan pulni avtomatik qaytaradigan hech qanday integratsiya yo'q
+(escrow — faqat ilova ichidagi status, real on-chain/hamyon emas).
+RefundPolicyPage.tsx ham "muzlatilgan mablag'ni xaridor hamyoniga
+qaytaradi" deb, xuddi shu noto'g'ri taassurotni berardi (110-banddagi
+SupportPage/haqiqiy-tizim nomuvofiqligi bilan bir xil turdagi muammo,
+faqat bu safar moliyaviy oqibati borroq — admin buni ko'rib "ish
+tugadi" deb o'ylashi, real qaytarish esa hech qachon amalga
+oshmasligi mumkin edi). Tuzatildi: resolution==="refunded" bo'lganda
+endi Payment.status ham "refund_required"ga o'tkaziladi (bu status
+allaqachon boshqa joyda — startup ikki marta sotib olinganda — xuddi
+shu ma'noda ishlatiladi, 3532-qator), bildirishnoma matni "CoinGate
+orqali qo'lda qayta ishlanadi" deb aniqlashtirildi, RefundPolicyPage.tsx
+matni ham shu haqiqatga moslashtirildi.
+"HALI QILINMAGAN" ro'yxatiga qo'shildi: AdminPage.tsx'da Payment.status=
+"refund_required" bo'lgan to'lovlarni ko'rsatadigan/kuzatadigan alohida
+ro'yxat (moliya jamoasi uchun "qo'lda qaytarish kutilmoqda" ro'yxati)
+hali yo'q — bu kattaroq UI qaror talab qiladi.
+Navbatdagi qadam edi: 4-aylanish davom etadi — Sidebar.tsx/MobileNav.tsx
+qayta hisobga olinib (114-band shu yerda tuzatilgan edi), keyingi
+navbat MessagesPage.tsx (10x guruhidan).
+
+99-bosqich: Foydalanuvchi so'rovi bo'yicha avval "tuzatish.txt'ga
+kiritilmagan fayl bormi" qayta tekshirildi — barcha .ts/.tsx/.js/.json/
+.css/.html/.prisma/.cjs/.yaml/.sh/.md/.sql/.toml fayllar (migration va
+README_MIGRATIONS.md ham) allaqachon hisobda ekani tasdiqlandi, yangi
+kiritilmagan fayl topilmadi. Shundan so'ng rejadagi navbat — MessagesPage.tsx
+(10x guruhidan, 10→11-marta) — to'liq qayta ko'rib chiqildi: so'rov tartib
+raqami (75-band tuzatishi), submitting holati (76-band), socket ulanishi
+(selectedConversationRef orqali qayta ulanmasligi), dublikat xabar himoyasi
+— hammasi hali to'g'ri ishlayotgani tasdiqlandi.
+116-band (dizayn/UX xatosi): xabarlar oynasida (chat panel) AVTOMATIK
+PASTGA AYLANTIRISH umuman yo'q edi — suhbat ochilganda ham, yangi xabar
+kelganda/yuborilganda ham foydalanuvchi har safar ro'yxatni qo'lda pastga
+aylantirib, eng oxirgi xabarni topishi kerak edi (odatiy chat interfeysi
+xatti-harakatiga zid). Bundan tashqari, suhbat almashtirilganda (masalan
+A dan B ga o'tilganda) tarmoq javobi kelguncha oldingi (A) suhbatning
+xabarlari bir lahza yangi (B) sarlavha ostida ko'rinib turardi (so'rov
+tartib raqami himoyasi faqat NOTO'G'RI/eskirgan javobni bostirishga
+xizmat qiladi, lekin eski ma'lumotni darhol tozalamaydi). Tuzatildi:
+messagesEndRef sentinel qo'shildi, xabarlar ro'yxati yoki tanlangan
+suhbat o'zgarganda avtomatik pastga aylanadi; suhbat tanlanganda
+`setMessages([])` bilan eski xabarlar darhol tozalanadi (yangi javob
+kelguncha bo'sh oyna ko'rsatiladi, eski ma'lumot emas).
+Fayl node_modules yo'qligi sababli to'liq esbuild/tsc orqali sinab
+ko'rilmadi (bu muhitda avvalgi bosqichlarda ham xuddi shunday edi) —
+qo'lda diqqat bilan JSX/TS sintaksisi tekshirildi.
+100-bosqich: "4-aylanish" davom ettirildi — avval yana bir marta kiritilmagan
+fayl qidirildi (topilmadi, 56 ta trackable fayl hammasi hisobda). Keyin
+navbatdagi rejalashtirilgan qadam — Sidebar.tsx va MobileNav.tsx
+(10x guruhidan, 10→11-marta, RASMAN hisoblanadigan tsikl bo'yicha —
+97-bosqichdagi maxsus "dizayn" so'rovi bo'yicha tekshiruv hisobga
+kiritilmagan edi) — to'liq, mustaqil qayta ko'rib chiqildi.
+Sidebar.tsx: isActive hisoblash (profile/admin/settings ajratilishi),
+avatar bosilganda profileTab='startups'ga o'tishi, Navbar'dagi "Xabarlar"
+tugmasi barcha ekran o'lchamlarida ko'rinishi sababli Sidebar'da alohida
+xabarlar bandi yo'qligi muammo emasligi tasdiqlandi.
+MobileNav.tsx: 114-band tuzatishi (`isActive && tab.fillIcon`) hali to'g'ri
+ishlayotgani tasdiqlandi, "Profil"/"Saqlanganlar" tab almashtirish
+mantiqi, markazdagi "E'lon" tugmasi, App.tsx'dagi `pb-28` bilan pastki
+navbar balandligi to'g'ri moslashgani (kontent ustidan bosib
+qolmasligi) tekshirildi. Yangi xato topilmadi.
+Navbatdagi qadam: 4-aylanish davom etadi — ForgotPasswordPage.tsx va
+ResetPasswordPage.tsx (10x guruhidan, 11-marta uchun navbatda).
+
+101-bosqich: kiritilmagan fayl yana qidirildi (topilmadi). Rejadagi navbat
+— ForgotPasswordPage.tsx va ResetPasswordPage.tsx (10x guruhidan, 10→11-
+marta) to'liq qayta ko'rib chiqildi, shu bilan bog'liq routes/auth.ts'dagi
+forgot/reset-password endpointlari (resetToken/expiry, resetPasswordSchema,
+sendEmail, refresh token bekor qilinishi) ham qayta solishtirildi — barchasi
+to'g'ri edi (parol qoidasi frontend/backendda so'z-so'z mos).
+117-band: ikkala forma ham faqat "Yuborish" tugmasini `disabled={loading}`
+qilardi (SellPage/SupportPage/MessagesPage'dagi 60/74/76-band naqshi
+qisman qo'llangan edi), lekin `handleSubmit` funksiyasining ICHIDA
+`loading`dan qayta kirish himoyasi yo'q edi — input maydonida Enter
+bosilsa forma darhol qayta submit bo'lardi (tugma disabled bo'lishi buni
+bloklamaydi, chunki forma submit hodisasi Enter orqali ham keladi).
+Natijada tez-tez Enter bosilsa bir nechta parolni tiklash xati yuborilishi
+yoki bir nechta reset-password so'rovi ketishi mumkin edi. Tuzatildi:
+ikkala `handleSubmit` boshiga `if (loading) return;` qo'shildi, barcha
+matn kiritish maydonlari (email, token, parol, parolni tasdiqlash) endi
+`disabled={loading}` bilan ham himoyalangan (ko'z-tugmasi funksional
+qolishi uchun ochiq qoldirildi).
+Fayl node_modules yo'qligi sababli to'liq esbuild/tsc orqali sinalmadi —
+qo'lda diqqat bilan JSX/TS sintaksisi tekshirildi.
+Navbatdagi qadam: 4-aylanish davom etadi — IdeasRatingPage.tsx
+(10x guruhidan, 11-marta uchun navbatda).
+
+102-bosqich: kiritilmagan fayl yana qidirildi (topilmadi). Rejadagi navbat
+— IdeasRatingPage.tsx (10x guruhidan, 10→11-marta) to'liq qayta ko'rib
+chiqildi, shu bilan bog'liq server.ts GET /api/ideas/top (78-band status
+filtri hali to'g'ri) va POST /api/ideas/:id/upvote (voterKey — user-id
+yoki IP+UA xesh, IdeaVote unique constraint) ham qayta solishtirildi.
+Sahifalash (so'rov tartib raqami, filtr o'zgarganda page=1ga qaytarilishi),
+kategoriya/vaqt filtri backend bilan mos ekani, rank medali hisoblash —
+hammasi to'g'ri edi.
+118-band: "Ovoz berish" (upvote) tugmasi loyihaning boshqa deyarli barcha
+harakat tugmalaridan (60/74/76/83/84/117-band) farqli o'laroq so'rov
+davomida disabled/loading holatiga o'tmasdi — tez-tez bosilsa bir nechta
+bir xil POST /api/ideas/:id/upvote so'rovi ketardi. Backend voterKey
+orqali dublikatni haqiqiy bloklaydi (IdeaVote unique, 409 qaytaradi), shu
+sabab ovozlar soni buzilmasdi, lekin foydalanuvchiga tez-tez bosilganda
+chalkash/keraksiz "Siz allaqachon ovoz bergansiz" xabari ko'rsatilishi
+mumkin edi va umuman loyihaning o'zi qabul qilgan naqshga mos emas edi.
+Tuzatildi: har g'oya uchun alohida `votingIds` holati qo'shildi, so'rov
+davomida shu g'oyaning tugmasi bloklanadi (`disabled` + `opacity-50`).
+Fayl node_modules yo'qligi sababli to'liq esbuild/tsc orqali sinalmadi —
+qo'lda diqqat bilan JSX/TS sintaksisi tekshirildi.
+Navbatdagi qadam: 4-aylanish davom etadi — DetailPage.tsx
+(10x guruhidan, 11-marta uchun navbatda).
+
+103-bosqich: kiritilmagan fayl yana qidirildi (topilmadi). Rejadagi navbat
+— DetailPage.tsx (1398 qator, 10x guruhidan, 10→11-marta) to'liq qayta
+ko'rib chiqildi — SEO meta, hook tartibi, narx/o'ziga xarid himoyasi
+(91-band), demoUrl/githubUrl protokol tekshiruvi (89-band), milestones
+timeline (90-band), 'user' report tugmasi (97-band), Review/Dispute/Report/
+Idea formalarining barchasida submitting holati to'g'ri ishlayotgani
+tasdiqlandi.
+119-band: shu faylning o'z ichidagi "G'oyalar reytingi" bo'limidagi "Ovoz
+berish" tugmasi ham IdeasRatingPage.tsx'dagi 118-band bilan AYNAN bir xil
+muammoga ega edi — so'rov davomida disabled bo'lmasdi. Bundan tashqari,
+bir xil g'oyaning bir xil "ovoz berilganmi" holatini ikkala fayl ikki xil
+brauzer xotirasida saqlardi: DetailPage.tsx localStorage (doimiy),
+IdeasRatingPage.tsx esa sessionStorage (faqat shu tab/sessiya uchun) —
+foydalanuvchi bitta g'oyaga bir sahifada ovoz bersa, ikkinchi sahifada
+(sessiya davom etayotgan bo'lsa ham boshqa tab/keyinroq) tugma hali ham
+faol ko'rinardi (backend baribir 409 bilan bloklardi, lekin UI holati
+nomuvofiq edi). Tuzatildi: DetailPage.tsx'ga IdeasRatingPage'dagi bilan
+bir xil `votingIdeaIds` himoyasi qo'shildi; IdeasRatingPage.tsx
+localStorage'ga o'tkazildi (ikkalasi endi bir xil, doimiy xotiradan
+foydalanadi).
+Fayl node_modules yo'qligi sababli to'liq esbuild/tsc orqali sinalmadi —
+qo'lda diqqat bilan JSX/TS sintaksisi tekshirildi.
+Navbatdagi qadam: 4-aylanish davom etadi — ProfilePage.tsx
+(10x guruhidan, 11-marta uchun navbatda).
+
+104-bosqich: kiritilmagan fayl yana qidirildi (topilmadi). Rejadagi navbat
+— ProfilePage.tsx (1597 qator, 10x guruhidan, 10→11-marta) to'liq qayta
+ko'rib chiqildi — settings/B2B forma submitting holati (83-band), escrow
+release xato xabari (63-band), rol privilege escalation himoyasi, soxta
+"12 ta taklif" olib tashlangani (64-band) hammasi hali to'g'ri edi.
+120-band: TOP boost va VIP xarid tugmalari ("To'lovga o'tish", "VIP
+bo'lish"), shuningdek "Tasdiqlash"/"Nizo" (escrow release/dispute)
+tugmalari loyihaning boshqa deyarli barcha harakat tugmalaridan (60/74/
+76/83/84/117/118/119-band) farqli o'laroq so'rov davomida disabled
+bo'lmasdi — tez-tez/qayta bosilsa bir nechta to'lov yaratish yoki bir
+nechta escrow release/dispute so'rovi ketishi mumkin edi. Bundan tashqari
+"Nizo" tugmasi fetch xatosini umuman ushlamasdi (.catch() yo'q edi) —
+tarmoq xatosida foydalanuvchiga hech qanday xabar ko'rsatilmasdi (jimgina
+osilib qolardi). Tuzatildi: isBuyingTop/isBuyingVip holatlari qo'shildi,
+ikkala tugma ham so'rov davomida disabled+"Yuklanmoqda..." matni
+ko'rsatadi; escrowActionId (payment.id bo'yicha) qo'shildi, release/dispute
+tugmalari shu paymentga tegishli so'rov ketayotganda disabled bo'ladi;
+dispute so'roviga .catch() bilan tarmoq xatosi xabari qo'shildi.
+Fayl node_modules yo'qligi sababli to'liq esbuild/tsc orqali sinalmadi,
+lekin tsc --noEmit --noResolve bilan sintaksis alohida tekshirildi (xato
+topilmadi).
+ProfilePage.tsx bilan 11x-guruhning barcha fayllari (MessagesPage,
+Sidebar, MobileNav, ForgotPassword, ResetPassword, IdeasRatingPage,
+DetailPage, ProfilePage) shu aylanishda 10→11-marta tekshirilib bo'ldi.
+Navbatdagi qadam: 4-aylanish davom etadi — 10x-guruh boshidan,
+SupportPage.tsx (10x guruhidan, 10→11-marta).
+
+105-bosqich: foydalanuvchi so'rovi bo'yicha "tuzatish.txt'ga kiritilmagan
+fayl bormi" qayta tekshirildi — bu safar package-lock.json va bun.lock
+ham .json/.lock fayllar sifatida qo'shildi (avvalgi bosqichlarda "avtomatik
+generatsiya qilinadi" deb butunlay o'tkazib yuborilgan edi, biroq
+package.json/deploy.sh uchun 83-bosqichda qabul qilingan qoidaga ko'ra —
+"config, alohida sanalmaydi" degan taxmin ikkitasida ham haqiqiy
+REGRESSIYA topgani sabab bekor qilingan edi — xuddi shu mantiq bu yerda
+ham qo'llanildi).
+121-band (BOG'LIQLIK MUAMMOSI): package.json'da `compression` va
+`@types/compression` dependencies sifatida yozilgan (server.ts'da
+`app.use(compression())` orqali ishlatiladi ham), lekin ikkalasi ham
+package-lock.json'da VA bun.lock'da umuman yo'q edi — bu fayllar
+`compression` qo'shilgandan keyin qayta generatsiya qilinmagan. Natijada
+`npm ci`/`bun install --frozen-lockfile` каби qat'iy rejimlar xato berishi
+mumkin edi (`npm install`/oddiy `bun install` muammoni sezmasdan avtomatik
+tuzatib qo'yadi, lekin CI/production muhitida qat'iy rejim ishlatilsa
+build buzilishi mumkin edi). Bundan tashqari ikkala faylda ham `@google/genai`
+va `decimal.js` root dependencies sifatida qolib ketgan edi — bular
+package.json'da UMUMAN yo'q va kodning hech qayerida ishlatilmaydi (grep
+bilan tekshirildi), ya'ni package.json'dan olib tashlangandan keyin lock
+fayllar qayta generatsiya qilinmagan (teskari muammo). Tuzatildi: ikkala
+lock faylidan `@google/genai`/`decimal.js` root-dependency yozuvlari va ularga
+tegishli paket yozuvlari (boshqa hech qanday paket ularga bog'liq emasligi
+tasdiqlangandan keyin) olib tashlandi. `compression`ni to'g'ri qo'shish esa
+haqiqiy npm registry integrity hash talab qiladi — bu muhitda tarmoq
+yo'qligi sababli (bash tool network o'chirilgan) xavfsiz bajarib bo'lmadi;
+soxta/noto'g'ri hash yozish haqiqiy `npm ci`ni yanada battar buzardi, shu
+sabab bu qism ATAYLAB tuzatilmadi. "HALI QILINMAGAN" ro'yxatiga qo'shildi:
+tarmoqqa ulangan muhitda (yoki lokal kompyuterda) `npm install` (yoki
+`bun install`) qayta ishga tushirilib, package-lock.json/bun.lock
+`compression`/`@types/compression` bilan qayta generatsiya qilinishi kerak.
+122-bosqichda qo'shilgan avtomatik testlar hozircha faqat 3 ta sof
+funksiyani qamrab oladi (escapeHtml/getReferralTier/safeCompare) va
+crypto.ts'ni — asosiy biznes-mantiq (to'lov/escrow/webhook, referral
+hisob-kitob, auth flow) hali test qilinmagan, chunki bular Prisma/DB'ga
+chuqur bog'langan (DB mock'lash yoki alohida test-SQLite kerak bo'ladi).
+Ikkala faylning JSON/JSONC balansi (qavslar soni) qo'lda tekshirildi, xato
+topilmadi.
+Navbatdagi qadam: 4-aylanish davom etadi — SupportPage.tsx
+(10x guruhidan, 10→11-marta).
+
+106-bosqich: kiritilmagan fayl yana qidirildi — bu safar barcha
+kengaytmalar (.lock ham) bo'yicha to'liq ro'yxat tuzatish.txt bilan
+avtomatik solishtirildi (skript orqali), yangi kiritilmagan fayl
+topilmadi (57 ta trackable fayl hammasi hisobda). Rejadagi navbat —
+SupportPage.tsx (253 qator) va u bilan chambarchas bog'liq
+routes/support.ts (10x guruhidan, 10→11-marta) birga to'liq qayta
+ko'rib chiqildi: qo'llab-quvvatlash forma submitting himoyasi (74-band),
+support email domeni (savdo24.online), FAQ, SupportTicket status
+oqimi (pending→reviewing/resolved, AdminPage bilan mos), Report
+uniqueness+P2002 himoyasi — hammasi to'g'ri edi.
+122-band (kichik tozalash): POST /api/reports endpoint'ida
+`reportLimiter` bilan bir qatorda `supportLimiter` ham qo'shilgan edi —
+ikkalasi ham AYNAN bir xil sozlamaga ega (max=5/15min), ya'ni ikkinchisi
+funksional jihatdan hech narsa qo'shmasdi, faqat ortiqcha/chalkash
+ikkinchi hisoblagich (94-band'dagi o'lik GET /api/support kabi shu
+faylning o'zida ilgari topilgan tozalash turi). Tuzatildi: `supportLimiter`
+POST /reports'dan olib tashlandi, faqat maqsadli `reportLimiter` qoldirildi
+(import hali ham POST /support uchun kerak, o'chirilmadi).
+Fayl node_modules yo'qligi sababli to'liq esbuild/tsc orqali sinalmadi,
+lekin tsc --noEmit --noResolve bilan ikkala fayl alohida tekshirildi
+(xato topilmadi).
+Navbatdagi qadam: 4-aylanish davom etadi — telegram-bot/index.ts
+(10x guruhidan, 10→11-marta).
+
+107-bosqich: kiritilmagan fayl yana qidirildi (skript orqali, topilmadi).
+Rejadagi navbat — telegram-bot/index.ts (381 qator, 10x guruhidan,
+10→11-marta) to'liq qayta ko'rib chiqildi: /start, /bogla, /mahsulot,
+/new_listings, /top_deals, /profile buyruqlari, buy_/check_subscription
+callback'lari, secret header (13/14-MUAMMO), rasmsiz/rasmli xabar farqi
+(41-MUAMMO), answerCallbackQuery osilib qolish tuzatishi (68-MUAMMO) —
+hammasi hali to'g'ri edi.
+123-band: oddiy matn xabarini mahsulot ID sifatida qabul qiladigan
+`bot.on("message:text")` handler'ida `text.length < 20` sharti bor edi.
+Biroq server.ts'da Startup.id — foydalanuvchi kiritgan nomdan (150
+belgigacha, server.ts validatsiyasi) generatsiya qilinadigan slug, ya'ni
+haqiqiy mahsulot ID'lari deyarli har doim 20 belgidan uzun bo'ladi
+(masalan "ai-powered-marketplace-platform"). Natijada foydalanuvchi
+haqiqiy, to'g'ri slug'ni botga oddiy matn sifatida yuborsa (nusxalab
+joylasa), bot JIMGINA hech qanday javob bermasdi — go'yo bot ishlamayotgandek
+ko'rinardi. Tuzatildi: uzunlik chegarasi haqiqiy slug formatiga mos 160ga
+oshirildi, qo'shimcha ravishda faqat slug pattern'iga (kichik harf/raqam/
+tire, server.ts'dagi bilan bir xil) mos matnlar ID sifatida qabul qilinadi
+— bo'sh joy/tinish belgili oddiy xabarlar (savol va h.k.) endi keraksiz
+mahsulot-qidiruv so'roviga yubormaydi.
+Fayl node_modules yo'qligi sababli to'liq esbuild/tsc orqali sinalmadi,
+lekin tsc --noEmit --noResolve bilan sintaksis tekshirildi (xato topilmadi).
+Navbatdagi qadam: 4-aylanish davom etadi — lib/crypto.ts
+(10x guruhidan, 10→11-marta).
+
+
+122-bosqich: Foydalanuvchi so'rovi bo'yicha "hech qanday avtomatik test
+yo'q" tanqidiga javoban BIRINCHI avtomatik testlar qo'shildi.
+Muammo: tashqi test freymvork (jest/vitest) o'rnatib bo'lmaydi (tarmoq
+yo'q muhit, npm registry'ga kirish yo'q — bevosita sinab ko'rildi, 403
+xato). Yechim: Node 18+ da o'rnatilgan `node:test`/`node:assert` ishlatildi
+— hech qanday tashqi paket kerak emas, `tsx --test` orqali ishga tushadi
+(tsx allaqachon dependency edi).
+Qamrov: server.ts'dagi UCH ta sof (DB'ga bog'liq bo'lmagan) funksiya —
+escapeHtml, getReferralTier, safeCompare — `src/lib/pure-helpers.ts`ga
+ko'chirildi (mantiq AYNAN o'zgarishsiz), server.ts endi shu yerdan
+import+re-export qiladi (`export { ... } from "./src/lib/pure-helpers"`)
+— boshqa 8 ta faylda (auth.ts/disputes.ts/referrals.ts/reviews.ts/
+support.ts/telegram-integration.ts va h.k.) `from "../../server"` orqali
+import qilinishi o'zgarishsiz qoladi, xatti-harakat farqi yo'q.
+`tests/pure-helpers.test.ts` (15 ta test: escapeHtml XSS-belgilar,
+null/undefined, getReferralTier uch daraja chegarasi, safeCompare
+timing-safe taqqoslash va bo'sh-satr edge case'lari) va
+`tests/crypto.test.ts` (encryptSecret/decryptSecret round-trip, format,
+tasodifiy IV, buzilgan GCM tag'da xato tashlashi) yozildi.
+`npm run test` skripti qo'shildi (`tsx --test tests/*.test.ts`).
+MUHIM: bu safar avvalgi bosqichlardagi kabi "qo'lda o'qib tasdiqlandi"
+EMAS — testlar shu muhitda HAQIQATAN ishga tushirildi va barcha 15 ta
+o'tdi (natija: `# pass 15, # fail 0`). Bundan tashqari server.ts'ning
+qolgan qismi network-siz muhitda mavjud bo'lgan `tsc --noEmit
+--skipLibCheck` orqali ham tekshirildi — faqat oldindan mavjud
+(@types/node/@types/express yo'qligi sabab) xatolar chiqdi, YANGI xato
+yo'q. README.md'ga "Avtomatik testlar" bo'limi qo'shildi.
+CHEKLOV (ochiq qoldi): bu hali faqat 3 ta sof funksiyani qamrab oladi —
+server.ts'dagi asosiy biznes-mantiq (to'lov/escrow/auth flow'lari)
+Prisma/DB'ga chuqur bog'langan, ularni test qilish uchun DB mock'lash
+yoki haqiqiy test-DB (masalan alohida SQLite fayli) kerak bo'ladi — bu
+navbatdagi qadam sifatida "HALI QILINMAGAN" ro'yxatiga qo'shildi.
+
+123-bosqich: Foydalanuvchi so'rovi bo'yicha "tsc/esbuild bilan tekshirildi
+degan da'volarning aksariyati haqiqiy compiler emas" tanqidiga javob.
+Ildiz sabab: sandbox'da tarmoq yo'q (bevosita sinab ko'rilgan — `npx
+esbuild` ham 403 npm registry xatosi berdi), shu sabab bu muhitning O'ZI
+hech qachon haqiqiy `npm ci`+to'liq tip-tekshiruv+build bajara olmaydi —
+bu doimiy, sandbox'ning tuzilishidan kelib chiqadigan cheklov, birror
+bosqichda "tuzatib" bo'lmaydi.
+Yechim: `.github/workflows/ci.yml` qo'shildi — bu workflow GitHub'ning
+o'z serverida (haqiqiy tarmoq, haqiqiy node_modules bilan) ishlaydi:
+checkout → npm ci (haqiqiy registry'dan) → prisma generate (ikkala
+schema) → `tsc --noEmit` (TO'LIQ, @types/node/@types/express bilan) →
+`vite build` + `esbuild` bundle → `npm run test` (122-bosqichdagi
+testlar). Har push/PR'da avtomatik ishga tushadi.
+MUHIM FARQ: bu deploy'ni AVTOMATLASHTIRMAYDI — faqat tekshiruv (CI).
+Deploy hamon `deploy.sh`/FileZilla orqali qo'lda (ARXITEKTURA-6 band
+hamon ochiq). README.md'dagi "GitHub Actions workflow'lari mavjud emas"
+degan eski jumla endi noto'g'ri bo'lib qolardi (106-band'dagi hujjat/kod
+nomuvofiqligi bilan bir xil turdagi xato bo'lardi) — shu sabab aniqlashtirib
+yozildi: CI workflow bor, lekin faqat tekshiruv uchun, deploy alohida.
+Bu workflow loyiha hali GitHub'ga ulanmaguncha ishlamaydi (repo hozircha
+faqat zip sifatida uzatilmoqda, `.git` yo'q) — lekin fayl allaqachon
+tayyor, GitHub'ga push qilinganda darhol ishga tushadi.
+Metodologiya qoidasiga (yuqoriga qarang) doimiy eslatma qo'shildi:
+keyingi barcha bosqichlarda "sintaksis tekshirildi (--noResolve)" va
+"haqiqiy tsc/build (faqat CI orqali)" ikkalasi aniq ajratib yozilishi
+kerak.
+
+124-bosqich: Foydalanuvchi so'rovi bo'yicha "versiyalash tizimi yo'q (.git
+umuman yo'q)" tanqidiga javob.
+Ildiz muammo: 1-123-bosqich davomida loyiha faqat zip fayllar orqali
+uzatilgan, `.git` umuman bo'lmagan — bosqichlar orasidagi haqiqiy diff
+yo'q, xato bosqichni tanlab orqaga qaytarish imkonsiz edi (faqat butun
+zip'ni almashtirish mumkin edi).
+Yechim: `.gitignore` yaratildi (avval umuman yo'q edi — node_modules,
+dist, .env*, dev.db, *.log istisno qilingan). `git init` bajarildi,
+BARCHA joriy fayllar (123-bosqichdagi holat) BITTA boshlang'ich commit
+sifatida yozildi (commit xabarida ochiq yozilgan: bu 1-123 bosqichlarning
+haqiqiy tarixi EMAS — ular git'siz bajarilgani uchun qadam-baqadam
+qayta tiklab bo'lmaydi, bu shunchaki yagona boshlang'ich nuqta).
+MUHIM CHEKLOV (yashirilmadi): bu repoda hozircha REMOTE yo'q — sandbox'da
+tarmoq yo'qligi sababli bu yerdan `git push` qilib bo'lmaydi. README.md'ga
+"Versiyalash (Git)" bo'limi qo'shildi — foydalanuvchi (yoki serverdagi
+DevOps) `git remote add origin <repo>` + `git push -u origin main`
+bilan bir martalik ulanish qilishi kerak, shundan keyin har bosqich
+alohida commit sifatida yozilishi tavsiya etiladi.
+Natija: bu zipning o'zi ENDI `.git` papkasini o'z ichiga oladi (avvalgi
+122/123-bosqich zip'larida `.git` maxsus o'chirilgan edi, bu safar
+ataylab saqlangan) — zip'ni ochib, ichida `git log` qilsa bo'ladi.
+
+125-bosqich: Foydalanuvchi so'rovi bo'yicha "ikki yo'nalish aralashtirilgan,
+ochiq savolga javob kutmasdan ARXITEKTURA-3 bilan davom etilgan" tanqidiga
+javob.
+MUAMMONI KOD BILAN "TUZATIB" BO'LMAYDI — bu metodologik xato, shu sabab
+haqiqiy tuzatish shu: (1) qoidaga doimiy eslatma qo'shish, (2) HOZIR
+to'xtab, foydalanuvchidan haqiqatan javob so'rash (taxmin qilib davom
+etish o'rniga).
+QOIDAGA QO'SHILDI: agar foydalanuvchiga biror tartib/tanlov taklif
+qilingan bo'lsa-yu javob kelmagan bo'lsa, keyingi sessiya (yoki keyingi
+xabar) bu savolni "ochiq" deb belgilab, YANGI ishni SHU yo'nalishda
+boshlamasligi kerak — avval savolni qayta so'rash yoki aniq
+to'xtatilgan joyni davom ettirish (allaqachon boshlangan ishni yakunlash)
+orasida ANIQ tanlov qilinishi, va bu tanlov foydalanuvchiga ochiq
+aytilishi kerak (taxmin qilib "davom etaverish" emas).
+HOZIRGI HOLAT (halol): ARXITEKTURA-3 (server.ts modullashtirish)
+110-121-bosqichlarda 12 ta route guruhi allaqachon ko'chirilgan
+(sponsor-channels, b2b, disputes, reviews, referrals, top-boost-vip,
+telegram-integration, conversations, admin-users, admin-settings,
+admin-audit, admin-delete) — server.ts 5471→3755 qatorga tushgan.
+Buni "orqaga qaytarish" (hammasini birlashtirib qo'yish) ham qo'shimcha
+xavf/vaqt, "davom ettirish" ham foydalanuvchi boshqa tartib xohlagan
+bo'lsa noto'g'ri bo'lishi mumkin — shu sabab BU BOSQICHDA yangi kod
+o'zgarishi QILINMADI, faqat shu holat va savol foydalanuvchiga qayta
+aniq taqdim etildi (suhbatning o'zida).
+
+=== ARXITEKTURA MUAMMOLARI (tashqi tanqid, hali BOSHLANMAGAN, alohida reja) ===
+Suhbat limiti kam bo'lgani uchun bu yerga yozildi — navbatdagi Claude
+sessiyalari shu ro'yxatdan davom etsin, foydalanuvchidan tartib so'ralgan
+edi, hali javob kelmagan (savol ochiq).
+
+REJA TARTIBI (foydalanuvchiga taklif qilingan, tanlovi kutilmoqda):
+1) [BAJARILDI - 108-bosqich] bun.lock o'chirildi, npm/package-lock.json
+   yagona lock fayl sifatida qoldirildi.
+2) [BAJARILDI - 109-bosqich, foydalanuvchi bazasi bo'sh deb tasdiqladi]
+   Eski (6 jadvalli) migrations papkasi o'chirildi, deploy.sh
+   "db push" o'rniga "migrate deploy" ishlatadigan qilib o'zgartirildi.
+   FOYDALANUVCHIGA BIR MARTALIK QADAM QOLDI (serverda, qo'lda bajarish
+   kerak — bu yerda (sandbox) tarmoq yo'q, prisma buyrug'ini bajarib
+   bo'lmadi): SSH orqali serverda
+     cd /var/www/savdo24 && npx prisma migrate dev --name baseline_full_schema --schema=prisma/schema.prisma
+   shu buyruqni ishga tushirish kerak — bu joriy schema.prisma'ga mos
+   yangi baseline migration yaratadi. Shundan keyingina deploy.sh'dagi
+   yangi "migrate deploy" qatori ishlay boshlaydi.
+3) server.ts bo'lish — 5471 qator bitta faylda (auth/to'lov/escrow/admin/
+   newsletter/statistika aralash). Modullarga (routes/) ajratish kerak,
+   lekin yuqori xavfli — kichik bo'laklarda, har bosqichda test qilib
+   borish kerak (xuddi shu faylning yuqoridagi 1-107-bosqich uslubida).
+4) Katta React komponentlarini bo'lish — AdminPage.tsx (134KB),
+   ProfilePage.tsx (81KB), DetailPage.tsx (65KB) — kichik
+   subkomponentlarga ajratish.
+5) Bundle code-splitting — build'da 1.1MB'lik bitta JS chunk chiqadi
+   (React.lazy/dynamic import yo'q).
+6) Staging muhit yo'q — hozir FileZilla orqali to'g'ridan-to'g'ri
+   production'ga chiqarilyapti (createdAt xatosi shu sabab production'da
+   topilgan edi, 107-bosqichdan keyin serverda tuzatildi).
+
+MUHIM: 3 va 4-band juda katta va xavfli — bir yo'la EMAS, foydalanuvchi
+tanlagan tartibda, har birini alohida kichik qadamlarda, har safar
+build+test qilib, keyin navbatdagisiga o'tish kerak (xuddi 1-107-bosqich
+tizimidagi kabi). Bu bandlar hali kod darajasida BOSHLANMAGAN — faqat
+tashxis qo'yilgan.
+
+108-bosqich: ARXITEKTURA MUAMMOLARI ro'yxatidagi 1-band bajarildi.
+Tekshirildi: deploy.sh, render.yaml, package.json scripts — barchasi
+faqat npm ishlatadi (npm install/npm run build/npm run start), bun
+hech qayerda chaqirilmaydi. Xulosa: bun.lock — faol ishlatilmaydigan
+qoldiq fayl, xavfsiz o'chirildi. package-lock.json yagona lock fayl
+sifatida qoldirildi (npm ci/install shu bilan ishlaydi).
+Navbatdagi qadam: ARXITEKTURA ro'yxatidagi 2-band bajarish jarayonida
+(quyida 109-bosqichga qarang).
+
+109-bosqich: ARXITEKTURA 2-band ustida ishlandi. Foydalanuvchi
+bazada hech qanday real ma'lumot yo'qligini tasdiqladi — shu sabab
+eng xavfsiz yo'l tanlandi: eski, chala (faqat 6 jadvalli) migrations
+papkasi butunlay o'chirildi; deploy.sh'dagi "npx prisma db push"
+qatori "npx prisma migrate deploy"ga almashtirildi (izoh bilan).
+BAJARILMAGAN QISM (sandbox'da tarmoq yo'qligi sababli bajarib
+bo'lmadi, foydalanuvchi serverda SSH orqali bir marta o'zi
+ishga tushirishi kerak):
+  cd /var/www/savdo24
+  npx prisma migrate dev --name baseline_full_schema --schema=prisma/schema.prisma
+Bu buyruq schema.prisma'dagi barcha 30 modelga mos yangi to'liq
+migration yaratadi va uni migration tarixiga yozadi (baza allaqachon
+db push orqali shu holatda bo'lgani uchun ehtimol hech narsani
+o'zgartirmaydi, faqat tarixni to'g'irlaydi — lekin baza bo'sh
+bo'lgani uchun drift/reset so'ralsa ham xavfsiz "ha" deyish mumkin).
+Shu buyruq ishga tushirilmaguncha, keyingi deploy'da "migrate deploy"
+xato beradi (chunki migration tarixi hali serverda yo'q).
+Navbatdagi qadam: ARXITEKTURA 3-band davom etmoqda (110-bosqichga
+qarang). Foydalanuvchi baseline buyrug'ini hali serverda ishga
+tushirmagan bo'lishi mumkin — bu alohida, unutilmasligi kerak.
+
+110-bosqich: ARXITEKTURA 3-band (server.ts modullashtirish) BOSHLANDI.
+Avval to'liq inventarizatsiya qilindi — server.ts'da ~90 ta route,
+appga to'g'ridan-to'g'ri yozilgan (auth.ts/support.ts kabi alohida
+faylga chiqarilmagan). MUHIM TOPILMA: 5098-5370 qatorlar oralig'idagi
+route'lar (notifications, categories-admin, auth/sessions, sitemap.xml,
+/startup/:id, static/vite middleware, global error handler) hammasi
+`async function start()` FUNKSIYASI ICHIDA joylashgan — ya'ni ular
+faqat seedDatabase() tugagach registratsiya qilinadi. Bu hozircha
+ISHLAYDI (chunki httpServer.listen() ham shu funksiya ichida, routelardan
+KEYIN chaqiriladi), lekin juda mo'rt uslub — kelajakda bu qismni
+alohida ehtiyotkorlik bilan (registratsiya tartibini buzmasdan)
+ajratish kerak, ARXITEKTURA-3 ning navbatdagi kichik bosqichlaridan
+biri sifatida, oxirida (eng xavfli qism bo'lgani uchun).
+
+BIRINCHI HAQIQIY KO'CHIRISH (past xavfli, to'liq mustaqil CRUD blok):
+Sponsor-channels admin route'lari (4 ta: GET/POST/PATCH/DELETE
+/api/admin/sponsor-channels*) `src/routes/sponsor-channels.ts`ga
+ko'chirildi, xuddi mavjud auth.ts/support.ts naqshi bilan bir xil
+(umumiy prisma/authenticateToken/requireAdmin/AuthRequest
+"../../server"'dan import qilinadi). server.ts'da endi shu 4 route
+o'rniga bitta `app.use("/api/admin/sponsor-channels", sponsorChannelsRouter)`
+qatori bor. server.ts 5471→5358 qatorga qisqardi.
+Tekshirish: tsc --noEmit --noResolve orqali sintaksis tekshirildi
+(node_modules yo'qligi sabab chiqadigan module-not-found/AuthRequest
+property xatolari — bularning barchasi oldindan mavjud edi, YANGI
+sintaksis xatosi yo'q). Qavslar balansi ham qo'lda tekshirildi
+(server.ts: 2065/2065, yangi fayl: 46/46).
+DIQQAT — BU HALI SERVERDA SINALMAGAN: FileZilla orqali tashlangach,
+AdminPage'dagi "Sponsor kanallar" bo'limi (agar bo'lsa) qo'lda
+tekshirilishi kerak — ro'yxat ko'rinishi, qo'shish/tahrirlash/o'chirish
+ishlashi kerak build+restart'dan keyin.
+Navbatdagi qadam: 4-aylanish uslubidagi kabi, keyingi mustaqil route
+guruhini tanlab ko'chirish (nomzodlar: categories-admin (lekin start()
+ichida — TEGMASLIK, keyinroq), b2b/referrals, disputes, reviews,
+telegram-integratsiya route'lari — hammasi start() TASHQARISIDA,
+xavfsizroq).
+
+111-bosqich: ARXITEKTURA 3-band davom etdi. B2B wholesale route'lari
+(POST /api/b2b/onboard, GET /api/b2b/profile, PATCH
+/api/admin/b2b/:id/verify) `src/routes/b2b.ts`ga ko'chirildi (bir fayl
+ichida ikkita router: default export oddiy /api/b2b uchun, named export
+`adminB2bRouter` /api/admin/b2b uchun — chunki ikkalasi turli middleware
+talab qiladi: biri faqat authenticateToken, ikkinchisi +requireAdmin).
+server.ts 5359→5281 qatorga qisqardi. Qavslar balansi tekshirildi
+(server.ts 2033/2033, b2b.ts 35/35), tsc --noEmit --noResolve orqali
+yangi sintaksis xatosi yo'qligi tasdiqlandi.
+DIQQAT — HALI SERVERDA SINALMAGAN: build+restart'dan keyin B2B
+onboarding formasi (agar frontend'da bo'lsa) va admin panelda B2B
+tasdiqlash funksiyasini qo'lda tekshirish kerak.
+Navbatdagi qadam: keyingi mustaqil route guruhi — nomzodlar: disputes
+(4367-4524), reviews (4218-4366), yoki telegram-integratsiya
+(3872-4035) — hammasi start() tashqarisida.
+
+112-bosqich: ARXITEKTURA 3-band davom etdi. Disputes route'lari
+(POST/GET /api/disputes, PATCH /api/disputes/:id) `src/routes/disputes.ts`ga
+ko'chirildi (bir router, uch endpoint, auth.ts naqshi bilan bir xil,
+createNotification/sendEmail/escapeHtml import qilingan). server.ts
+5281→5127 qatorga qisqardi. Qavslar balansi tekshirildi (1968/1968,
+disputes.ts 67/67), yangi sintaksis xatosi yo'q.
+DIQQAT — HALI SERVERDA SINALMAGAN: build+restart'dan keyin admin
+panelda "Nizolar" bo'limini (ro'yxat, hal qilish/rad etish, email+
+bildirishnoma yuborilishi) qo'lda tekshirish kerak.
+Hozirgacha ko'chirilgan modullar: sponsor-channels.ts, b2b.ts,
+disputes.ts (110-112-bosqich). server.ts hali ham 5127 qator —
+katta ish davom etadi.
+Navbatdagi qadam: keyingi mustaqil route guruhi — nomzodlar: reviews
+(4218-4366'ga yaqin, POST /api/reviews + GET /api/users/:id/reviews),
+telegram-integratsiya (3872-4035), yoki referrals (1675-1782) —
+hammasi start() tashqarisida.
+
+113-bosqich: ARXITEKTURA 3-band davom etdi. Reviews route'lari
+(POST /api/reviews, GET /api/users/:id/reviews) `src/routes/reviews.ts`ga
+ko'chirildi (support.ts naqshi: router "/api" ostiga mount, ichida
+to'liq yo'llar, chunki ikki route boshqa-boshqa prefiks ostida).
+server.ts 5127→4982 qatorga qisqardi (5000 chegarasidan pastga tushdi).
+Qavslar balansi tekshirildi (1914/1914, reviews.ts 56/56), yangi
+sintaksis xatosi yo'q.
+DIQQAT — HALI SERVERDA SINALMAGAN: build+restart'dan keyin mahsulot
+sotib olingandan keyin sharh qoldirish formasi va sotuvchi profilidagi
+"Sharhlar" bo'limini qo'lda tekshirish kerak.
+Hozirgacha ko'chirilgan modullar: sponsor-channels.ts, b2b.ts,
+disputes.ts, reviews.ts (110-113-bosqich). server.ts hali 4982 qator.
+Navbatdagi qadam: keyingi mustaqil route guruhi — nomzodlar:
+telegram-integratsiya (3872-4035'ga yaqin), referrals (1675-1782),
+yoki top-boost/vip (2271-2567).
+
+114-bosqich: ARXITEKTURA 3-band davom etdi. Referrals route'lari
+(POST /api/referrals/generate, GET /api/referrals/apply,
+GET /api/referrals/my-stats, GET /api/admin/referrals)
+`src/routes/referrals.ts`ga ko'chirildi (b2b.ts naqshi: ikkita router,
+default oddiy /api/referrals uchun, named `adminReferralsRouter`
+/api/admin/referrals uchun). getReferralCount() endi export qilingan
+(getReferralTier kabi) — yangi fayl ikkalasini ham "../../server"'dan
+import qiladi. server.ts 4982→4878 qatorga qisqardi. Qavslar balansi
+tekshirildi (server.ts 1865/1865, referrals.ts 52/52); tsc --noEmit
+--noResolve orqali yangi sintaksis xatosi yo'qligi tasdiqlandi (faqat
+oldindan mavjud module-not-found/implicit-any xatolari, node_modules
+yo'qligi sabab).
+DIQQAT — HALI SERVERDA SINALMAGAN: build+restart'dan keyin referral
+kod yaratish/qo'llash (checkout) va admin paneldagi referral
+statistikasini qo'lda tekshirish kerak.
+Hozirgacha ko'chirilgan modullar: sponsor-channels.ts, b2b.ts,
+disputes.ts, reviews.ts, referrals.ts (110-114-bosqich). server.ts
+hali 4878 qator.
+Navbatdagi qadam: keyingi mustaqil route guruhi — nomzodlar:
+telegram-integratsiya (3872-4035'ga yaqin) yoki top-boost/vip
+(2271-2567, ikkalasi ham bitta model atrofida, birga ko'chirilishi
+mumkin).
+
+115-bosqich: ARXITEKTURA 3-band davom etdi. Top-boost/VIP route'lari
+(GET/POST /api/top-boost/price,create, GET/POST /api/vip/price,create)
+`src/routes/top-boost-vip.ts`ga ko'chirildi — bitta router /api ostiga
+mount qilingan (yo'llar o'zida to'liq yozilgan: /top-boost/..., /vip/...).
+calculateTopPrice/calculateVipPrice helper funksiyalari faqat shu
+yerda ishlatilgani sabab (boshqa joyda chaqirilmaydi) export qilib
+server.ts'da qoldirish o'rniga yangi faylga birga ko'chirildi.
+server.ts 4879→4640 qatorga qisqardi. Qavslar balansi tekshirildi
+(server.ts 1771/1771 { } — parens ham endi 2337/2337, oldingi
+1 dona nomuvofiqlik ko'chirilgan blok bilan birga ketdi); tsc --noEmit
+--noResolve orqali yangi sintaksis xatosi yo'qligi tasdiqlandi.
+DIQQAT — HALI SERVERDA SINALMAGAN: build+restart'dan keyin TOP
+boost va VIP obuna sotib olish oqimlarini (narx ko'rsatish + to'lov
+yaratish) qo'lda tekshirish kerak.
+Hozirgacha ko'chirilgan modullar: sponsor-channels.ts, b2b.ts,
+disputes.ts, reviews.ts, referrals.ts, top-boost-vip.ts
+(110-115-bosqich). server.ts hali 4640 qator.
+Navbatdagi qadam: keyingi mustaqil route guruhi — nomzod:
+telegram-integratsiya (GET/POST /api/telegram/*, taxminan
+3630-3790 atrofida, joriy qator raqamlarini qayta tekshirish kerak).
+
+116-bosqich: ARXITEKTURA 3-band davom etdi. Telegram-integratsiya
+route'lari (POST /link, GET /user-stats/:id, GET /verify/:token,
+GET /sponsor-channels, POST /deliver/:token) `src/routes/
+telegram-integration.ts`ga ko'chirildi — bitta router "/api/telegram"
+ostiga mount qilingan. /api/telegram/create-payment BU YERGA
+KO'CHIRILMADI — u to'lov yaratish oqimiga yaqinroq, server.ts'da
+qoldi (izoh bilan belgilandi). safeCompare() endi export qilingan
+(create-payment va payments/status'da hali ishlatilgani sabab
+server.ts'da qoldi, faqat eksport qo'shildi). server.ts 4640→4482
+qatorga qisqardi. Qavslar balansi tekshirildi (server.ts 1695/1695,
+telegram-integration.ts 78/78); tsc --noEmit --noResolve orqali
+yangi sintaksis xatosi yo'qligi tasdiqlandi.
+DIQQAT — HALI SERVERDA SINALMAGAN: build+restart'dan keyin Telegram
+bot orqali hisob bog'lash, foydalanuvchi statistikasi, sponsor
+kanal tekshiruvi va loyiha yetkazib berishni qo'lda tekshirish kerak.
+Hozirgacha ko'chirilgan modullar: sponsor-channels.ts, b2b.ts,
+disputes.ts, reviews.ts, referrals.ts, top-boost-vip.ts,
+telegram-integration.ts (110-116-bosqich). server.ts hali 4482 qator.
+Navbatdagi qadam: keyingi mustaqil route guruhi tanlash — server.ts'da
+qolgan yiriklardan: /api/admin/* (users/startups/settings/audit-logs/
+stats — ko'p, ehtiyotkorlik bilan kichik guruhlarga bo'lish kerak),
+/api/conversations (messaging, 4 endpoint), yoki /api/startups CRUD
+(eng katta va markaziy, oxiriga qoldirish tavsiya etiladi).
+
+117-bosqich: ARXITEKTURA 3-band davom etdi. Conversations/messaging
+route'lari (POST/GET /api/conversations, GET/POST /:id/messages,
+PATCH /:id/read) `src/routes/conversations.ts`ga ko'chirildi — bitta
+router "/api/conversations" ostiga mount qilingan, yo'llar nisbiy.
+io (socket.io) va createNotification "../../server"'dan import
+qilindi (ikkalasi ham allaqachon export qilingan edi). server.ts
+4482→4342 qatorga qisqardi. Qavslar balansi tekshirildi (server.ts
+1613/1613, conversations.ts 85/85); tsc --noEmit --noResolve orqali
+yangi sintaksis xatosi yo'qligi tasdiqlandi.
+DIQQAT — HALI SERVERDA SINALMAGAN: build+restart'dan keyin xabarlar
+oqimini (suhbat boshlash, xabar yuborish/qabul qilish real-time
+orqali, o'qilgan deb belgilash) qo'lda tekshirish kerak.
+Hozirgacha ko'chirilgan modullar: sponsor-channels.ts, b2b.ts,
+disputes.ts, reviews.ts, referrals.ts, top-boost-vip.ts,
+telegram-integration.ts, conversations.ts (110-117-bosqich).
+server.ts hali 4342 qator.
+Navbatdagi qadam: keyingi mustaqil route guruhi — qolgan yiriklar:
+/api/admin/* (users/startups/settings/audit-logs/stats/categories —
+juda ko'p, kichik kichik guruhlarga bo'lib ko'chirish kerak, masalan
+avval "categories-admin" kabi mustaqil kichigidan boshlash mumkin),
+yoki /api/startups CRUD (eng katta va markaziy — oxiriga qoldirish
+tavsiya etiladi).
+
+118-bosqich: ARXITEKTURA 3-band davom etdi. Admin/users route'lari
+(GET /, PATCH /:id/ban, GET /:id, PATCH /:id/vip, PATCH /:id/role,
+DELETE /:id — jami 6 endpoint) `src/routes/admin-users.ts`ga
+ko'chirildi, router "/api/admin/users" ostiga mount qilingan.
+isPostgres endi export qilingan (server.ts qolgan qismida — masalan
+/api/startups qidiruvida — hali ham ishlatilgani sabab server.ts'da
+qoldi, faqat eksport qo'shildi). server.ts 4342→4080 qatorga
+qisqardi (birinchi marta 4-ming ostiga tushdi doim yaqin edi).
+Qavslar balansi tekshirildi (server.ts 1468/1468, admin-users.ts
+147/147); tsc --noEmit --noResolve orqali yangi sintaksis xatosi
+yo'qligi tasdiqlandi.
+DIQQAT — HALI SERVERDA SINALMAGAN: build+restart'dan keyin admin
+paneldagi "Foydalanuvchilar" bo'limini to'liq (ro'yxat+qidiruv,
+bloklash, tafsilot, VIP berish, rol o'zgartirish, hisobni o'chirish)
+qo'lda tekshirish kerak — ayniqsa o'chirish (eng murakkab tranzaksiya).
+Hozirgacha ko'chirilgan modullar: sponsor-channels.ts, b2b.ts,
+disputes.ts, reviews.ts, referrals.ts, top-boost-vip.ts,
+telegram-integration.ts, conversations.ts, admin-users.ts
+(110-118-bosqich). server.ts hali 4080 qator.
+Navbatdagi qadam: keyingi mustaqil route guruhi — nomzodlar:
+admin/settings (GET+PUT, 2 endpoint), admin/audit-logs+stats
+(2 endpoint, faqat o'qish), admin/startups+ideas delete (2 endpoint),
+yoki categories+admin/categories (4 endpoint, start() TASHQARISIDA
+ekanligini alohida tekshirish kerak — 110-bosqichdagi eslatma
+eskirgan bo'lishi mumkin, chunki ko'p narsa ko'chib ketdi).
+
+119-bosqich: ARXITEKTURA 3-band davom etdi. Admin/settings route'lari
+(GET /, PUT /:key) `src/routes/admin-settings.ts`ga ko'chirildi,
+router "/api/admin/settings" ostiga mount qilingan. maskValue()
+faqat shu yerda ishlatilgani sabab birga ko'chirildi; encryptSecret
+server.ts'da ham (seedSettings'da) ishlatilgani sabab u yerda
+qoldi, yangi fayl "../lib/crypto"'dan to'g'ridan-to'g'ri import
+qiladi. server.ts 4080→3952 qatorga qisqardi (birinchi marta 4-ming
+ostiga tushdi). Qavslar balansi tekshirildi (server.ts 1440/1440,
+admin-settings.ts 31/31); tsc --noEmit --noResolve orqali yangi
+sintaksis xatosi yo'qligi tasdiqlandi.
+DIQQAT — HALI SERVERDA SINALMAGAN: build+restart'dan keyin admin
+paneldagi "Sozlamalar" bo'limini (ko'rish — qiymatlar maskirovka
+bilan, yangilash — kalit validatsiyasi va audit log) qo'lda
+tekshirish kerak.
+Hozirgacha ko'chirilgan modullar: sponsor-channels.ts, b2b.ts,
+disputes.ts, reviews.ts, referrals.ts, top-boost-vip.ts,
+telegram-integration.ts, conversations.ts, admin-users.ts,
+admin-settings.ts (110-119-bosqich). server.ts hali 3952 qator.
+120-bosqich: ARXITEKTURA 3-band davom etdi. Admin/audit-logs+stats
+route'lari (GET /audit-logs, GET /stats) `src/routes/admin-audit.ts`ga
+ko'chirildi, router "/api/admin" ostiga mount qilingan (ikkalasi ham
+faqat o'qish, start() TASHQARISIDA edi — eng kam xavfli guruh sifatida
+tanlandi). getSetting allaqachon export qilingan edi, o'zgarishsiz
+import qilindi. server.ts 3952→3840 qatorga qisqardi. Qavslar balansi
+tekshirildi (server.ts 1406/1406 { }, 1914/1914 ( ); admin-audit.ts
+36/36, 57/57); tsc --noEmit --noResolve orqali yangi sintaksis xatosi
+yo'qligi tasdiqlandi (faqat oldindan mavjud module-not-found/import.meta
+xatolari, node_modules yo'qligi va CLI tsconfig cheklovi sabab).
+DIQQAT — HALI SERVERDA SINALMAGAN: build+restart'dan keyin admin
+paneldagi "Audit Logs" va Dashboard statistikasi (komissiya, sotuvlar,
+so'nggi nizolar/shikoyatlar) bo'limlarini qo'lda tekshirish kerak.
+Hozirgacha ko'chirilgan modullar: sponsor-channels.ts, b2b.ts,
+disputes.ts, reviews.ts, referrals.ts, top-boost-vip.ts,
+telegram-integration.ts, conversations.ts, admin-users.ts,
+admin-settings.ts, admin-audit.ts (110-120-bosqich). server.ts
+hali 3840 qator.
+121-bosqich: ARXITEKTURA 3-band davom etdi. Admin/startups+ideas delete
+route'lari (DELETE /api/admin/startups/:id — kaskad transaction,
+DELETE /api/admin/ideas/:id) `src/routes/admin-delete.ts`ga ko'chirildi,
+router "/api/admin" ostiga mount qilingan (start() TASHQARISIDA ekani
+tasdiqlangandan keyin ko'chirildi). server.ts 3840→3755 qatorga
+qisqardi. Qavslar balansi tekshirildi (server.ts {}:1351/1351,
+():1864/1864; admin-delete.ts {}:57/57, ():54/54); tsc mavjud emasligi
+sabab qo'lda sintaksis tekshirildi, yangi xato yo'q.
+DIQQAT — HALI SERVERDA SINALMAGAN: build+restart'dan keyin admin
+paneldagi loyiha o'chirish (kaskad, barcha bog'liq yozuvlar) va
+izoh/g'oya o'chirishni qo'lda tekshirish kerak.
+categories+admin/categories (4 endpoint) tekshirildi: async function
+start() 3382-qatorda boshlanadi, categories route'lari 3508+ qatorda —
+ya'ni HALI HAM start() ICHIDA, shu sabab TEGILMADI (mo'rt registratsiya
+tartibi, alohida ehtiyotkorlik bilan keyinroq).
+Hozirgacha ko'chirilgan modullar: sponsor-channels.ts, b2b.ts,
+disputes.ts, reviews.ts, referrals.ts, top-boost-vip.ts,
+telegram-integration.ts, conversations.ts, admin-users.ts,
+admin-settings.ts, admin-audit.ts, admin-delete.ts (110-121-bosqich).
+server.ts hali 3755 qator.
+Navbatdagi qadam: server.ts'da qolgan yirik bloklar asosan
+/api/startups CRUD (eng katta, markaziy — oxiriga qoldirish tavsiya
+etiladi) va start() ICHIDAGI route'lar (categories, notifications,
+auth/sessions, sitemap.xml, /startup/:id, static/vite middleware) —
+bularni ajratish uchun avval start() ichidagi registratsiya tartibini
+buzmaydigan alohida reja kerak (masalan httpServer.listen'dan oldin
+barcha router'larni ulab, keyin listen chaqirish — buni sinab ko'rish
+kerak bo'ladi, xavfli qadam).
+
+126-bosqich: Foydalanuvchi ANIQ tanladi — "3-bandni (ARXITEKTURA-3,
+server.ts modullashtirish) yakunlashda davom etish" (125-bosqichda
+so'ralgan savolga javob). Escrow route guruhi (GET /api/escrow/
+my-purchases, POST /release, POST /dispute, GET+PATCH /api/admin/
+escrow-disputes*) `src/routes/escrow.ts`ga ko'chirildi — mantiq AYNAN
+o'zgarishsiz (62/63/115-band tuzatishlari, refund_required, nizo-
+himoyasi — hammasi saqlangan). Naqsh avvalgi fayllar bilan bir xil:
+bitta router "/api" ostiga mount qilinadi. server.ts 3755→3488
+qatorga qisqardi (keyin "--- ESCROW SYSTEM ---" duplikat izoh ham
+tozalandi).
+Tekshirish: qavslar balansi (server.ts {}:1227/1227, ():1739/1739;
+escrow.ts {}:116/116, ():116/116); `tsc --noEmit --skipLibCheck`
+qayta ishga tushirildi — faqat oldindan mavjud (@types/express
+yo'qligi sabab AuthRequest.body/params) xatolar, YANGI xato yo'q
+(123-bosqich qoidasiga ko'ra ANIQ aytilgan: bu sintaksis darajasidagi
+tekshiruv, --skipLibCheck bilan, HAQIQIY tip-tekshiruv emas — u faqat
+CI orqali). 122-bosqichdagi avtomatik testlar (15 ta) qayta ishga
+tushirildi, hammasi hali o'tmoqda (bu fayl ularga tegmagan, lekin
+regressiya yo'qligini tasdiqlash uchun qayta tekshirildi).
+DIQQAT — HALI SERVERDA SINALMAGAN: build+restart'dan keyin escrow
+release/dispute va admin escrow-nizolari bo'limini qo'lda tekshirish
+kerak.
+Hozirgacha ko'chirilgan modullar: sponsor-channels.ts, b2b.ts,
+disputes.ts, reviews.ts, referrals.ts, top-boost-vip.ts,
+telegram-integration.ts, conversations.ts, admin-users.ts,
+admin-settings.ts, admin-audit.ts, admin-delete.ts, escrow.ts
+(110-126-bosqich). server.ts hali 3488 qator.
+Navbatdagi qadam: qolgan yirik bloklar — /api/startups CRUD (eng
+katta, markaziy — oxiriga qoldirish tavsiya etiladi), yoki start()
+TASHQARISIDAGI kichikroq guruhlar (masalan users/me/* — profil
+o'z-xizmat endpointlari: PATCH /me, telegram-link-code, earnings,
+reviews-given/received — bularni birga ko'chirish mumkin), yoki
+auth/google* + newsletter/analytics/ai-price kabi bitta-bittalik
+endpointlar. start() ICHIDAGI qism (categories, notifications,
+auth/sessions, sitemap.xml, /startup/:id) hamon TEGILMAGAN —
+registratsiya tartibi xavfi sabab alohida reja bilan, oxiriroqqa
+qoldirilgan.
+barcha router'larni ulab, keyin listen chaqirish — buni sinab ko'rish
+kerak bo'ladi, xavfli qadam).

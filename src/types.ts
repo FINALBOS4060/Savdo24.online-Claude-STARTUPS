@@ -21,9 +21,10 @@ export interface Startup {
   listingType: string; // "To'liq loyiha (manba kodi bilan)" or "Faqat litsenziya (foydalanish huquqi)"
   techStack: string[];
   demoUrl?: string;
+  githubUrl?: string;
   repoIncluded: boolean;
   soldStatus: 'sotuvda' | 'sotildi';
-  status: 'active' | 'pending';
+  status: 'active' | 'pending' | 'rejected';
   proposalsCount?: number;
   team: TeamMember[];
   milestones: LoyihaMilestone[];

@@ -46,6 +46,7 @@ model User {
   referrals          Referral[] @relation("ReferrerReferrals")
   referredBy         Referral[] @relation("RefereeReferrals")
   b2bAccount         B2BAccount?
+  auditLogs          AuditLog[]
 }
 
 model Category {
@@ -66,6 +67,7 @@ model Startup {
   listingType     String    @default("To'liq loyiha (manba kodi bilan)")
   techStack       String    @default("[]") // Serialized JSON array of strings
   demoUrl         String?
+  githubUrl       String?
   repoIncluded    Boolean   @default(false)
   soldStatus      String    @default("sotuvda") // "sotuvda" | "sotildi"
   status          String    @default("pending") // "active" | "pending"
@@ -197,15 +199,24 @@ model Report {
   description String?
   status      String   @default("pending") // "pending" | "reviewed" | "dismissed"
   createdAt   DateTime @default(now())
+
+  // PostgreSQL sxemasidagi (schema.prisma) bilan bir xil sabab: bitta
+  // foydalanuvchi bitta targetga ikki marta shikoyat qoldirishining oldini
+  // olish uchun. Ikkala sxema doim bir-biriga muvofiq bo'lishi shart.
+  @@unique([reporterId, targetId, targetType])
 }
 
 model AuditLog {
-  id        Int      @id @default(autoincrement())
-  adminId   Int
-  action    String   // "approve_startup" | "reject_startup" | "resolve_dispute" | "delete_report" va h.k.
-  targetId  String
-  details   String?
-  createdAt DateTime @default(now())
+  id         Int      @id @default(autoincrement())
+  adminId    Int
+  admin      User     @relation(fields: [adminId], references: [id])
+  action     String   // "approve_startup" | "reject_startup" | "resolve_dispute" | "delete_report" va h.k.
+  targetType String?
+  targetId   String
+  details    String?
+  createdAt  DateTime @default(now())
+
+  @@index([adminId])
 }
 
 model Setting {
@@ -404,4 +415,20 @@ model SupportTicket {
   message     String
   status      String   @default("pending") // pending, reviewing, resolved, closed
   createdAt   DateTime @default(now())
+}
+
+// MUHIM: server.ts'da `prisma.notification` ko'p joyda ishlatiladi, lekin
+// bu model avval sxemada umuman yo'q edi. Endi qo'shildi (schema.prisma
+// bilan bir xil).
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  type      String
+  title     String
+  message   String
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }

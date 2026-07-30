@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import { Startup, UserProfileData, Category } from '../types';
 import { apiFetch as fetch } from '../lib/api';
@@ -23,7 +24,61 @@ export default function AdminPage({
   fetchCategories,
 }: AdminPageProps) {
   const [pendingStartups, setPendingStartups] = useState<Startup[]>([]);
+  const [isLoadingPending, setIsLoadingPending] = useState(true);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
+
+  // MUHIM: Admin panelidagi "E'lonlar" bo'limi avval FAQAT moderatsiya
+  // kutayotgan ("pending") e'lonlarni ko'rsatardi — allaqachon FAOL
+  // (active) status bilan bazaga kiritilgan e'lonlarni (masalan, avvalgi
+  // bosqichda topilgan soxta demo e'lonlar) ko'rish yoki o'chirish uchun
+  // panelda UMUMAN hech qanday joy yo'q edi. Shu sabab ular hech qachon
+  // o'chirilmasdi — admin ularni panelda topa olmasdi. Endi "Barcha
+  // e'lonlar" rejimi qo'shildi, u orqali istalgan holatdagi (faol,
+  // sotilgan va h.k.) e'lonni qidirib, to'g'ridan-to'g'ri o'chirish mumkin.
+  const [listingsView, setListingsView] = useState<'pending' | 'all'>('pending');
+  const [listingsSearch, setListingsSearch] = useState('');
+  const [isDeletingStartupId, setIsDeletingStartupId] = useState<string | null>(null);
+
+  // 88-band: "Barcha e'lonlar" ilgari App.tsx'ning umumiy `startups`
+  // prop'idan (standart limit=50, max=100) ko'rsatilardi — 100+ e'lon
+  // bo'lsa, admin qolganlarini hech qachon ko'ra/qidira/o'chira olmasdi,
+  // haqiqiy sahifalash yo'q edi. Endi bu bo'lim server.ts'ning mavjud
+  // page/limit/search'ini o'z holicha (alohida) so'raydi, xuddi
+  // foydalanuvchilar ro'yxati kabi.
+  const [allListings, setAllListings] = useState<Startup[]>([]);
+  const [totalAllListings, setTotalAllListings] = useState(0);
+  const [allListingsPage, setAllListingsPage] = useState(1);
+  const [allListingsTotalPages, setAllListingsTotalPages] = useState(1);
+  const [isLoadingAllListings, setIsLoadingAllListings] = useState(false);
+  const listingsSearchDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestAllListingsRequestIdRef = React.useRef(0);
+
+  const fetchAllListingsAdmin = async (page = 1, search = '') => {
+    const requestId = ++latestAllListingsRequestIdRef.current;
+    setIsLoadingAllListings(true);
+    try {
+      const res = await fetch(`/api/startups?page=${page}&limit=50&search=${encodeURIComponent(search)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (requestId !== latestAllListingsRequestIdRef.current) return;
+        setAllListings(data.startups || []);
+        setTotalAllListings(data.totalCount || 0);
+        setAllListingsTotalPages(data.totalPages || 1);
+        setAllListingsPage(page);
+      }
+    } catch (err) {
+      console.error("Fetch all listings error:", err);
+    } finally {
+      if (requestId === latestAllListingsRequestIdRef.current) setIsLoadingAllListings(false);
+    }
+  };
+
+  useEffect(() => {
+    if (listingsView === 'all' && isAdmin) {
+      fetchAllListingsAdmin(1, listingsSearch);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listingsView]);
 
   // Statistics and Disputes state
   const [stats, setStats] = useState<any>(null);
@@ -35,6 +90,10 @@ export default function AdminPage({
   const [isLoadingDisputes, setIsLoadingDisputes] = useState(true);
   const [updatingDisputeId, setUpdatingDisputeId] = useState<number | null>(null);
   const [adminNotes, setAdminNotes] = useState<Record<number, string>>({});
+  const [escrowDisputes, setEscrowDisputes] = useState<any[]>([]);
+  const [isLoadingEscrowDisputes, setIsLoadingEscrowDisputes] = useState(true);
+  const [updatingEscrowDisputeId, setUpdatingEscrowDisputeId] = useState<string | null>(null);
+  const [escrowAdminNotes, setEscrowAdminNotes] = useState<Record<string, string>>({});
 
   // Reports (Shikoyatlar) state
   
@@ -43,6 +102,13 @@ export default function AdminPage({
 
   const [reports, setReports] = useState<any[]>([]);
   const [isLoadingReports, setIsLoadingReports] = useState(true);
+  // 85-band: Shikoyatlar (reports) va Murojaatlar (support tickets)
+  // amal tugmalarida boshqa bo'limlar (disputes/escrow/users)dagi kabi
+  // loading/disabled himoyasi yo'q edi — tez-tez bosilsa bir xil amal
+  // bir necha marta yuborilishi mumkin edi.
+  const [updatingReportId, setUpdatingReportId] = useState<number | null>(null);
+  const [isDeletingReportedItem, setIsDeletingReportedItem] = useState<number | null>(null);
+  const [updatingTicketId, setUpdatingTicketId] = useState<number | null>(null);
 
   // Sponsor channels state
   const [sponsorChannels, setSponsorChannels] = useState<any[]>([]);
@@ -59,7 +125,21 @@ export default function AdminPage({
   const [isAddingSponsor, setIsAddingSponsor] = useState(false);
 
   // Active view tab state & Audit Logs state
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'analytics' | 'listings' | 'users' | 'categories' | 'disputes' | 'reports' | 'sponsors' | 'audit' | 'settings' | 'support'>('dashboard');
+  const ADMIN_TABS = ['dashboard', 'analytics', 'listings', 'users', 'categories', 'disputes', 'reports', 'sponsors', 'audit', 'settings', 'support'] as const;
+  type AdminTab = typeof ADMIN_TABS[number];
+  const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
+  const location = useLocation();
+  // 93-band: bildirishnomalardagi "/admin?tab=disputes" kabi havolalar avval
+  // hech qanday tabga o'tkazmasdi (AdminPage URL query'ni o'qimasdi) —
+  // ProfilePage'dagi profileTab mexanizmiga o'xshash, lekin bu yerda alohida
+  // App.tsx state kerak emas, to'g'ridan-to'g'ri URL'dan o'qiladi.
+  useEffect(() => {
+    const tab = new URLSearchParams(location.search).get('tab');
+    if (tab && (ADMIN_TABS as readonly string[]).includes(tab)) {
+      setActiveTab(tab as AdminTab);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [isLoadingAudit, setIsLoadingAudit] = useState(true);
 
@@ -73,7 +153,9 @@ export default function AdminPage({
   const [adminUsers, setAdminUsers] = useState<any[]>([]);
   const [totalAdminUsers, setTotalAdminUsers] = useState(0);
   const [usersPage, setUsersPage] = useState(1);
+  const [usersTotalPages, setUsersTotalPages] = useState(1);
   const [usersSearch, setUsersSearch] = useState('');
+  const usersSearchDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [isBanningId, setIsBanningId] = useState<number | null>(null);
   const [selectedUserDetail, setSelectedUserDetail] = useState<any>(null);
@@ -97,10 +179,31 @@ export default function AdminPage({
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [settingsStatus, setSettingsStatus] = useState<{[key: string]: string}>({});
 
-  // Filter pending startups
+  // 46-MUAMMO: "Kutilayotganlar" navbati App.tsx'ning umumiy `startups`
+  // ro'yxatidan (standart limit=50, isTop/id bo'yicha eng yangilari)
+  // filtrlanardi — agar saytda 50 tadan ko'p e'lon bo'lsa (statusidan
+  // qat'i nazar), eski kutilayotgan arizalar bu ro'yxatga UMUMAN
+  // kirmasdi va admin ularni hech qachon ko'rmasdi/tasdiqlamasdi. Endi
+  // Admin sahifasi "pending" statusini to'g'ridan-to'g'ri, alohida va
+  // katta limit bilan so'raydi.
+  const fetchPendingStartups = async () => {
+    setIsLoadingPending(true);
+    try {
+      const res = await fetch('/api/startups?status=pending&limit=100');
+      if (res.ok) {
+        const data = await res.json();
+        setPendingStartups(data.startups || []);
+      }
+    } catch (err) {
+      console.error("Fetch pending startups error:", err);
+    } finally {
+      setIsLoadingPending(false);
+    }
+  };
+
   useEffect(() => {
-    setPendingStartups(startups.filter((s) => s.status === 'pending'));
-  }, [startups]);
+    fetchPendingStartups();
+  }, []);
 
   // Authorization check
   const isAdmin = user && user.role === 'Admin';
@@ -137,6 +240,23 @@ export default function AdminPage({
       console.error("Fetch disputes error:", err);
     } finally {
       setIsLoadingDisputes(false);
+    }
+  };
+
+  // Escrow (kafolatlangan to'lov) nizolari — /api/admin/escrow-disputes
+  // endpointi mavjud edi, lekin uni chaqiradigan UI umuman yo'q edi.
+  const fetchEscrowDisputes = async () => {
+    try {
+      setIsLoadingEscrowDisputes(true);
+      const res = await fetch('/api/admin/escrow-disputes');
+      if (res.ok) {
+        const data = await res.json();
+        setEscrowDisputes(data);
+      }
+    } catch (err) {
+      console.error("Fetch escrow disputes error:", err);
+    } finally {
+      setIsLoadingEscrowDisputes(false);
     }
   };
 
@@ -229,7 +349,18 @@ export default function AdminPage({
         setSettings(data);
         const vals: {[key: string]: string} = {};
         data.forEach((s: any) => {
-          vals[s.key] = s.value;
+          // 100-band (KATTA MUAMMO): s.value bu yerda serverdan MASKA qilingan
+          // ko'rinish edi ("••••••••1234"), lekin u to'g'ridan-to'g'ri input
+          // maydoniga ("qayta yuborilishi mumkin" holatda) yozilardi. Agar
+          // admin allaqachon sozlangan sirni HECH NARSA yozmasdan "Saqlash"ni
+          // bossa, aynan shu maska matni haqiqiy qiymat sifatida serverga
+          // yuborilib, shifrlanib, DB'dagi haqiqiy sirni (Stripe kaliti, SMTP
+          // paroli, Telegram tokeni va h.k.) BUTUNLAY yo'q qilib yuborardi —
+          // va eng yomoni, javobda qaytadan maskalangani uchun oxirgi 4
+          // belgi o'zgarmay qolib, ekranda hech qanday farq ko'rinmasdi.
+          // Endi maydon har doim bo'sh boshlanadi; "hasValue" holati faqat
+          // placeholder orqali (pastda) ko'rsatiladi.
+          vals[s.key] = '';
         });
         setSettingsValues(vals);
       }
@@ -241,10 +372,23 @@ export default function AdminPage({
   };
 
   const handleSaveSetting = async (key: string) => {
+    const val = settingsValues[key] || '';
+    // 100-band: input endi doim bo'sh boshlanadi (yuqoridagi fetchSettings
+    // tuzatishi), shuning uchun bo'sh qiymat = admin haqiqatda hech narsa
+    // kiritmagan, degani. Buni jim yuborib sirni tozalab yubormasdan, aniq
+    // xatolik ko'rsatamiz.
+    const existing = settings.find(s => s.key === key);
+    if (!val && existing?.hasValue) {
+      setSettingsStatus(prev => ({ ...prev, [key]: 'error' }));
+      onActionToast("Avval yangi qiymat kiriting — bo'sh maydon saqlanmadi (mavjud qiymat o'zgarishsiz qoldi).");
+      setTimeout(() => {
+        setSettingsStatus(prev => ({ ...prev, [key]: '' }));
+      }, 3000);
+      return;
+    }
     setSavingKey(key);
     setSettingsStatus(prev => ({ ...prev, [key]: '' }));
     try {
-      const val = settingsValues[key] || '';
       const res = await fetch(`/api/admin/settings/${key}`, {
         method: 'PUT',
         headers: {
@@ -255,7 +399,7 @@ export default function AdminPage({
       if (res.ok) {
         const data = await res.json();
         setSettings(prev => prev.map(s => s.key === key ? { ...s, value: data.value, hasValue: !!val } : s));
-        setSettingsValues(prev => ({ ...prev, [key]: data.value }));
+        setSettingsValues(prev => ({ ...prev, [key]: '' }));
         setSettingsStatus(prev => ({ ...prev, [key]: 'success' }));
         fetchAuditLogs();
         setTimeout(() => {
@@ -272,19 +416,30 @@ export default function AdminPage({
     }
   };
 
+  // 66-band: usersSearch har bir harf kiritilganda to'g'ridan-to'g'ri
+  // fetchAdminUsers'ni chaqirardi (debounce yo'q) — bu ham ortiqcha so'rovlar,
+  // ham BrowsePage'dagi kabi poyga sharoiti (eski javob yangisini bosib
+  // ketishi) xavfini keltirib chiqarardi. Shu sabab bu yerda ham eng so'nggi
+  // so'rov himoyasi qo'shildi, qidiruv esa pastda debounce bilan chaqiriladi.
+  const latestUsersRequestIdRef = React.useRef(0);
+
   const fetchAdminUsers = async (page = 1, search = '') => {
+    const requestId = ++latestUsersRequestIdRef.current;
     setIsLoadingUsers(true);
     try {
-      const res = await fetch(`/api/admin/users?page=${page}&search=${search}`);
+      const res = await fetch(`/api/admin/users?page=${page}&search=${encodeURIComponent(search)}`);
       if (res.ok) {
         const data = await res.json();
+        if (requestId !== latestUsersRequestIdRef.current) return;
         setAdminUsers(data.users);
         setTotalAdminUsers(data.total);
+        setUsersTotalPages(data.pages || 1);
+        setUsersPage(page);
       }
     } catch (err) {
       console.error("Fetch admin users error:", err);
     } finally {
-      setIsLoadingUsers(false);
+      if (requestId === latestUsersRequestIdRef.current) setIsLoadingUsers(false);
     }
   };
 
@@ -302,6 +457,16 @@ export default function AdminPage({
         onActionToast(isBanned ? "Foydalanuvchi bloklandi" : "Foydalanuvchi blokdan chiqarildi");
         fetchAdminUsers(usersPage, usersSearch);
         fetchAuditLogs();
+        // MUHIM: agar amal aynan "Batafsil" modali ichidan bajarilgan bo'lsa,
+        // modal o'zining ma'lumotini avtomatik yangilamasdi (VIP/rol funksiyalari
+        // fetchUserDetails'ni chaqiradi, lekin bu funksiya chaqirmasdi) — natijada
+        // admin blokdan keyin ham modalda eski (bloklanmagan) holatni ko'rardi.
+        if (selectedUserDetail?.user?.id === userId) {
+          fetchUserDetails(userId);
+        }
+      } else {
+        const err = await res.json().catch(() => ({}));
+        onActionToast(err.error || "Foydalanuvchi holatini o'zgartirib bo'lmadi.");
       }
     } catch (err) {
       onActionToast("Xatolik yuz berdi.");
@@ -337,9 +502,14 @@ export default function AdminPage({
       if (res.ok) {
         fetchUserDetails(id);
         fetchAdminUsers(usersPage, usersSearch);
+        onActionToast("VIP holati yangilandi.");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        onActionToast(err.error || "VIP holatini yangilab bo'lmadi.");
       }
     } catch (err) {
       console.error("Update VIP error:", err);
+      onActionToast("Tarmoq xatosi yuz berdi.");
     } finally {
       setIsUpdatingUser(false);
     }
@@ -356,9 +526,14 @@ export default function AdminPage({
       if (res.ok) {
         fetchUserDetails(id);
         fetchAdminUsers(usersPage, usersSearch);
+        onActionToast("Rol muvaffaqiyatli yangilandi.");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        onActionToast(err.error || "Rolni yangilab bo'lmadi.");
       }
     } catch (err) {
       console.error("Update role error:", err);
+      onActionToast("Tarmoq xatosi yuz berdi.");
     } finally {
       setIsUpdatingUser(false);
     }
@@ -372,9 +547,14 @@ export default function AdminPage({
         setSelectedUserDetail(null);
         setShowDeleteConfirm(false);
         fetchAdminUsers(usersPage, usersSearch);
+        onActionToast("Foydalanuvchi o'chirildi.");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        onActionToast(err.error || "Foydalanuvchini o'chirib bo'lmadi.");
       }
     } catch (err) {
       console.error("Delete user error:", err);
+      onActionToast("Tarmoq xatosi yuz berdi.");
     } finally {
       setIsUpdatingUser(false);
     }
@@ -389,12 +569,31 @@ export default function AdminPage({
         body: JSON.stringify({ email })
       });
       if (res.ok) {
-        alert("Parolni tiklash havolasi yuborildi.");
+        onActionToast("Parolni tiklash havolasi yuborildi.");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        onActionToast(err.error || "Havolani yuborib bo'lmadi.");
       }
     } catch (err) {
       console.error("Send reset link error:", err);
+      onActionToast("Tarmoq xatosi yuz berdi.");
     } finally {
       setIsUpdatingUser(false);
+    }
+  };
+
+  const fetchSupportTickets = async () => {
+    setIsLoadingSupport(true);
+    try {
+      const res = await fetch('/api/admin/support-tickets');
+      if (res.ok) {
+        const data = await res.json();
+        setSupportTickets(data);
+      }
+    } catch (err) {
+      console.error("Fetch support tickets error:", err);
+    } finally {
+      setIsLoadingSupport(false);
     }
   };
 
@@ -417,12 +616,14 @@ export default function AdminPage({
     if (isAdmin) {
       fetchAdminStats();
       fetchDisputes();
+      fetchEscrowDisputes();
       fetchReports();
       fetchAuditLogs();
       fetchSettings();
       fetchSponsorChannels();
       fetchAdminUsers(1, '');
       fetchAnalytics(analyticsPeriod);
+      fetchSupportTickets();
     }
   }, [isAdmin]);
 
@@ -568,6 +769,7 @@ export default function AdminPage({
   };
 
   const handleReportStatusChange = async (id: number, status: 'reviewed' | 'dismissed') => {
+    setUpdatingReportId(id);
     try {
       const res = await fetch(`/api/reports/${id}/status`, {
         method: 'PATCH',
@@ -586,14 +788,24 @@ export default function AdminPage({
       }
     } catch (err) {
       onActionToast("Tarmoq xatosi.");
+    } finally {
+      setUpdatingReportId(null);
     }
   };
 
   const handleDeleteReportedItem = async (reportId: number, targetType: string, targetId: string) => {
+    // 97-band: 'user' nishon turi endi DetailPage'dan haqiqiy shikoyat sifatida
+    // kelishi mumkin — bu funksiya avval faqat 'startup'/boshqa (idea deb
+    // faraz qilingan) uchun yozilgan edi, 'user' kelsa targetId (foydalanuvchi
+    // ID) tasodifan mos keladigan boshqa bir g'oyani (Idea) o'chirib
+    // yuborishi mumkin edi. Endi 'user' uchun o'chirish tugmasi umuman
+    // chaqirilmaydi (pastdagi render qismida bloklangan), shu yerda ham
+    // ehtiyot chorasi sifatida qaytariladi.
+    if (targetType === 'user') return;
     if (!window.confirm(`Haqiqatan ham ushbu ${targetType === 'startup' ? "startap e'lonini" : "izoh/g'oyani"} butunlay o'chirmoqchimisiz? Bu amal qaytarilmas!`)) {
       return;
     }
-
+    setIsDeletingReportedItem(reportId);
     try {
       const endpoint = targetType === 'startup' 
         ? `/api/admin/startups/${targetId}` 
@@ -609,12 +821,15 @@ export default function AdminPage({
         await handleReportStatusChange(reportId, 'reviewed');
         fetchReports();
         fetchStartups(); // Refresh main list
+        fetchPendingStartups();
       } else {
         const err = await res.json();
         onActionToast(err.error || "O'chirishda xatolik yuz berdi.");
       }
     } catch (err) {
       onActionToast("Tarmoq xatosi.");
+    } finally {
+      setIsDeletingReportedItem(null);
     }
   };
 
@@ -646,6 +861,61 @@ export default function AdminPage({
       setUpdatingDisputeId(null);
     }
   };
+
+  const handleEscrowDisputeUpdate = async (id: string, resolution: 'released' | 'refunded') => {
+    setUpdatingEscrowDisputeId(id);
+    try {
+      const res = await fetch(`/api/admin/escrow-disputes/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          resolution,
+          adminNote: escrowAdminNotes[id] || ""
+        })
+      });
+
+      if (res.ok) {
+        onActionToast(`Escrow nizosi muvaffaqiyatli ${resolution === 'released' ? "ozod qilindi" : "qaytarildi"}!`);
+        fetchEscrowDisputes();
+        fetchAdminStats();
+      } else {
+        const err = await res.json();
+        onActionToast(err.error || "Escrow nizosini yangilab bo'lmadi.");
+      }
+    } catch (err) {
+      onActionToast("Tarmoq xatosi.");
+    } finally {
+      setUpdatingEscrowDisputeId(null);
+    }
+  };
+
+  const handleDeleteStartup = async (id: string, name: string) => {
+    if (!window.confirm(`"${name}" e'lonini BUTUNLAY o'chirmoqchimisiz? Bu amal qaytarilmas — unga bog'liq barcha to'lov, g'oya, sharh va suhbat ma'lumotlari ham o'chib ketadi.`)) {
+      return;
+    }
+    setIsDeletingStartupId(id);
+    try {
+      const res = await fetch(`/api/admin/startups/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        onActionToast(`"${name}" muvaffaqiyatli o'chirildi.`);
+        fetchStartups();
+        fetchPendingStartups();
+        fetchAdminStats();
+        if (listingsView === 'all') fetchAllListingsAdmin(allListingsPage, listingsSearch);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        onActionToast(err.error || "E'lonni o'chirib bo'lmadi.");
+      }
+    } catch (err) {
+      console.error("Delete startup error:", err);
+      onActionToast("Tarmoq xatosi yuz berdi.");
+    } finally {
+      setIsDeletingStartupId(null);
+    }
+  };
+
 
   if (!isAdmin) {
     return (
@@ -679,6 +949,7 @@ export default function AdminPage({
       if (res.ok) {
         onActionToast(`Startap muvaffaqiyatli ${newStatus === 'active' ? 'tasdiqlandi' : 'rad etildi'}.`);
         fetchStartups(); // Refresh the main startup array
+        fetchPendingStartups(); // Kutilayotganlar navbati endi alohida so'raladi — uni ham yangilash kerak
       } else {
         const err = await res.json();
         onActionToast(err.error || "Statusni yangilab bo'lmadi.");
@@ -828,8 +1099,12 @@ export default function AdminPage({
                 placeholder="Qidirish (ism, email)..."
                 value={usersSearch}
                 onChange={(e) => {
-                  setUsersSearch(e.target.value);
-                  fetchAdminUsers(1, e.target.value);
+                  const val = e.target.value;
+                  setUsersSearch(val);
+                  if (usersSearchDebounceRef.current) clearTimeout(usersSearchDebounceRef.current);
+                  usersSearchDebounceRef.current = setTimeout(() => {
+                    fetchAdminUsers(1, val);
+                  }, 500);
                 }}
                 className="w-full pl-9 pr-4 py-2 bg-[#0b1426] border border-white/10 rounded-xl text-xs text-white focus:border-[#f0b90b] outline-none"
               />
@@ -903,6 +1178,7 @@ export default function AdminPage({
               </tbody>
             </table>
           </div>
+          {renderPagination(usersPage, usersTotalPages, (page) => fetchAdminUsers(page, usersSearch))}
         </div>
       )}
 
@@ -972,7 +1248,7 @@ export default function AdminPage({
           }`}
         >
           <span className="material-symbols-outlined text-sm">gavel</span>
-          Nizolar ({disputes.filter(d => d.status === 'open').length})
+          Nizolar ({disputes.filter(d => d.status === 'open').length + escrowDisputes.length})
         </button>
         <button
           onClick={() => setActiveTab('reports')}
@@ -1278,7 +1554,7 @@ export default function AdminPage({
                       </div>
                       <div className="space-y-3">
                         <div className="grid grid-cols-2 gap-2">
-                          {['Buyer', 'Seller', 'Admin'].map(role => (
+                          {['Xaridor', 'Sotuvchi', 'Admin'].map(role => (
                             <button
                               key={role}
                               disabled={isUpdatingUser}
@@ -1344,8 +1620,9 @@ export default function AdminPage({
                           <p className="text-[10px] text-red-400 font-bold text-center">Ishonchingiz komilmi?</p>
                           <div className="flex gap-2">
                             <button 
+                              disabled={isUpdatingUser}
                               onClick={() => handleDeleteUser(selectedUserDetail.user.id)}
-                              className="flex-1 py-2 bg-red-600 text-white rounded-lg text-[10px] font-black"
+                              className="flex-1 py-2 bg-red-600 text-white rounded-lg text-[10px] font-black disabled:opacity-50"
                             >
                               HA, O'CHIRISH
                             </button>
@@ -1503,69 +1780,175 @@ export default function AdminPage({
       {activeTab === 'listings' && (
         <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
 
-          {pendingStartups.length === 0 ? (
-            <div className="py-12 text-center text-on-primary-container space-y-2">
-              <span className="material-symbols-outlined text-4xl opacity-40">assignment_turned_in</span>
-              <p className="text-sm font-bold">Kutilayotgan yangi arizalar mavjud emas</p>
-              <p className="text-xs">Barcha yuborilgan loyihalar ko'rib chiqilgan.</p>
+          {/* Kutilayotgan / Barcha e'lonlar almashtirgichi */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-5">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setListingsView('pending')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                  listingsView === 'pending'
+                    ? 'bg-secondary-container text-on-secondary-fixed'
+                    : 'bg-white/5 border border-white/10 text-white hover:bg-white/10'
+                }`}
+              >
+                Kutilayotganlar ({pendingStartups.length})
+              </button>
+              <button
+                onClick={() => setListingsView('all')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                  listingsView === 'all'
+                    ? 'bg-secondary-container text-on-secondary-fixed'
+                    : 'bg-white/5 border border-white/10 text-white hover:bg-white/10'
+                }`}
+              >
+                Barcha e'lonlar ({totalAllListings})
+              </button>
             </div>
-          ) : (
-            <div className="space-y-4">
-              {pendingStartups.map((startup) => (
-                <div
-                  key={startup.id}
-                  className="bg-[#0b1426] border border-white/5 hover:border-white/10 rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 transition-all"
-                >
-                  <div className="flex items-center gap-4 flex-1">
-                    <img
-                      src={startup.image}
-                      alt={`${startup.name} - kutilayotgan loyiha muqovasi`}
-                      className="w-16 h-16 rounded-xl object-cover border border-white/5 flex-shrink-0"
-                      referrerPolicy="no-referrer"
-                      loading="lazy"
-                      width={64}
-                      height={64}
-                    />
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-white font-extrabold text-base">{startup.name}</h3>
-                        <span className="bg-yellow-500/10 text-yellow-500 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md border border-yellow-500/20">
-                          {startup.category}
-                        </span>
+            {listingsView === 'all' && (
+              <input
+                type="text"
+                value={listingsSearch}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setListingsSearch(val);
+                  if (listingsSearchDebounceRef.current) clearTimeout(listingsSearchDebounceRef.current);
+                  listingsSearchDebounceRef.current = setTimeout(() => {
+                    fetchAllListingsAdmin(1, val);
+                  }, 500);
+                }}
+                placeholder="Nomi yoki ID bo'yicha qidirish..."
+                className="w-full sm:w-64 bg-[#0b1426] border border-white/10 rounded-xl px-4 py-2 text-xs text-white outline-none focus:border-secondary-container"
+              />
+            )}
+          </div>
+
+          {listingsView === 'pending' ? (
+            pendingStartups.length === 0 ? (
+              <div className="py-12 text-center text-on-primary-container space-y-2">
+                <span className="material-symbols-outlined text-4xl opacity-40">assignment_turned_in</span>
+                <p className="text-sm font-bold">Kutilayotgan yangi arizalar mavjud emas</p>
+                <p className="text-xs">Barcha yuborilgan loyihalar ko'rib chiqilgan.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {pendingStartups.map((startup) => (
+                  <div
+                    key={startup.id}
+                    className="bg-[#0b1426] border border-white/5 hover:border-white/10 rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 transition-all"
+                  >
+                    <div className="flex items-center gap-4 flex-1">
+                      <img
+                        src={startup.image}
+                        alt={`${startup.name} - kutilayotgan loyiha muqovasi`}
+                        className="w-16 h-16 rounded-xl object-cover border border-white/5 flex-shrink-0"
+                        referrerPolicy="no-referrer"
+                        loading="lazy"
+                        width={64}
+                        height={64}
+                      />
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-white font-extrabold text-base">{startup.name}</h3>
+                          <span className="bg-yellow-500/10 text-yellow-500 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md border border-yellow-500/20">
+                            {startup.category}
+                          </span>
+                        </div>
+                        <p className="text-xs text-[#f3ba2f] font-mono font-bold">
+                          Sotish narxi: ${startup.price ? startup.price.toLocaleString() : "0"} • Turi: {startup.listingType}
+                        </p>
+                        <p className="text-xs text-on-primary-container leading-relaxed line-clamp-1">
+                          {startup.slogan}
+                        </p>
                       </div>
-                      <p className="text-xs text-[#f3ba2f] font-mono font-bold">
-                        Sotish narxi: ${startup.price ? startup.price.toLocaleString() : "0"} • Turi: {startup.listingType}
-                      </p>
-                      <p className="text-xs text-on-primary-container leading-relaxed line-clamp-1">
-                        {startup.slogan}
-                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 w-full md:w-auto">
+                      <button
+                        disabled={isUpdating !== null}
+                        onClick={() => handleStatusChange(startup.id, 'active')}
+                        className="flex-1 md:flex-none px-4 py-2.5 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-[#12161c] font-extrabold text-xs rounded-xl transition-all flex items-center justify-center gap-1 active:scale-95 shadow-lg shadow-green-500/10 cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-sm font-bold">check_circle</span>
+                        Tasdiqlash
+                      </button>
+                      <button
+                        disabled={isUpdating !== null}
+                        onClick={() => handleStatusChange(startup.id, 'rejected')}
+                        className="flex-1 md:flex-none px-4 py-2.5 bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 disabled:opacity-50 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1 active:scale-95 cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-sm">cancel</span>
+                        Rad etish
+                      </button>
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-2.5 w-full md:w-auto">
-                    <button
-                      disabled={isUpdating !== null}
-                      onClick={() => handleStatusChange(startup.id, 'active')}
-                      className="flex-1 md:flex-none px-4 py-2.5 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-[#12161c] font-extrabold text-xs rounded-xl transition-all flex items-center justify-center gap-1 active:scale-95 shadow-lg shadow-green-500/10 cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-sm font-bold">check_circle</span>
-                      Tasdiqlash
-                    </button>
-                    <button
-                      disabled={isUpdating !== null}
-                      onClick={() => handleStatusChange(startup.id, 'rejected')}
-                      className="flex-1 md:flex-none px-4 py-2.5 bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 disabled:opacity-50 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1 active:scale-95 cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-sm">cancel</span>
-                      Rad etish
-                    </button>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            )
+          ) : isLoadingAllListings ? (
+            <div className="py-12 text-center text-on-primary-container">
+              <span className="material-symbols-outlined text-4xl opacity-40 animate-spin">progress_activity</span>
             </div>
+          ) : (
+            (() => {
+              const filtered = allListings;
+              return filtered.length === 0 ? (
+                <div className="py-12 text-center text-on-primary-container space-y-2">
+                  <span className="material-symbols-outlined text-4xl opacity-40">search_off</span>
+                  <p className="text-sm font-bold">Hech qanday e'lon topilmadi</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filtered.map((startup) => (
+                    <div
+                      key={startup.id}
+                      className="bg-[#0b1426] border border-white/5 hover:border-white/10 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-all"
+                    >
+                      <div className="flex items-center gap-4 flex-1 min-w-0">
+                        <img
+                          src={startup.image}
+                          alt={`${startup.name} - loyiha muqovasi`}
+                          className="w-12 h-12 rounded-xl object-cover border border-white/5 flex-shrink-0"
+                          referrerPolicy="no-referrer"
+                          loading="lazy"
+                          width={48}
+                          height={48}
+                        />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="text-white font-extrabold text-sm truncate">{startup.name}</h3>
+                            <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-md border ${
+                              startup.status === 'active'
+                                ? 'bg-green-500/10 text-green-400 border-green-500/20'
+                                : startup.status === 'pending'
+                                ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
+                                : 'bg-red-500/10 text-red-400 border-red-500/20'
+                            }`}>
+                              {startup.status}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-on-primary-container font-mono truncate">ID: {startup.id}</p>
+                        </div>
+                      </div>
+
+                      <button
+                        disabled={isDeletingStartupId !== null}
+                        onClick={() => handleDeleteStartup(startup.id, startup.name)}
+                        className="w-full md:w-auto px-4 py-2 bg-red-600/20 text-red-400 border border-red-500/30 hover:bg-red-500 hover:text-white disabled:opacity-50 font-black text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-sm">delete_forever</span>
+                        {isDeletingStartupId === startup.id ? "O'chirilmoqda..." : "Butunlay o'chirish"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()
           )}
+          {listingsView === 'all' && !isLoadingAllListings &&
+            renderPagination(allListingsPage, allListingsTotalPages, (page) => fetchAllListingsAdmin(page, listingsSearch))}
         </div>
       )}
+
 
       {activeTab === 'disputes' && (
         <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
@@ -1668,6 +2051,90 @@ export default function AdminPage({
         </div>
       )}
 
+      {activeTab === 'disputes' && (
+        <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4">
+            <span className="material-symbols-outlined text-red-400">account_balance</span>
+            Escrow (kafolatlangan to'lov) nizolari ({escrowDisputes.length})
+          </h2>
+
+          {isLoadingEscrowDisputes ? (
+            <div className="py-12 text-center text-on-primary-container text-sm">Yuklanmoqda...</div>
+          ) : escrowDisputes.length === 0 ? (
+            <div className="py-12 text-center text-on-primary-container space-y-2">
+              <span className="material-symbols-outlined text-4xl opacity-40">account_balance</span>
+              <p className="text-sm font-bold">Hech qanday escrow nizosi mavjud emas</p>
+              <p className="text-xs">Barcha kafolatlangan to'lovlar muammosiz davom etmoqda.</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {escrowDisputes.map((ed) => (
+                <div
+                  key={ed.id}
+                  className="bg-[#0b1426] border border-white/5 hover:border-white/10 rounded-2xl p-5 space-y-4 transition-all"
+                >
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-3">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-[#8892b0] block">Loyiha</span>
+                      <span className="text-white font-black text-sm">{ed.escrow?.payment?.startup?.name || "Noma'lum loyiha"}</span>
+                      <span className="text-xs text-on-primary-container block mt-0.5">To'lov ID: {ed.escrow?.paymentId} • Narxi: ${ed.escrow?.payment?.startup?.price?.toLocaleString()}</span>
+                    </div>
+                    <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-md border bg-red-500/10 text-red-400 border-red-500/20">
+                      Hal qilinmagan
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    <div className="space-y-1 bg-[#0e1726] p-3.5 rounded-xl border border-white/5">
+                      <span className="text-yellow-500/80 font-bold uppercase text-[9px] tracking-wider block">Nizo ochuvchi xaridor</span>
+                      <p className="text-white font-extrabold">{ed.escrow?.payment?.user?.name}</p>
+                      <p className="text-on-primary-container text-[11px]">{ed.escrow?.payment?.user?.email}</p>
+                      <p className="text-[#8892b0] text-[10px] mt-1.5">{new Date(ed.createdAt).toLocaleString("uz-UZ")}</p>
+                    </div>
+
+                    <div className="space-y-1 bg-[#0e1726] p-3.5 rounded-xl border border-white/5">
+                      <span className="text-red-400/80 font-bold uppercase text-[9px] tracking-wider block">Nizo sababi</span>
+                      <p className="text-white font-extrabold">"{ed.reason}"</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-2">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] uppercase font-bold text-[#8892b0]">Admin qarori / Izohi (adminNote):</label>
+                      <input
+                        type="text"
+                        placeholder="Qarorni asoslab yozing (masalan: dalillar tekshirildi, xaridorning haqi ...)"
+                        value={escrowAdminNotes[ed.id] || ""}
+                        onChange={(e) => setEscrowAdminNotes({ ...escrowAdminNotes, [ed.id]: e.target.value })}
+                        className="w-full p-2.5 bg-[#0e1726] border border-white/10 rounded-xl text-white text-xs placeholder-[#8892b0]/50 focus:border-secondary-container focus:outline-none transition-all"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 justify-end">
+                      <button
+                        disabled={updatingEscrowDisputeId !== null}
+                        onClick={() => handleEscrowDisputeUpdate(ed.id, 'released')}
+                        className="px-4 py-2 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-[#12161c] font-extrabold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95 shadow-md shadow-green-500/10"
+                      >
+                        <span className="material-symbols-outlined text-xs">check_circle</span>
+                        Sotuvchiga ozod qilish
+                      </button>
+                      <button
+                        disabled={updatingEscrowDisputeId !== null}
+                        onClick={() => handleEscrowDisputeUpdate(ed.id, 'refunded')}
+                        className="px-4 py-2 bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 disabled:opacity-50 font-bold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                      >
+                        <span className="material-symbols-outlined text-xs">undo</span>
+                        Xaridorga qaytarish
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {activeTab === 'reports' && (
         <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
           <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4">
@@ -1697,13 +2164,15 @@ export default function AdminPage({
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">
-                            {report.targetType === 'startup' ? "E'lon" : "Izoh / G'oya"}
+                            {report.targetType === 'startup' ? "E'lon" : report.targetType === 'user' ? "Foydalanuvchi" : "Izoh / G'oya"}
                           </span>
                           <span className="text-[#8892b0] text-[10px]">ID: {report.targetId}</span>
                         </div>
                         <h4 className="text-white font-black text-sm">
                           {report.targetType === 'startup' 
                             ? (reportedStartup ? `Loyiha: ${reportedStartup.name}` : `Noma'lum Loyiha (ID: ${report.targetId})`)
+                            : report.targetType === 'user'
+                            ? `Foydalanuvchi (ID: ${report.targetId})`
                             : `Izoh (ID: ${report.targetId})`
                           }
                         </h4>
@@ -1743,14 +2212,16 @@ export default function AdminPage({
                           <>
                             <button
                               onClick={() => handleReportStatusChange(report.id, 'reviewed')}
-                              className="px-3 py-2 bg-green-500 hover:bg-green-600 text-[#12161c] font-bold text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                              disabled={updatingReportId === report.id || isDeletingReportedItem === report.id}
+                              className="px-3 py-2 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-[#12161c] font-bold text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
                             >
                               <span className="material-symbols-outlined text-xs">check</span>
                               Tasdiqlash (Ko'rib chiqildi)
                             </button>
                             <button
                               onClick={() => handleReportStatusChange(report.id, 'dismissed')}
-                              className="px-3 py-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 font-bold text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                              disabled={updatingReportId === report.id || isDeletingReportedItem === report.id}
+                              className="px-3 py-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 disabled:opacity-50 font-bold text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
                             >
                               <span className="material-symbols-outlined text-xs">close</span>
                               Inkor etish (Rad etish)
@@ -1759,13 +2230,28 @@ export default function AdminPage({
                         )}
                       </div>
 
-                      <button
-                        onClick={() => handleDeleteReportedItem(report.id, report.targetType, report.targetId)}
-                        className="px-3 py-2 bg-red-600/20 text-red-400 border border-red-500/30 hover:bg-red-500 hover:text-white font-black text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
-                      >
-                        <span className="material-symbols-outlined text-xs">delete</span>
-                        {report.targetType === 'startup' ? "E'lonni o'chirish" : "Izohni o'chirish"}
-                      </button>
+                      {report.targetType === 'user' ? (
+                        <button
+                          onClick={() => {
+                            setActiveTab('users');
+                            setUsersSearch(report.targetId);
+                            fetchAdminUsers(1, report.targetId);
+                          }}
+                          className="px-3 py-2 bg-white/5 text-white border border-white/10 hover:bg-white/10 font-black text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                        >
+                          <span className="material-symbols-outlined text-xs">person_search</span>
+                          Foydalanuvchini ko'rish
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleDeleteReportedItem(report.id, report.targetType, report.targetId)}
+                          disabled={updatingReportId === report.id || isDeletingReportedItem === report.id}
+                          className="px-3 py-2 bg-red-600/20 text-red-400 border border-red-500/30 hover:bg-red-500 hover:text-white disabled:opacity-50 font-black text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                        >
+                          <span className="material-symbols-outlined text-xs">delete</span>
+                          {isDeletingReportedItem === report.id ? "O'chirilmoqda..." : (report.targetType === 'startup' ? "E'lonni o'chirish" : "Izohni o'chirish")}
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -1968,9 +2454,9 @@ export default function AdminPage({
                       </td>
                       <td className="py-3.5 px-4">
                         <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border ${
-                          log.action.includes('APPROVE') || log.action.includes('RESOLVE')
+                          log.action.toUpperCase().includes('APPROVE') || log.action.toUpperCase().includes('RESOLVE')
                             ? 'bg-green-500/10 text-green-400 border-green-500/20'
-                            : log.action.includes('REJECT') || log.action.includes('DELETE')
+                            : log.action.toUpperCase().includes('REJECT') || log.action.toUpperCase().includes('DELETE')
                             ? 'bg-red-500/10 text-red-400 border-red-500/20'
                             : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
                         }`}>
@@ -2030,38 +2516,54 @@ export default function AdminPage({
                   <div className="flex flex-col gap-2 shrink-0 w-full md:w-auto mt-4 md:mt-0">
                     {ticket.status === 'pending' && (
                       <button
+                        disabled={updatingTicketId === ticket.id}
                         onClick={() => {
+                          setUpdatingTicketId(ticket.id);
                           fetch(`/api/admin/support-tickets/${ticket.id}/status`, {
                             method: 'PATCH',
                             headers: {
                               'Content-Type': 'application/json'
                             },
                             body: JSON.stringify({ status: 'reviewing' })
-                          }).then(() => {
-                            setSupportTickets(supportTickets.map(t => t.id === ticket.id ? { ...t, status: 'reviewing' } : t));
-                            onActionToast('Holat o\'zgartirildi');
-                          });
+                          }).then(async (res) => {
+                            if (res.ok) {
+                              setSupportTickets(supportTickets.map(t => t.id === ticket.id ? { ...t, status: 'reviewing' } : t));
+                              onActionToast('Holat o\'zgartirildi');
+                            } else {
+                              const err = await res.json().catch(() => ({}));
+                              onActionToast(err.error || 'Holatni o\'zgartirib bo\'lmadi.');
+                            }
+                          }).catch(() => onActionToast('Tarmoq xatosi yuz berdi.'))
+                            .finally(() => setUpdatingTicketId(null));
                         }}
-                        className="px-4 py-2 bg-blue-500/20 text-blue-400 border border-blue-500/40 rounded-xl font-bold text-xs hover:bg-blue-500/30 transition-all"
+                        className="px-4 py-2 bg-blue-500/20 text-blue-400 border border-blue-500/40 rounded-xl font-bold text-xs hover:bg-blue-500/30 transition-all disabled:opacity-50"
                       >
                         Ko'rib chiqilmoqda
                       </button>
                     )}
                     {(ticket.status === 'pending' || ticket.status === 'reviewing') && (
                       <button
+                        disabled={updatingTicketId === ticket.id}
                         onClick={() => {
+                          setUpdatingTicketId(ticket.id);
                           fetch(`/api/admin/support-tickets/${ticket.id}/status`, {
                             method: 'PATCH',
                             headers: {
                               'Content-Type': 'application/json'
                             },
                             body: JSON.stringify({ status: 'resolved' })
-                          }).then(() => {
-                            setSupportTickets(supportTickets.map(t => t.id === ticket.id ? { ...t, status: 'resolved' } : t));
-                            onActionToast('Holat o\'zgartirildi');
-                          });
+                          }).then(async (res) => {
+                            if (res.ok) {
+                              setSupportTickets(supportTickets.map(t => t.id === ticket.id ? { ...t, status: 'resolved' } : t));
+                              onActionToast('Holat o\'zgartirildi');
+                            } else {
+                              const err = await res.json().catch(() => ({}));
+                              onActionToast(err.error || 'Holatni o\'zgartirib bo\'lmadi.');
+                            }
+                          }).catch(() => onActionToast('Tarmoq xatosi yuz berdi.'))
+                            .finally(() => setUpdatingTicketId(null));
                         }}
-                        className="px-4 py-2 bg-green-500/20 text-green-400 border border-green-500/40 rounded-xl font-bold text-xs hover:bg-green-500/30 transition-all"
+                        className="px-4 py-2 bg-green-500/20 text-green-400 border border-green-500/40 rounded-xl font-bold text-xs hover:bg-green-500/30 transition-all disabled:opacity-50"
                       >
                         Hal qilindi
                       </button>

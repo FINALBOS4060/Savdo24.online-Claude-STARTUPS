@@ -1,37 +1,67 @@
-name: Savdo24 Continuous Integration
+# 123-bosqich: bu fayl "tsc/esbuild bilan tekshirildi" tanqidiga javoban
+# qo'shildi. Sandbox muhitida (Claude sessiyalarida) tarmoq yo'q — shu
+# sabab 1-122-bosqichlarning aksariyatida "tsc --noEmit --noResolve"
+# (node_modules'siz, faqat sintaksis) yoki qo'lda qavs sanash ishlatilgan,
+# bular HAQIQIY tip-tekshiruv EMAS edi (buni oldingi bosqichlarda ochiq
+# yozib borilgan, lekin amalda bu haqiqiy build o'rnini bosolmaydi).
+#
+# Bu workflow GitHub'ning o'z serverida (haqiqiy tarmoq, haqiqiy
+# node_modules bilan) ishlaydi — shu sabab bu yerda bajariladigan
+# tekshiruvlar HAQIQIY: to'liq @types/node, @types/express, Prisma Client
+# generatsiyasi bilan tsc, va haqiqiy vite/esbuild build. Loyiha bu
+# workflow orqali hali GitHub'ga ulanmagan bo'lishi mumkin (README.md'da
+# yozilganidek, hozirgacha GitHub Actions ISHLATILMAGAN) — bu fayl faqat
+# repo GitHub'da bo'lganda avtomatik ishga tushadi. Deploy jarayoniga
+# (deploy.sh/FileZilla) HECH QANDAY ta'sir qilmaydi — bu FAQAT tekshiruv
+# (CI), deploy emas.
+name: CI (build + typecheck + test)
 
 on:
   push:
-    branches:
-      - '**'
   pull_request:
-    branches:
-      - '**'
 
 jobs:
-  build_and_test:
+  verify:
     runs-on: ubuntu-latest
-
+    env:
+      # prisma generate schema'ni o'qish uchun DATABASE_URL borligini talab
+      # qilishi mumkin (haqiqiy DB'ga ulanmaydi, faqat client generatsiya
+      # qiladi) — shu sabab soxta qiymat yetarli.
+      DATABASE_URL: "postgresql://ci:ci@localhost:5432/ci_placeholder"
+      JWT_SECRET: "ci-placeholder-jwt-secret-not-for-production"
+      ENCRYPTION_KEY: "ci-placeholder-encryption-key-not-for-prod"
+      NODE_ENV: "test"
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
+          node-version: "22"
+          cache: "npm"
 
-      - name: Install dependencies
-        run: npm install
+      # `npm ci` (jest/vitest kabi tashqi paketlarni ham) haqiqiy npm
+      # registry'dan o'rnatadi — sandbox'da bu qadam network yo'qligi
+      # sabab HECH QACHON to'liq bajarilmagan edi (105/121-band, 403 xato).
+      - name: Install dependencies (npm ci)
+        run: npm ci
 
-      - name: Run Prisma Client Generation
+      - name: Prisma generate (ikkala schema)
         run: |
           npx prisma generate --schema=prisma/schema.sqlite.prisma
           npx prisma generate --schema=prisma/schema.prisma
 
-      - name: Run TypeScript validation
+      # HAQIQIY tip-tekshiruv — @types/node/@types/express to'liq mavjud,
+      # sandbox'dagi "--noResolve" bilan solishtirganda bu butunlay
+      # boshqa (ancha qattiqroq) tekshiruv.
+      - name: Typecheck (tsc --noEmit)
         run: npx tsc --noEmit
 
-      - name: Build Application
-        run: npm run build
+      # Haqiqiy build — frontend (vite) + backend bundle (esbuild).
+      - name: Build (vite + esbuild)
+        run: |
+          npx vite build
+          npx esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs
+
+      # 122-bosqichda qo'shilgan avtomatik testlar.
+      - name: Test (node:test)
+        run: npm run test

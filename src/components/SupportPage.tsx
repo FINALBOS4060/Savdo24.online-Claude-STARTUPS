@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { apiFetch as fetch } from '../lib/api';
 
 interface FAQItem {
   question: string;
@@ -8,6 +9,7 @@ interface FAQItem {
 export default function SupportPage({ setView }: { setView: (view: string) => void }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [formSubmitted, setFormSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [email, setEmail] = useState('');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
@@ -27,11 +29,11 @@ export default function SupportPage({ setView }: { setView: (view: string) => vo
     },
     {
       question: "Sotib olingan loyihani qaytarish mumkinmi?",
-      answer: "Blokcheyn tranzaksiyalari yakuniy va qaytarib bo'lmas hisoblanadi. Agar loyihada muammo yuzaga kelsa, support@savdo24.uz yoki sotuvchi aloqa ma'lumotlari orqali biz bilan bog'lanishingiz mumkin."
+      answer: "Raqamli mahsulotlar (kod, loyiha, startap) yetkazib berilgandan so'ng odatda qaytarilmaydi. Biroq agar sotuvchi loyihani topshirishdan bosh tortsa yoki mahsulot va'dalarga zid bo'lsa, mablag' xarid vaqtida escrow'da (vaqtincha ushlab turiladi) saqlanadi va admin nizoni ko'rib chiqib, kerak bo'lsa pulni qaytarishi mumkin. Batafsil shartlar 'Qaytarish va nizolar siyosati' sahifasida."
     },
     {
       question: "Xavfsizlik qanday ta'minlanadi?",
-      answer: "Har bir e'lon va foydalanuvchi ma'lumotlari adminlar tomonidan tekshiriladi. Shuningdek, xaridlar va to'lovlar blokcheyn konsensusi orqali kafolatlanadi."
+      answer: "Har bir e'lon va foydalanuvchi ma'lumotlari adminlar tomonidan tekshiriladi. To'lovlar CoinGate orqali amalga oshiriladi va xarid summasi darhol sotuvchiga o'tkazilmaydi — u escrow tizimida ushlab turiladi hamda nizo bo'lmasa muddat tugagach avtomatik ozod qilinadi, nizo bo'lsa admin hal qiladi."
     }
   ];
 
@@ -41,7 +43,8 @@ export default function SupportPage({ setView }: { setView: (view: string) => vo
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email && subject && message) {
+    if (email && subject && message && !submitting) {
+      setSubmitting(true);
       try {
         const res = await fetch('/api/support', {
           method: 'POST',
@@ -62,6 +65,8 @@ export default function SupportPage({ setView }: { setView: (view: string) => vo
         }
       } catch (err) {
         alert("Server bilan ulanishda xatolik.");
+      } finally {
+        setSubmitting(false);
       }
     }
   };
@@ -101,7 +106,7 @@ export default function SupportPage({ setView }: { setView: (view: string) => vo
 
             <div className="space-y-4">
               <a
-                href="mailto:support@savdo24.uz"
+                href="mailto:support@savdo24.online"
                 className="flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all group"
               >
                 <div className="w-10 h-10 rounded-full bg-secondary-container/10 flex items-center justify-center text-secondary-container">
@@ -109,7 +114,7 @@ export default function SupportPage({ setView }: { setView: (view: string) => vo
                 </div>
                 <div>
                   <p className="text-[10px] uppercase tracking-wider text-on-primary-container font-extrabold">Elektron pochta</p>
-                  <p className="text-sm font-bold text-white group-hover:text-secondary-container transition-colors">support@savdo24.uz</p>
+                  <p className="text-sm font-bold text-white group-hover:text-secondary-container transition-colors">support@savdo24.online</p>
                 </div>
               </a>
 
@@ -189,10 +194,11 @@ export default function SupportPage({ setView }: { setView: (view: string) => vo
 
                 <button
                   type="submit"
-                  className="w-full py-3 bg-secondary-container text-on-secondary-fixed rounded-xl font-bold text-xs shadow-lg shadow-secondary-container/10 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                  disabled={submitting}
+                  className="w-full py-3 bg-secondary-container text-on-secondary-fixed rounded-xl font-bold text-xs shadow-lg shadow-secondary-container/10 hover:brightness-110 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 transition-all flex items-center justify-center gap-1.5"
                 >
                   <span className="material-symbols-outlined text-sm">send</span>
-                  Yuborish
+                  {submitting ? 'Yuborilmoqda...' : 'Yuborish'}
                 </button>
               </form>
             )}

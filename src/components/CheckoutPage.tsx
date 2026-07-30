@@ -22,7 +22,7 @@ export default function CheckoutPage({
   onSuccessPayment,
   startup,
 }: CheckoutPageProps) {
-  const startupId = startup?.id || 'ecoflow-systems';
+  const startupId = startup?.id;
   const [timeLeft, setTimeLeft] = useState(899); // 14:59 in seconds
   const [paymentStep, setPaymentStep] = useState<'checkout' | 'processing' | 'success'>('checkout');
   const [activeOrderId, setActiveOrderId] = useState<string>('');
@@ -41,14 +41,39 @@ export default function CheckoutPage({
   };
   const [deliveryData, setDeliveryData] = useState<DeliveryData>({});
 
-  // Automatic CoinGate Order Creation on Mount with duplicate protection
+  // Automatic CoinGate Order Creation on Mount with duplicate protection.
+  // MUHIM: bu effekt ichida `activeOrderId` state'i o'rnatilardi VA aynan
+  // shu state effektning dependency arrayida ham bor edi — natijada
+  // setActiveOrderId chaqirilgach effekt qayta ishga tushib, o'zining
+  // cleanup funksiyasi orqali hozirgina o'rnatilgan redirectTimer'ni
+  // (1.5 soniyadan keyin CoinGate to'lov sahifasiga avtomatik
+  // yo'naltirish uchun) darhol bekor qilib qo'yardi — shu sabab avtomatik
+  // yo'naltirish HECH QACHON ishlamas edi (faqat qo'lda "To'lovni
+  // yakunlash" tugmasi ishlardi). Endi takroriy chaqiruvni oldini olish
+  // uchun state o'rniga ref ishlatiladi, shunda effekt qayta ishga
+  // tushmaydi va o'z taymerini bekor qilmaydi.
+  const paymentInitiatedRef = React.useRef(false);
+  // MUHIM: redirectTimer avval useEffect ichidagi mahalliy o'zgaruvchi edi —
+  // referralCode input maydoni xuddi shu sahifada bo'lsa-da, uni bekor
+  // qilishning iloji yo'q edi. Endi ref orqali saqlanadi, shunda referral
+  // kod qo'llanganda avtomatik yo'naltirishni bekor qilish mumkin.
+  const redirectTimerRef = React.useRef<any>(null);
   useEffect(() => {
     let isMounted = true;
-    let redirectTimer: any = null;
 
     const initPayment = async () => {
       try {
-        if (activeOrderId) return;
+        if (paymentInitiatedRef.current) return;
+
+        if (!startupId) {
+          if (isMounted) {
+            onActionToast("Xarid qilish uchun mahsulot tanlanmagan.");
+            setView("browse");
+          }
+          return;
+        }
+
+        paymentInitiatedRef.current = true;
 
         const res = await fetch('/api/payments/create', {
           method: 'POST',
@@ -57,7 +82,7 @@ export default function CheckoutPage({
           },
           body: JSON.stringify({
             amount,
-            startupId: startupId || 'ecoflow-systems'
+            startupId
           }),
         });
 
@@ -69,17 +94,34 @@ export default function CheckoutPage({
           setActiveOrderId(data.id);
           if (data.paymentUrl) {
             setPaymentUrl(data.paymentUrl);
-            // Only auto-redirect ONCE
-            redirectTimer = setTimeout(() => {
-              if (isMounted) {
-                window.location.href = data.paymentUrl;
-              }
-            }, 1500);
+            // XATO: agar foydalanuvchida referral kod bo'lsa (masalan,
+            // referral havola orqali kirgan), 1.5 soniyada CoinGate'ga
+            // yo'naltirilib, kodni qo'llash imkoniyati yo'qolib qolardi —
+            // shuning uchun referral kod mavjud bo'lsa avtomatik
+            // yo'naltirish o'chiriladi, foydalanuvchi qo'lda tugmani bosadi.
+            if (!referralCode) {
+              redirectTimerRef.current = setTimeout(() => {
+                if (isMounted) {
+                  window.location.href = data.paymentUrl;
+                }
+              }, 1500);
+            }
           }
           if (data.api_keys_missing) setApiKeysMissing(true);
         } else {
+          // 42-MUAMMO: server aniq sabab (allaqachon sotilgan, email
+          // tasdiqlanmagan, referral xato va h.k.) qaytarsa ham, bu yerda
+          // doim umumiy "yaratib bo'lmadi" xabari ko'rsatilib, foydalanuvchi
+          // sababsiz "Yaratilmoqda..." holatida qolgan checkout sahifasida
+          // qotib qolardi — endi server xabari ko'rsatiladi va browse'ga qaytariladi.
           if (isMounted) {
-            onActionToast("To'lov buyurtmasini yaratib bo'lmadi.");
+            let serverError = "To'lov buyurtmasini yaratib bo'lmadi.";
+            try {
+              const errData = await res.json();
+              if (errData?.error) serverError = errData.error;
+            } catch {}
+            onActionToast(serverError);
+            setView("browse");
           }
         }
       } catch (err) {
@@ -94,9 +136,9 @@ export default function CheckoutPage({
 
     return () => {
       isMounted = false;
-      if (redirectTimer) clearTimeout(redirectTimer);
+      if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
     };
-  }, [startupId, amount, activeOrderId]);
+  }, [startupId, amount]);
 
   const applyReferralCode = async () => {
     if (!referralCode || referralCode.trim().length === 0) {
@@ -105,6 +147,12 @@ export default function CheckoutPage({
     }
     
     if (isApplyingReferral) return;
+
+    // Referral qo'llanayotganda avtomatik CoinGate'ga yo'naltirish bekor qilinadi
+    if (redirectTimerRef.current) {
+      clearTimeout(redirectTimerRef.current);
+      redirectTimerRef.current = null;
+    }
 
     // Client-side validation
     if (referralCode.length > 10 || !/^[A-Z0-9]+$/.test(referralCode.trim().toUpperCase())) {
@@ -214,7 +262,13 @@ export default function CheckoutPage({
     return `${mins}:${remainingSecs < 10 ? '0' : ''}${remainingSecs}`;
   };
 
+  const isExpired = timeLeft <= 0 && paymentStep === 'checkout';
+
   const handleCoinGateRedirect = () => {
+    if (isExpired) {
+      onActionToast("To'lov vaqti tugadi. Iltimos, sahifani yangilab qayta urinib ko'ring.");
+      return;
+    }
     if (paymentUrl) {
       window.location.href = paymentUrl;
       onActionToast("CoinGate xavfsiz to'lov sahifasiga yo'naltirilmoqda...");
@@ -315,9 +369,9 @@ export default function CheckoutPage({
                     <p className="text-[10px] text-emerald-400 font-bold">-{discountData.discountPercent}% referral chegirmasi qo'llanildi</p>
                   )}
                 </div>
-                <div className="text-right bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20 rounded-xl px-3 py-1.5 font-mono text-xs font-bold flex items-center gap-1.5">
+                <div className={`text-right rounded-xl px-3 py-1.5 font-mono text-xs font-bold flex items-center gap-1.5 border ${isExpired ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-[#10b981]/10 text-[#10b981] border-[#10b981]/20'}`}>
                   <span className="material-symbols-outlined text-sm">schedule</span>
-                  {formatTime(timeLeft)}
+                  {isExpired ? "Vaqt tugadi" : formatTime(timeLeft)}
                 </div>
               </div>
 
@@ -363,7 +417,7 @@ export default function CheckoutPage({
               {activeOrderId && (
                 <button
                   onClick={handleVerifyPayment}
-                  disabled={isChecking}
+                  disabled={isChecking || isExpired}
                   className="px-6 py-3 border border-[#10b981]/30 hover:bg-[#10b981]/5 active:scale-95 text-[#10b981] font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <span className={`material-symbols-outlined text-sm ${isChecking ? 'animate-spin' : ''}`}>
@@ -412,7 +466,7 @@ export default function CheckoutPage({
           <div className="bg-white/5 border border-white/5 rounded-2xl p-6 space-y-4 font-semibold text-sm">
             <div className="flex justify-between">
               <span className="text-on-primary-container">Jami summa</span>
-              <span className="text-white font-mono font-bold">${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} USDT</span>
+              <span className="text-white font-mono font-bold">${(discountData ? amount * (1 - discountData.discountPercent / 100) : amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} USDT</span>
             </div>
             <div className="flex justify-between">
               <span className="text-on-primary-container">Mahsulot</span>
