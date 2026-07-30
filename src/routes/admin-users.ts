@@ -232,12 +232,12 @@ router.delete("/:id", authenticateToken, requireAdmin, async (req: AuthRequest, 
         where: { OR: [{ buyerId: userId }, { sellerId: userId }] },
         select: { id: true }
       })
-    ).map((c) => c.id);
+    ).map((c: any) => c.id);
 
     const userB2BAccount = await prisma.b2BAccount.findUnique({ where: { userId } });
     const userReferralIds = (
       await prisma.referral.findMany({ where: { referrerId: userId }, select: { id: true } })
-    ).map((r) => r.id);
+    ).map((r: any) => r.id);
 
     await prisma.$transaction([
       ...(userConversationIds.length > 0
