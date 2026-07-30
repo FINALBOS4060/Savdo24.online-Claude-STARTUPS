@@ -40,6 +40,7 @@ import {
   globalLimiter,
   authLimiter
 } from "./src/lib/rateLimiters";
+import { CATEGORY_FIELDS } from "./src/categoryFields";
 
 dotenv.config();
 
@@ -729,50 +730,31 @@ async function seedDatabase() {
           id: "startups", 
           name: "Startaplar", 
           icon: "rocket_launch",
-          fields: JSON.stringify([
-            { key: 'teamSize', label: 'Jamoa hajmi (kishi)', type: 'number', placeholder: 'Masalan: 5' },
-            { key: 'stage', label: 'Loyiha bosqichi', type: 'select', options: ["G'oya", 'Prototip', 'Ishlab chiqarilgan', 'Foydalanuvchilari bor'] },
-            { key: 'pitchDeckUrl', label: 'Asoslash hujjati havolasi (Pitch deck)', type: 'text', placeholder: 'Masalan: https://drive.google.com/...' }
-          ])
+          fields: JSON.stringify(CATEGORY_FIELDS["startups"] || [])
         },
         { 
           id: "ai-prompts", 
           name: "AI Promptlar", 
           icon: "auto_awesome",
-          fields: JSON.stringify([
-            { key: 'targetAi', label: 'Qaysi AI tizimi uchun', type: 'select', options: ['ChatGPT', 'Midjourney', 'Claude', 'Boshqa'] },
-            { key: 'promptsCount', label: 'Promptlar soni', type: 'number', placeholder: 'Masalan: 50' },
-            { key: 'language', label: 'Muloqot tili', type: 'select', options: ["o'zbek", "ingliz", "rus"] }
-          ])
+          fields: JSON.stringify(CATEGORY_FIELDS["ai-prompts"] || [])
         },
         { 
           id: "ai-models", 
           name: "AI Modellar/Botlar", 
           icon: "smart_toy",
-          fields: JSON.stringify([
-            { key: 'framework', label: 'Kutubxona / Framework', type: 'select', options: ['PyTorch', 'TensorFlow', 'Boshqa'] },
-            { key: 'modelSize', label: 'Model hajmi', type: 'text', placeholder: 'Masalan: 7B parametr' },
-            { key: 'datasetSource', label: 'O\'qitilgan ma\'lumotlar manbai', type: 'text', placeholder: 'Masalan: Common Crawl, Custom dataset' }
-          ])
+          fields: JSON.stringify(CATEGORY_FIELDS["ai-models"] || [])
         },
         { 
           id: "sites-apps", 
           name: "Saytlar/Ilovalar", 
           icon: "web",
-          fields: JSON.stringify([
-            { key: 'hasDomain', label: 'Domen qo\'shiladimi (beriladimi)', type: 'checkbox' },
-            { key: 'hasHosting', label: 'Hosting qo\'shiladimi', type: 'checkbox' },
-            { key: 'mau', label: 'Oylik faol foydalanuvchi soni', type: 'number', placeholder: 'Masalan: 1200' },
-            { key: 'platformType', label: 'Platforma turi', type: 'select', options: ['Web', 'iOS', 'Android'] }
-          ])
+          fields: JSON.stringify(CATEGORY_FIELDS["sites-apps"] || [])
         },
         { 
           id: "other-digital", 
           name: "Boshqa raqamli mahsulotlar", 
           icon: "category",
-          fields: JSON.stringify([
-            { key: 'additionalNotes', label: 'Erkin qo\'shimcha izoh maydoni', type: 'text', placeholder: 'Mahsulot haqida qo\'shimcha ma\'lumotlar...' }
-          ])
+          fields: JSON.stringify(CATEGORY_FIELDS["other-digital"] || [])
         },
       ];
       for (const cat of categories) {
@@ -1846,6 +1828,7 @@ app.patch("/api/startups/:id/status", authenticateToken, async (req: AuthRequest
       await prisma.auditLog.create({
         data: {
           adminId: req.user?.id || 0,
+          adminEmail: req.user?.email,
           action: status === "active" ? "approve_startup" : "reject_startup",
           targetId: id,
           details: `Startup status updated to ${status}`
@@ -2036,7 +2019,7 @@ app.post("/api/ideas/:id/upvote", upvoteLimiter, async (req: Request, res: Respo
   }
 
   if (!voterKey) {
-    const ip = (req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || "unknown").split(',')[0].trim();
+    const ip = req.ip || req.socket.remoteAddress || "unknown";
     const userAgent = req.headers["user-agent"] || "unknown";
     const rawKey = `guest-${ip}-${userAgent}`;
     voterKey = crypto.createHash("sha256").update(rawKey).digest("hex");
@@ -2240,9 +2223,21 @@ async function createPaymentOrder(userId: number, startupId: string, referralCod
     throw new Error("O'z loyihangizni sotib ololmaysiz.");
   }
 
-  let realAmount = Number(startupRecord.price);
+  let basePrice = Number(startupRecord.price);
+  let realAmount = basePrice;
   let discountApplied = 0;
   let referralId = null;
+
+  // 1) B2B hisobni tekshirish (verified === true bo'lsa)
+  const b2bAccount = await prisma.b2BAccount.findUnique({ where: { userId } });
+  let b2bDiscountPercent = 0;
+  if (b2bAccount && b2bAccount.verified) {
+    b2bDiscountPercent = Number(b2bAccount.discount) || 0;
+  }
+
+  // 2) Referral kodni tekshirish
+  let referralDiscountPercent = 0;
+  let referralObj: any = null;
 
   if (referralCode) {
     const referral = await prisma.referral.findUnique({
@@ -2278,10 +2273,35 @@ async function createPaymentOrder(userId: number, startupId: string, referralCod
     if (!referrer || referrer.isBanned) {
       throw new Error("Ushbu referral kodning egasi faol emas.");
     }
-    
-    discountApplied = (realAmount * referral.discountPercent) / 100;
-    realAmount -= discountApplied;
-    referralId = referral.id;
+
+    referralDiscountPercent = Number(referral.discountPercent) || 0;
+    referralObj = referral;
+  }
+
+  // 3) Kattaroq chegirmani tanlash (B2B vs Referral)
+  let chosenDiscountPercent = 0;
+  let discountType: "b2b" | "referral" | null = null;
+
+  if (referralDiscountPercent > b2bDiscountPercent && referralDiscountPercent > 0) {
+    chosenDiscountPercent = referralDiscountPercent;
+    discountType = "referral";
+    referralId = referralObj ? referralObj.id : null;
+  } else if (b2bDiscountPercent > 0) {
+    chosenDiscountPercent = b2bDiscountPercent;
+    discountType = "b2b";
+    referralId = null;
+  }
+
+  if (chosenDiscountPercent > 0) {
+    discountApplied = (basePrice * chosenDiscountPercent) / 100;
+    realAmount = basePrice - discountApplied;
+  }
+
+  let paymentSource = source;
+  if (discountType === "b2b") {
+    paymentSource = "b2b_discount";
+  } else if (discountType === "referral") {
+    paymentSource = "referral_discount";
   }
 
   const orderId = "CG-" + crypto.randomBytes(4).toString('hex').toUpperCase();
@@ -2310,13 +2330,14 @@ async function createPaymentOrder(userId: number, startupId: string, referralCod
       startupId: startupId,
       callbackToken: secureToken,
       gateway: "coingate",
-      source: source,
+      source: paymentSource,
       referralId: referralId
     },
   });
 
   let paymentUrl = "";
   let useStripe = false;
+  let usedGateway = "coingate";
 
   const coingateToken = await getSetting("COINGATE_API_TOKEN");
   const appUrlSetting = await getSetting("APP_URL") || "http://localhost:3000";
@@ -2384,6 +2405,7 @@ async function createPaymentOrder(userId: number, startupId: string, referralCod
           // metadata.orderId already carries it through to Stripe for correlation.
           data: { gateway: "stripe" }
         });
+        usedGateway = "stripe";
       } catch (stripeErr) {
         console.error("Stripe fallback error:", stripeErr);
       }
@@ -2400,7 +2422,15 @@ async function createPaymentOrder(userId: number, startupId: string, referralCod
     paymentUrl = `${appUrlSetting}/api/payments/coingate-simulator?orderId=${orderId}&token=${secureToken}&amount=${realAmount.toFixed(2)}&title=${encodeURIComponent(startupRecord.name)}`;
   }
 
-  return { orderId, paymentUrl, amount: realAmount, apiKeysMissing };
+  return {
+    orderId,
+    paymentUrl,
+    amount: realAmount,
+    apiKeysMissing,
+    gateway: usedGateway,
+    discountPercent: chosenDiscountPercent,
+    discountType
+  };
 }
 
 // POST /api/payments/create — to'lov buyurtmasi yaratish
@@ -2412,7 +2442,7 @@ app.post("/api/payments/create", authenticateToken, async (req: AuthRequest, res
   }
 
   try {
-    const { orderId, paymentUrl, amount, apiKeysMissing } = await createPaymentOrder(req.user!.id, startupId, referralCode, "web");
+    const { orderId, paymentUrl, amount, apiKeysMissing, gateway, discountPercent, discountType } = await createPaymentOrder(req.user!.id, startupId, referralCode, "web");
 
     res.status(201).json({
       id: orderId,
@@ -2420,7 +2450,10 @@ app.post("/api/payments/create", authenticateToken, async (req: AuthRequest, res
       status: "pending",
       currency: "USDT",
       paymentUrl,
-      api_keys_missing: apiKeysMissing
+      api_keys_missing: apiKeysMissing,
+      gateway,
+      discountPercent: discountPercent || 0,
+      discountType: discountType || null
     });
   } catch (err: any) {
     console.error("POST /api/payments/create error:", err);
@@ -2500,6 +2533,10 @@ app.get("/api/payments/coingate-simulator", async (req: Request, res: Response) 
     return res.status(400).send("Buyurtma ID si yoki token yo'q.");
   }
 
+  const safeOrderId = JSON.stringify(String(orderId));
+  const safeToken = JSON.stringify(String(token));
+  const safeAmount = JSON.stringify(String(amount || ""));
+
   res.send(`
     <!DOCTYPE html>
     <html>
@@ -2560,9 +2597,9 @@ app.get("/api/payments/coingate-simulator", async (req: Request, res: Response) 
         <div class="card">
           <div class="logo">CoinGate</div>
           <h2>To'lov Shlyuzi (Simulyator)</h2>
-          <p class="order-id">Buyurtma ID: <strong>${orderId}</strong></p>
-          <p style="color: #cbd5e0; font-size: 15px; font-weight: 600; margin-bottom: 4px;">${title || "Loyiha xaridi"}</p>
-          <div class="amount">${amount} <span class="currency">USDT</span></div>
+          <p class="order-id">Buyurtma ID: <strong>${escapeHtml(String(orderId))}</strong></p>
+          <p style="color: #cbd5e0; font-size: 15px; font-weight: 600; margin-bottom: 4px;">${escapeHtml(String(title || "Loyiha xaridi"))}</p>
+          <div class="amount">${escapeHtml(String(amount || ""))} <span class="currency">USDT</span></div>
           <p class="info-text">Bu CoinGate to'lov tizimining integratsiyasini va webhook qayta qo'ng'iroqlarini tekshirish uchun maxsus simulyatordir.</p>
           <button onclick="pay()">To'lovni tasdiqlash</button>
         </div>
@@ -2570,13 +2607,13 @@ app.get("/api/payments/coingate-simulator", async (req: Request, res: Response) 
           async function pay() {
             try {
               const params = new URLSearchParams();
-              params.append('order_id', '${orderId}');
+              params.append('order_id', ${safeOrderId});
               params.append('status', 'paid');
-              params.append('price_amount', '${amount}');
+              params.append('price_amount', ${safeAmount});
               params.append('price_currency', 'USD');
               params.append('id', 'CG-' + Math.floor(Math.random() * 1000000));
 
-              const res = await fetch('/api/payments/webhook?token=${token}', {
+              const res = await fetch('/api/payments/webhook?token=' + encodeURIComponent(${safeToken}), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: params

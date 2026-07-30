@@ -45,6 +45,26 @@ const ALL_KEYS = [
   "VIP_PRICE_PER_DAY"
 ];
 
+const SECRET_KEYS = [
+  "COINGATE_API_TOKEN",
+  "CONTABO_ACCESS_KEY",
+  "CONTABO_SECRET_KEY",
+  "SMTP_PASS",
+  "TELEGRAM_BOT_TOKEN",
+  "BACKUP_GITHUB_TOKEN",
+  "GOOGLE_CLIENT_ID",
+  "STRIPE_SECRET_KEY",
+  "STRIPE_WEBHOOK_SECRET",
+  "TELEGRAM_BOT_INTERNAL_SECRET"
+];
+
+const PLAIN_CONFIG_KEYS = [
+  "TOP_BASE_PRICE_PER_DAY",
+  "TOP_MAX_CONCURRENT_SLOTS",
+  "VIP_DISCOUNT_PERCENT",
+  "VIP_PRICE_PER_DAY"
+];
+
 function maskValue(val: string): string {
   if (!val) return "";
   if (val.length <= 4) return "••••";
@@ -57,10 +77,12 @@ router.get("/", authenticateToken, requireAdmin, async (req: AuthRequest, res: R
     const results = [];
     for (const key of ALL_KEYS) {
       const val = await getSetting(key);
+      const isSecret = SECRET_KEYS.includes(key);
       results.push({
         key,
-        value: val ? maskValue(val) : "",
-        hasValue: !!val
+        value: val ? (isSecret ? maskValue(val) : val) : "",
+        hasValue: !!val,
+        isSecret
       });
     }
     res.json(results);
@@ -103,6 +125,7 @@ router.put("/:key", authenticateToken, requireAdmin, async (req: AuthRequest, re
     await prisma.auditLog.create({
       data: {
         adminId: req.user?.id || 0,
+        adminEmail: req.user?.email,
         action: "update_setting",
         targetId: key,
         details: `Admin ${adminName}, ${key} sozlamasini yangiladi.`

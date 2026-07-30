@@ -28,9 +28,10 @@ export default function CheckoutPage({
   const [activeOrderId, setActiveOrderId] = useState<string>('');
   const [isChecking, setIsChecking] = useState<boolean>(false);
   const [paymentUrl, setPaymentUrl] = useState<string>('');
+  const [gateway, setGateway] = useState<string>('coingate');
   const [apiKeysMissing, setApiKeysMissing] = useState<boolean>(false);
   const [referralCode, setReferralCode] = useState<string>(localStorage.getItem('savdo24_referral_code') || '');
-  const [discountData, setDiscountData] = useState<{ discountPercent: number, referrerName: string } | null>(null);
+  const [discountData, setDiscountData] = useState<{ discountPercent: number; referrerName?: string; type?: 'b2b' | 'referral' } | null>(null);
   const [isApplyingReferral, setIsApplyingReferral] = useState<boolean>(false);
 
   type DeliveryData = { 
@@ -92,6 +93,17 @@ export default function CheckoutPage({
           trackEvent('checkout_start', startupId, 'checkout_page', { amount });
           const data = await res.json();
           setActiveOrderId(data.id);
+          if (data.gateway) setGateway(data.gateway);
+          if (data.discountPercent && data.discountPercent > 0) {
+            setDiscountData({
+              discountPercent: data.discountPercent,
+              type: data.discountType as 'b2b' | 'referral',
+              referrerName: data.discountType === 'b2b' ? 'B2B' : ''
+            });
+            if (data.discountType === 'b2b') {
+              onActionToast(`${data.discountPercent}% B2B ulgurji chegirmasi qo'llanildi`);
+            }
+          }
           if (data.paymentUrl) {
             setPaymentUrl(data.paymentUrl);
             // XATO: agar foydalanuvchida referral kod bo'lsa (masalan,
@@ -166,8 +178,6 @@ export default function CheckoutPage({
 
       if (res.ok) {
         const data = await res.json();
-        setDiscountData(data);
-        onActionToast(`Chegirma qo'llanildi: ${data.discountPercent}% (${data.referrerName} tomonidan)`);
         
         // Re-init payment with referral code
         const payRes = await fetch('/api/payments/create', {
@@ -178,7 +188,22 @@ export default function CheckoutPage({
         if (payRes.ok) {
           const payData = await payRes.json();
           setActiveOrderId(payData.id);
+          if (payData.gateway) setGateway(payData.gateway);
           if (payData.paymentUrl) setPaymentUrl(payData.paymentUrl);
+
+          if (payData.discountPercent && payData.discountPercent > 0) {
+            setDiscountData({
+              discountPercent: payData.discountPercent,
+              type: payData.discountType as 'b2b' | 'referral',
+              referrerName: payData.discountType === 'referral' ? data.referrerName : 'B2B'
+            });
+
+            if (payData.discountType === 'b2b') {
+              onActionToast(`${payData.discountPercent}% B2B ulgurji chegirmasi qo'llanildi`);
+            } else {
+              onActionToast(`Chegirma qo'llanildi: ${payData.discountPercent}% (${data.referrerName} tomonidan)`);
+            }
+          }
         }
       } else if (res.status === 429) {
         onActionToast("Juda ko'p harakat. 5 daqiqa kuting.");
@@ -271,7 +296,7 @@ export default function CheckoutPage({
     }
     if (paymentUrl) {
       window.location.href = paymentUrl;
-      onActionToast("CoinGate xavfsiz to'lov sahifasiga yo'naltirilmoqda...");
+      onActionToast(gateway === 'stripe' ? "Xavfsiz to'lov sahifasiga yo'naltirilmoqda..." : "CoinGate xavfsiz to'lov sahifasiga yo'naltirilmoqda...");
     } else {
       onActionToast("To'lov manzili hali yaratilmoqda, iltimos kuting...");
     }
@@ -314,12 +339,16 @@ export default function CheckoutPage({
   return (
     <div className="max-w-2xl mx-auto animate-fade-in text-left">
       {paymentStep === 'checkout' && (
-        <div className="bg-[#0b1426] border border-[#10b981]/30 rounded-3xl overflow-hidden shadow-2xl">
-          {/* CoinGate Style Header */}
-          <div className="bg-gradient-to-r from-[#10b981] to-[#059669] px-8 py-5 flex items-center justify-between text-white">
+        <div className={`bg-[#0b1426] border ${gateway === 'stripe' ? 'border-[#6366f1]/30' : 'border-[#10b981]/30'} rounded-3xl overflow-hidden shadow-2xl`}>
+          {/* Header */}
+          <div className={gateway === 'stripe' ? "bg-gradient-to-r from-[#6366f1] to-[#4f46e5] px-8 py-5 flex items-center justify-between text-white" : "bg-gradient-to-r from-[#10b981] to-[#059669] px-8 py-5 flex items-center justify-between text-white"}>
             <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-3xl select-none font-bold">lock</span>
-              <span className="font-extrabold text-xl tracking-tight">CoinGate Secure Checkout</span>
+              <span className="material-symbols-outlined text-3xl select-none font-bold">
+                {gateway === 'stripe' ? 'credit_card' : 'lock'}
+              </span>
+              <span className="font-extrabold text-xl tracking-tight">
+                {gateway === 'stripe' ? "Karta orqali xavfsiz to'lov" : "CoinGate Secure Checkout"}
+              </span>
             </div>
             <div className="text-right">
               <p className="text-[10px] font-extrabold uppercase tracking-widest opacity-70">Sotuvchi</p>
@@ -329,19 +358,23 @@ export default function CheckoutPage({
 
           <div className="p-8 space-y-8">
             {/* Redirect Banner */}
-            <div className="bg-[#10b981]/10 border border-[#10b981]/20 rounded-2xl p-6 text-center space-y-4">
-              <div className="flex items-center justify-center gap-2 text-[#10b981]">
+            <div className={gateway === 'stripe' ? "bg-[#6366f1]/10 border border-[#6366f1]/20 rounded-2xl p-6 text-center space-y-4" : "bg-[#10b981]/10 border border-[#10b981]/20 rounded-2xl p-6 text-center space-y-4"}>
+              <div className={gateway === 'stripe' ? "flex items-center justify-center gap-2 text-[#818cf8]" : "flex items-center justify-center gap-2 text-[#10b981]"}>
                 <span className="material-symbols-outlined animate-spin">sync</span>
-                <span className="font-bold text-sm">CoinGate to'lov tizimiga yo'naltirilmoqda...</span>
+                <span className="font-bold text-sm">
+                  {gateway === 'stripe' ? "Stripe to'lov tizimiga yo'naltirilmoqda..." : "CoinGate to'lov tizimiga yo'naltirilmoqda..."}
+                </span>
               </div>
               <p className="text-xs text-on-primary-container leading-relaxed">
-                Xavfsiz USDT (TRC20, ERC20 va boshqalar) to'lovini amalga oshirishingiz uchun CoinGate sahifasiga yo'naltirilasiz. 
-                Agar avtomatik tarzda o'tmasa, quyidagi yashil tugmani bosing.
+                {gateway === 'stripe'
+                  ? "Kredit/debet karta orqali to'lovni amalga oshirish uchun xavfsiz sahifaga yo'naltirilasiz. Agar avtomatik tarzda o'tmasa, quyidagi tugmani bosing."
+                  : "Xavfsiz USDT (TRC20, ERC20 va boshqalar) to'lovini amalga oshirishingiz uchun CoinGate sahifasiga yo'naltirilasiz. Agar avtomatik tarzda o'tmasa, quyidagi yashil tugmani bosing."
+                }
               </p>
               <div className="flex justify-center gap-3 pt-2">
                 <button
                   onClick={handleCoinGateRedirect}
-                  className="px-6 py-3 bg-[#10b981] hover:bg-[#059669] active:scale-95 text-white font-black text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-[#10b981]/10"
+                  className={gateway === 'stripe' ? "px-6 py-3 bg-[#6366f1] hover:bg-[#4f46e5] active:scale-95 text-white font-black text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-[#6366f1]/10" : "px-6 py-3 bg-[#10b981] hover:bg-[#059669] active:scale-95 text-white font-black text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-[#10b981]/10"}
                 >
                   <span className="material-symbols-outlined text-sm font-bold">open_in_new</span>
                   To'lov sahifasiga o'tish
@@ -362,14 +395,18 @@ export default function CheckoutPage({
               <div className="col-span-2 pt-4 border-t border-white/5 flex justify-between items-center">
                 <div>
                   <p className="text-[10px] text-on-primary-container font-extrabold uppercase tracking-wider mb-1">To'lanadigan summa</p>
-                  <p className="text-2xl font-black text-[#10b981] font-mono">
-                    ${(discountData ? amount * (1 - discountData.discountPercent / 100) : amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT
+                  <p className={gateway === 'stripe' ? "text-2xl font-black text-[#818cf8] font-mono" : "text-2xl font-black text-[#10b981] font-mono"}>
+                    ${(discountData ? amount * (1 - discountData.discountPercent / 100) : amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {gateway === 'stripe' ? 'USD' : 'USDT'}
                   </p>
                   {discountData && (
-                    <p className="text-[10px] text-emerald-400 font-bold">-{discountData.discountPercent}% referral chegirmasi qo'llanildi</p>
+                    <p className="text-[10px] text-emerald-400 font-bold">
+                      {discountData.type === 'b2b'
+                        ? `-${discountData.discountPercent}% B2B ulgurji chegirmasi qo'llanildi`
+                        : `-${discountData.discountPercent}% referral chegirmasi qo'llanildi`}
+                    </p>
                   )}
                 </div>
-                <div className={`text-right rounded-xl px-3 py-1.5 font-mono text-xs font-bold flex items-center gap-1.5 border ${isExpired ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-[#10b981]/10 text-[#10b981] border-[#10b981]/20'}`}>
+                <div className={`text-right rounded-xl px-3 py-1.5 font-mono text-xs font-bold flex items-center gap-1.5 border ${isExpired ? 'bg-red-500/10 text-red-400 border-red-500/20' : (gateway === 'stripe' ? 'bg-[#6366f1]/10 text-[#818cf8] border-[#6366f1]/20' : 'bg-[#10b981]/10 text-[#10b981] border-[#10b981]/20')}`}>
                   <span className="material-symbols-outlined text-sm">schedule</span>
                   {isExpired ? "Vaqt tugadi" : formatTime(timeLeft)}
                 </div>
@@ -382,7 +419,7 @@ export default function CheckoutPage({
                     type="text"
                     value={referralCode}
                     onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-                    className="flex-1 bg-[#0b1426] border border-white/10 rounded-xl px-4 py-2 text-xs text-white outline-none focus:border-[#10b981]"
+                    className={`flex-1 bg-[#0b1426] border border-white/10 rounded-xl px-4 py-2 text-xs text-white outline-none ${gateway === 'stripe' ? 'focus:border-[#6366f1]' : 'focus:border-[#10b981]'}`}
                     placeholder="KODNI KIRITING"
                   />
                   <button 
@@ -418,7 +455,9 @@ export default function CheckoutPage({
                 <button
                   onClick={handleVerifyPayment}
                   disabled={isChecking || isExpired}
-                  className="px-6 py-3 border border-[#10b981]/30 hover:bg-[#10b981]/5 active:scale-95 text-[#10b981] font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={gateway === 'stripe'
+                    ? "px-6 py-3 border border-[#6366f1]/30 hover:bg-[#6366f1]/5 active:scale-95 text-[#818cf8] font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                    : "px-6 py-3 border border-[#10b981]/30 hover:bg-[#10b981]/5 active:scale-95 text-[#10b981] font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"}
                 >
                   <span className={`material-symbols-outlined text-sm ${isChecking ? 'animate-spin' : ''}`}>
                     {isChecking ? 'sync' : 'verified_user'}
@@ -435,16 +474,20 @@ export default function CheckoutPage({
       {paymentStep === 'processing' && (
         <div className="bg-[#0b1426] border border-outline-variant/30 rounded-3xl p-12 text-center space-y-8 shadow-2xl min-h-[400px] flex flex-col justify-center items-center">
           <div className="relative w-24 h-24">
-            <div className="absolute inset-0 border-4 border-[#10b981]/20 rounded-full"></div>
-            <div className="absolute inset-0 border-4 border-[#10b981] border-t-transparent rounded-full animate-spin"></div>
+            <div className={`absolute inset-0 border-4 ${gateway === 'stripe' ? 'border-[#6366f1]/20' : 'border-[#10b981]/20'} rounded-full`}></div>
+            <div className={`absolute inset-0 border-4 ${gateway === 'stripe' ? 'border-[#6366f1]' : 'border-[#10b981]'} border-t-transparent rounded-full animate-spin`}></div>
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="material-symbols-outlined text-3xl text-[#10b981] animate-pulse">lock</span>
+              <span className={`material-symbols-outlined text-3xl ${gateway === 'stripe' ? 'text-[#818cf8]' : 'text-[#10b981]'} animate-pulse`}>
+                {gateway === 'stripe' ? 'credit_card' : 'lock'}
+              </span>
             </div>
           </div>
           <div className="space-y-2 max-w-sm">
             <h2 className="text-xl font-black text-white">Tranzaksiya tasdiqlanmoqda</h2>
             <p className="text-xs text-on-primary-container leading-relaxed">
-              CoinGate USDT tranzaksiyasi tasdiqlanmoqda. Iltimos, ushbu oynani yopmang yoki yangilamang.
+              {gateway === 'stripe'
+                ? "Karta tranzaksiyasi tasdiqlanmoqda. Iltimos, ushbu oynani yopmang yoki yangilamang."
+                : "CoinGate USDT tranzaksiyasi tasdiqlanmoqda. Iltimos, ushbu oynani yopmang yoki yangilamang."}
             </p>
           </div>
         </div>
@@ -466,7 +509,7 @@ export default function CheckoutPage({
           <div className="bg-white/5 border border-white/5 rounded-2xl p-6 space-y-4 font-semibold text-sm">
             <div className="flex justify-between">
               <span className="text-on-primary-container">Jami summa</span>
-              <span className="text-white font-mono font-bold">${(discountData ? amount * (1 - discountData.discountPercent / 100) : amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} USDT</span>
+              <span className="text-white font-mono font-bold">${(discountData ? amount * (1 - discountData.discountPercent / 100) : amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} {gateway === 'stripe' ? 'USD' : 'USDT'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-on-primary-container">Mahsulot</span>
@@ -476,7 +519,7 @@ export default function CheckoutPage({
               <span className="text-on-primary-container">To'lov holati</span>
               <span className="text-green-400 flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-green-400 animate-ping"></span>
-                Tasdiqlangan (CoinGate)
+                Tasdiqlangan ({gateway === 'stripe' ? 'Stripe' : 'CoinGate'})
               </span>
             </div>
 

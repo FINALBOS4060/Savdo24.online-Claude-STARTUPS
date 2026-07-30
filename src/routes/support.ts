@@ -118,6 +118,7 @@ router.patch("/admin/support-tickets/:id/status", authenticateToken, requireAdmi
     await prisma.auditLog.create({
       data: {
         adminId: adminUser?.id || 0,
+        adminEmail: adminUser?.email,
         action: "update_support_ticket_status",
         targetType: "SupportTicket",
         targetId: String(ticket.id),
@@ -244,6 +245,7 @@ router.patch("/reports/:id/status", authenticateToken, requireAdmin, async (req:
     await prisma.auditLog.create({
       data: {
         adminId: req.user?.id || 0,
+        adminEmail: req.user?.email,
         action: result.data.status === "reviewed" ? "resolve_report" : "reject_report",
         targetType: "Report",
         targetId: String(id),

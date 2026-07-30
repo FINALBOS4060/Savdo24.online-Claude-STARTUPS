@@ -349,18 +349,7 @@ export default function AdminPage({
         setSettings(data);
         const vals: {[key: string]: string} = {};
         data.forEach((s: any) => {
-          // 100-band (KATTA MUAMMO): s.value bu yerda serverdan MASKA qilingan
-          // ko'rinish edi ("••••••••1234"), lekin u to'g'ridan-to'g'ri input
-          // maydoniga ("qayta yuborilishi mumkin" holatda) yozilardi. Agar
-          // admin allaqachon sozlangan sirni HECH NARSA yozmasdan "Saqlash"ni
-          // bossa, aynan shu maska matni haqiqiy qiymat sifatida serverga
-          // yuborilib, shifrlanib, DB'dagi haqiqiy sirni (Stripe kaliti, SMTP
-          // paroli, Telegram tokeni va h.k.) BUTUNLAY yo'q qilib yuborardi —
-          // va eng yomoni, javobda qaytadan maskalangani uchun oxirgi 4
-          // belgi o'zgarmay qolib, ekranda hech qanday farq ko'rinmasdi.
-          // Endi maydon har doim bo'sh boshlanadi; "hasValue" holati faqat
-          // placeholder orqali (pastda) ko'rsatiladi.
-          vals[s.key] = '';
+          vals[s.key] = s.isSecret ? '' : (s.value || '');
         });
         setSettingsValues(vals);
       }
@@ -373,12 +362,8 @@ export default function AdminPage({
 
   const handleSaveSetting = async (key: string) => {
     const val = settingsValues[key] || '';
-    // 100-band: input endi doim bo'sh boshlanadi (yuqoridagi fetchSettings
-    // tuzatishi), shuning uchun bo'sh qiymat = admin haqiqatda hech narsa
-    // kiritmagan, degani. Buni jim yuborib sirni tozalab yubormasdan, aniq
-    // xatolik ko'rsatamiz.
     const existing = settings.find(s => s.key === key);
-    if (!val && existing?.hasValue) {
+    if (!val && existing?.hasValue && existing?.isSecret) {
       setSettingsStatus(prev => ({ ...prev, [key]: 'error' }));
       onActionToast("Avval yangi qiymat kiriting — bo'sh maydon saqlanmadi (mavjud qiymat o'zgarishsiz qoldi).");
       setTimeout(() => {
@@ -399,7 +384,9 @@ export default function AdminPage({
       if (res.ok) {
         const data = await res.json();
         setSettings(prev => prev.map(s => s.key === key ? { ...s, value: data.value, hasValue: !!val } : s));
-        setSettingsValues(prev => ({ ...prev, [key]: '' }));
+        if (existing?.isSecret) {
+          setSettingsValues(prev => ({ ...prev, [key]: '' }));
+        }
         setSettingsStatus(prev => ({ ...prev, [key]: 'success' }));
         fetchAuditLogs();
         setTimeout(() => {
@@ -2600,21 +2587,23 @@ export default function AdminPage({
                   </div>
                   <div className="relative group">
                     <input
-                      type={visibleSecrets[s.key] ? "text" : "password"}
+                      type={s.isSecret ? (visibleSecrets[s.key] ? "text" : "password") : "text"}
                       value={settingsValues[s.key] || ''}
                       onChange={(e) => setSettingsValues(prev => ({ ...prev, [s.key]: e.target.value }))}
-                      placeholder={s.hasValue ? "••••••••••••" : "Qiymat kiritilmagan"}
+                      placeholder={s.hasValue && s.isSecret ? "••••••••••••" : "Qiymat kiritilmagan"}
                       className="w-full p-3 bg-[#0e1726] border border-white/10 rounded-xl text-white text-xs pr-10 focus:border-[#f0b90b] outline-none transition-all font-mono"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setVisibleSecrets(prev => ({ ...prev, [s.key]: !prev[s.key] }))}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8892b0] hover:text-white transition-colors cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-sm">
-                        {visibleSecrets[s.key] ? 'visibility_off' : 'visibility'}
-                      </span>
-                    </button>
+                    {s.isSecret && (
+                      <button
+                        type="button"
+                        onClick={() => setVisibleSecrets(prev => ({ ...prev, [s.key]: !prev[s.key] }))}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8892b0] hover:text-white transition-colors cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-sm">
+                          {visibleSecrets[s.key] ? 'visibility_off' : 'visibility'}
+                        </span>
+                      </button>
+                    )}
                   </div>
                   <div className="flex items-center justify-between gap-4">
                     <p className="text-[10px] text-[#8892b0] italic leading-tight">

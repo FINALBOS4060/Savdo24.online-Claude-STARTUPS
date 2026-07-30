@@ -1,5 +1,6 @@
 import { Router, Response } from "express";
 import crypto from "crypto";
+import { financialActionLimiter } from "../lib/rateLimiters";
 // 114-bosqich (server.ts modullashtirish, ARXITEKTURA 3-band): bu fayl
 // server.ts'dan ko'chirildi (referrals/generate, /apply, /my-stats,
 // admin/referrals bloklari). Naqsh b2b.ts bilan bir xil (ikkita router:
@@ -16,7 +17,7 @@ import {
 const router = Router();
 
 // POST /api/referrals/generate — Unique kod yaratish
-router.post("/generate", authenticateToken, async (req: AuthRequest, res: Response) => {
+router.post("/generate", authenticateToken, financialActionLimiter, async (req: AuthRequest, res: Response) => {
   if (!req.user) return res.status(401).json({ error: "Avtorizatsiyadan o'ting." });
 
   try {

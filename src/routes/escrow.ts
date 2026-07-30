@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { financialActionLimiter } from "../lib/rateLimiters";
 // 126-bosqich (server.ts modullashtirish, ARXITEKTURA 3-band): bu fayl
 // server.ts'dan ko'chirildi (GET /api/escrow/my-purchases, POST
 // /api/escrow/release, POST /api/escrow/dispute, GET+PATCH
@@ -30,7 +31,7 @@ router.get("/escrow/my-purchases", authenticateToken, async (req: AuthRequest, r
   }
 });
 
-router.post("/escrow/release", authenticateToken, async (req: AuthRequest, res: Response) => {
+router.post("/escrow/release", authenticateToken, financialActionLimiter, async (req: AuthRequest, res: Response) => {
   const { paymentId } = req.body;
   try {
     const escrow = await prisma.escrowPayment.findUnique({
@@ -85,7 +86,7 @@ router.post("/escrow/release", authenticateToken, async (req: AuthRequest, res: 
   }
 });
 
-router.post("/escrow/dispute", authenticateToken, async (req: AuthRequest, res: Response) => {
+router.post("/escrow/dispute", authenticateToken, financialActionLimiter, async (req: AuthRequest, res: Response) => {
   const { paymentId, reason, evidence } = req.body;
   try {
     const escrow = await prisma.escrowPayment.findUnique({
@@ -245,6 +246,16 @@ router.patch("/admin/escrow-disputes/:id", authenticateToken, requireAdmin, asyn
       await createNotification(sellerId, "SYSTEM", "Escrow nizosi hal qilindi",
         `"${startup?.name}" bo'yicha nizo hal qilindi: mablag' ${resultText}.`, `/profile?tab=earnings`);
     }
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user?.id || 0,
+        adminEmail: req.user?.email,
+        action: resolution === "released" ? "release_escrow_dispute" : "refund_escrow_dispute",
+        targetId: String(disputeResolution.id),
+        details: `Escrow nizosi (to'lov ID: ${disputeResolution.paymentId}) hal qilindi: ${resolution}.`
+      }
+    }).catch((e: any) => console.error("Audit log error:", e));
 
     res.json({ success: true });
   } catch (err: any) {

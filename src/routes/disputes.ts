@@ -1,4 +1,5 @@
 import { Router, Response } from "express";
+import { financialActionLimiter } from "../lib/rateLimiters";
 // 112-bosqich (server.ts modullashtirish, ARXITEKTURA 3-band): bu fayl
 // server.ts'dan ko'chirildi (POST/GET/PATCH /api/disputes bloki).
 // Naqsh auth.ts/support.ts/sponsor-channels.ts/b2b.ts bilan bir xil.
@@ -15,7 +16,7 @@ import {
 const router = Router();
 
 // POST /api/disputes — Nizo ochish
-router.post("/", authenticateToken, async (req: AuthRequest, res: Response) => {
+router.post("/", authenticateToken, financialActionLimiter, async (req: AuthRequest, res: Response) => {
   const { paymentId, reason, description } = req.body;
 
   if (!paymentId || !reason || !description) {
@@ -159,6 +160,7 @@ router.patch("/:id", authenticateToken, requireAdmin, async (req: AuthRequest, r
     await prisma.auditLog.create({
       data: {
         adminId: req.user?.id || 0,
+        adminEmail: req.user?.email,
         action: status === "resolved" ? "resolve_dispute" : "reject_dispute",
         targetId: String(disputeId),
         details: adminNote ? `Nizo statusi: ${status}. Izoh: ${adminNote}` : `Nizo statusi: ${status}`

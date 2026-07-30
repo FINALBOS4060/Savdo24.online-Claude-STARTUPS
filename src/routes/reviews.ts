@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { financialActionLimiter } from "../lib/rateLimiters";
 // 113-bosqich (server.ts modullashtirish, ARXITEKTURA 3-band): bu fayl
 // server.ts'dan ko'chirildi (POST /api/reviews va GET /api/users/:id/reviews).
 // Naqsh support.ts bilan bir xil: router "/api" ostiga mount qilinadi,
@@ -16,7 +17,7 @@ import {
 const router = Router();
 
 // POST /api/reviews — Sharh qoldirish
-router.post("/reviews", authenticateToken, async (req: AuthRequest, res: Response) => {
+router.post("/reviews", authenticateToken, financialActionLimiter, async (req: AuthRequest, res: Response) => {
   const { rating, comment, startupId } = req.body;
 
   if (!rating || !comment || !startupId) {

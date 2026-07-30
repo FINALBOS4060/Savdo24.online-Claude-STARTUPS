@@ -38,6 +38,7 @@ router.delete("/startups/:id", authenticateToken, requireAdmin, async (req: Auth
     await prisma.auditLog.create({
       data: {
         adminId: req.user?.id || 0,
+        adminEmail: req.user?.email,
         action: "delete_startup",
         targetId: id,
         details: `Startup and all related records deleted`
@@ -64,6 +65,7 @@ router.delete("/ideas/:id", authenticateToken, requireAdmin, async (req: AuthReq
     await prisma.auditLog.create({
       data: {
         adminId: req.user?.id || 0,
+        adminEmail: req.user?.email,
         action: "delete_idea",
         targetId: String(id),
         details: `Idea ${id} and its votes deleted`

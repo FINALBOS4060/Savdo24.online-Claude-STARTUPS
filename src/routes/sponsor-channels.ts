@@ -49,6 +49,7 @@ router.post("/", authenticateToken, requireAdmin, async (req: AuthRequest, res: 
     await prisma.auditLog.create({
       data: {
         adminId: req.user?.id || 0,
+        adminEmail: req.user?.email,
         action: "create_sponsor_channel",
         targetId: String(channel.id),
         details: `Yangi sponsor kanal qo'shildi: ${displayName} (@${channelUsername})`
@@ -88,6 +89,7 @@ router.patch("/:id", authenticateToken, requireAdmin, async (req: AuthRequest, r
     await prisma.auditLog.create({
       data: {
         adminId: req.user?.id || 0,
+        adminEmail: req.user?.email,
         action: "update_sponsor_channel",
         targetId: String(id),
         details: `Sponsor kanal yangilandi (ID: ${id})`
@@ -116,6 +118,7 @@ router.delete("/:id", authenticateToken, requireAdmin, async (req: AuthRequest, 
     await prisma.auditLog.create({
       data: {
         adminId: req.user?.id || 0,
+        adminEmail: req.user?.email,
         action: "delete_sponsor_channel",
         targetId: String(id),
         details: `Sponsor kanal o'chirildi (ID: ${id})`

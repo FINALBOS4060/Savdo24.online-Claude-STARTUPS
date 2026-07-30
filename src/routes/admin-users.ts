@@ -84,6 +84,7 @@ router.patch("/:id/ban", authenticateToken, requireAdmin, async (req: AuthReques
     await prisma.auditLog.create({
       data: {
         adminId: req.user!.id,
+        adminEmail: req.user?.email,
         action: isBanned ? "ban_user" : "unban_user",
         targetId: String(id),
         details: `User ${user.email} was ${isBanned ? 'banned' : 'unbanned'}`
@@ -164,6 +165,7 @@ router.patch("/:id/vip", authenticateToken, requireAdmin, async (req: AuthReques
     await prisma.auditLog.create({
       data: {
         adminId: req.user!.id,
+        adminEmail: req.user?.email,
         action: "manual_vip_update",
         targetId: String(id),
         details: `User ${user.email} VIP set to ${isVip} until ${vipExpiresAt}`
@@ -197,6 +199,7 @@ router.patch("/:id/role", authenticateToken, requireAdmin, async (req: AuthReque
     await prisma.auditLog.create({
       data: {
         adminId: req.user!.id,
+        adminEmail: req.user?.email,
         action: "change_user_role",
         targetId: String(id),
         details: `User ${user.email} role changed to ${role}`
@@ -217,6 +220,17 @@ router.delete("/:id", authenticateToken, requireAdmin, async (req: AuthRequest, 
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ error: "Foydalanuvchi topilmadi." });
+
+    if (userId === req.user!.id) {
+      return res.status(400).json({ error: "O'z hisobingizni o'chira olmaysiz." });
+    }
+
+    if (user.role === "Admin") {
+      const adminCount = await prisma.user.count({ where: { role: "Admin" } });
+      if (adminCount <= 1) {
+        return res.status(400).json({ error: "Tizimda oxirgi qolgan Admin hisobini o'chirib bo'lmaydi. Avval boshqa foydalanuvchiga Admin huquqini bering." });
+      }
+    }
 
     // MUHIM: sxemada User'ga majburiy (cascade bo'lmagan) tashqi kalit bilan
     // bog'langan juda ko'p jadval bor (RefreshToken, Review, Dispute,
@@ -261,13 +275,13 @@ router.delete("/:id", authenticateToken, requireAdmin, async (req: AuthRequest, 
       prisma.dispute.deleteMany({ where: { buyerId: userId } }),
       prisma.vipSubscription.deleteMany({ where: { userId } }),
       prisma.topBoost.deleteMany({ where: { userId } }),
-      prisma.auditLog.deleteMany({ where: { adminId: userId } }),
       prisma.user.delete({ where: { id: userId } }),
     ]);
 
     await prisma.auditLog.create({
       data: {
         adminId: req.user!.id,
+        adminEmail: req.user?.email,
         action: "delete_user_account",
         targetId: String(id),
         details: `User ${user.email} account deleted permanently`

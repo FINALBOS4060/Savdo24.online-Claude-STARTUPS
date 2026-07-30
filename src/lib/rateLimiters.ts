@@ -61,3 +61,10 @@ export const supportLimiter = rateLimit({
   max: 5,
   message: { error: "Juda ko'p so'rov yuborildi. Iltimos, 15 daqiqadan so'ng qayta urinib ko'ring." }
 });
+
+export const financialActionLimiter = rateLimit({
+  validate: { xForwardedForHeader: false, default: true },
+  windowMs: 15 * 60 * 1000,
+  max: 15,
+  message: { error: "Juda ko'p urinish. Iltimos, 15 daqiqadan so'ng qayta urinib ko'ring." }
+});

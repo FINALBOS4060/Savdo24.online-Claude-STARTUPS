@@ -98,6 +98,8 @@ model Startup {
   @@index([category])
   @@index([status])
   @@index([soldStatus])
+  @@index([status, category])
+  @@index([status, isTop, id])
 }
 
 model Payment {
@@ -208,8 +210,9 @@ model Report {
 
 model AuditLog {
   id         Int      @id @default(autoincrement())
-  adminId    Int
-  admin      User     @relation(fields: [adminId], references: [id])
+  adminId    Int?
+  adminEmail String?
+  admin      User?    @relation(fields: [adminId], references: [id], onDelete: SetNull)
   action     String   // "approve_startup" | "reject_startup" | "resolve_dispute" | "delete_report" va h.k.
   targetType String?
   targetId   String

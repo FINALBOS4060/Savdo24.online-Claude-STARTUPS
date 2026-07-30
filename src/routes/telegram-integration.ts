@@ -135,7 +135,21 @@ router.get("/verify/:token", async (req: Request, res: Response) => {
 // GET /api/telegram/sponsor-channels
 router.get("/sponsor-channels", async (req: Request, res: Response) => {
   try {
-    const channels = await prisma.sponsorChannel.findMany({ where: { isActive: true } });
+    const channels = await prisma.sponsorChannel.findMany({
+      where: {
+        isActive: true,
+        OR: [
+          { endDate: null },
+          { endDate: { gt: new Date() } }
+        ]
+      },
+      select: {
+        id: true,
+        channelId: true,
+        channelUsername: true,
+        displayName: true
+      }
+    });
     res.json(channels);
   } catch (err: any) {
     console.error("Get sponsor channels error:", err);
@@ -161,14 +175,19 @@ router.post("/deliver/:token", async (req: Request, res: Response) => {
     const { token } = req.params;
     const { telegramUserId } = req.body;
     const delivery = await prisma.telegramDelivery.findUnique({ where: { token } });
-    if (!delivery || delivery.used || new Date() > delivery.expiresAt) {
+    if (!delivery || new Date() > delivery.expiresAt) {
       return res.status(400).json({ error: "Havola eskirgan yoki noto'g'ri" });
     }
-    // Mark as used
-    await prisma.telegramDelivery.update({
-      where: { token },
+
+    const updated = await prisma.telegramDelivery.updateMany({
+      where: { token, used: false },
       data: { used: true, telegramUserId: String(telegramUserId) }
     });
+
+    if (updated.count === 0) {
+      return res.status(400).json({ error: "Bu havola allaqachon ishlatilgan." });
+    }
+
     // Get delivery URL
     const startup = await prisma.startup.findUnique({ where: { id: delivery.startupId } });
     res.json({ deliveryUrl: startup?.deliveryUrl });
