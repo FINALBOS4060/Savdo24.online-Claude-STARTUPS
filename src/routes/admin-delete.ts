@@ -21,6 +21,7 @@ router.delete("/startups/:id", authenticateToken, requireAdmin, async (req: Auth
 
       await tx.dispute.deleteMany({ where: { paymentId: { in: paymentIds } } });
       await tx.escrowPayment.deleteMany({ where: { paymentId: { in: paymentIds } } });
+      await tx.referralReward.deleteMany({ where: { paymentId: { in: paymentIds } } });
 
       const conversations = await tx.conversation.findMany({ where: { startupId: id } });
       for (const conv of conversations) {

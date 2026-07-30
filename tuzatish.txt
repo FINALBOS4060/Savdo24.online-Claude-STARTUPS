@@ -31,9 +31,8 @@ SupportPage.tsx, routes/support.ts, telegram-bot/index.ts
 ErrorBoundary.tsx, TermsPage.tsx, PrivacyPage.tsx, RefundPolicyPage.tsx,
 BrowsePage.tsx, AdminPage.tsx, App.tsx, routes/auth.ts, main.tsx, types.ts,
 categoryFields.ts, test-email.js, vite.config.ts
-1: metadata.json, index.css, index.html,
-robots.txt, tsconfig.json, ecosystem.config.cjs, render.yaml,
-telegram-bot/package.json
+2: metadata.json
+1: index.css, index.html, robots.txt, tsconfig.json, ecosystem.config.cjs, render.yaml, telegram-bot/package.json
 0→1 (120-bosqichda server.ts'dan ajratildi, yangi fayl):
 src/routes/admin-audit.ts
 0→1 (121-bosqichda server.ts'dan ajratildi, yangi fayl):
@@ -1746,3 +1745,8 @@ registratsiya tartibi xavfi sabab alohida reja bilan, oxiriroqqa
 qoldirilgan.
 barcha router'larni ulab, keyin listen chaqirish — buni sinab ko'rish
 kerak bo'ladi, xavfli qadam).
+
+90-band (telegram-bot/package.json tuzatishi): telegram-bot/package.json asosiy loyihaning noto'g'ri nusxasi edi (react-example, frontend, vite va h.k. bog'liqliklari bilan). telegram-bot/index.ts faqat grammy va dotenv paketlarini ishlatishi aniqlanib, telegram-bot/package.json to'g'ri name ("savdo24-telegram-bot"), scripts ("start": "tsx index.ts") va faqat kerakli dependencies (grammy, dotenv) bilan qayta yozildi.
+
+91-band (admin-delete.ts tuzatishi): DELETE /api/admin/startups/:id transaction ichida Payment o'chirilishidan oldin bog'liq ReferralReward yozuvlari etim qolmasligi uchun tx.referralReward.deleteMany({ where: { paymentId: { in: paymentIds } } }) qo'shildi (ReferralReward.paymentId Payment'ga FK emas, oddiy maydon). admin-delete.ts'dagi /ideas/:id tekshirildi — ideaVote va idea to'g'ri o'chirilishi tasdiqlandi.
+
