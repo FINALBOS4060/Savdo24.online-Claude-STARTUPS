@@ -1,4 +1,5 @@
 import { Router, Response } from "express";
+import { logger } from "../lib/logger";
 // 111-bosqich (server.ts modullashtirish, ARXITEKTURA 3-band): bu fayl
 // server.ts'dan ko'chirildi (--- B2B WHOLESALE --- va --- ADMIN B2B ---
 // bloklari). Naqsh auth.ts/support.ts/sponsor-channels.ts bilan bir xil.
@@ -41,10 +42,9 @@ router.post("/onboard", authenticateToken, async (req: AuthRequest, res: Respons
         "Yangi B2B So'rov",
         `"${companyName}" kompaniyasi B2B hisob uchun so'rov yubordi.`,
         // 93-band: "/admin/b2b" ham route emas edi, ham AdminPage'da B2B tabi
-        // umuman yo'q (HALI QILINMAGAN ro'yxatidagi ma'lum kamchilik) — hozircha
-        // mavjud "/admin" (dashboard)ga yo'naltiriladi, xato sahifaga
-        // tashlab yuborilmaydi.
-        `/admin`
+        // umuman yo'q (HALI QILINMAGAN ro'yxatidagi ma'lum kamchilik) — to'g'ridan-to'g'ri
+        // yangi B2B tabiga yo'naltiriladi.
+        `/admin?tab=b2b`
       )
     ));
 
@@ -71,6 +71,37 @@ export default router;
 
 export const adminB2bRouter = Router();
 
+// GET /api/admin/b2b — Barcha B2B hisoblarni olish (Admin)
+adminB2bRouter.get("/", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const skip = (page - 1) * limit;
+
+    const [b2bAccounts, totalCount] = await Promise.all([
+      prisma.b2BAccount.findMany({
+        include: {
+          user: { select: { id: true, name: true, email: true } }
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit
+      }),
+      prisma.b2BAccount.count()
+    ]);
+
+    res.json({
+      b2bAccounts,
+      totalCount,
+      totalPages: Math.ceil(totalCount / limit),
+      currentPage: page
+    });
+  } catch (err) {
+    logger.error({ err }, "Fetch admin b2b accounts error");
+    res.status(500).json({ error: "B2B hisoblarni yuklashda xatolik." });
+  }
+});
+
 adminB2bRouter.patch("/:id/verify", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   const { verified } = req.body;
@@ -78,7 +109,18 @@ adminB2bRouter.patch("/:id/verify", authenticateToken, requireAdmin, async (req:
   try {
     const b2b = await prisma.b2BAccount.update({
       where: { id },
-      data: { verified }
+      data: { verified },
+      include: { user: { select: { id: true, email: true, name: true } } }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user!.id,
+        adminEmail: req.user?.email,
+        action: verified ? "verify_b2b" : "reject_b2b",
+        targetId: String(id),
+        details: `B2B account for company "${b2b.companyName}" (${b2b.user?.email}) was ${verified ? 'verified' : 'unverified/rejected'}`
+      }
     });
 
     await createNotification(
@@ -91,6 +133,7 @@ adminB2bRouter.patch("/:id/verify", authenticateToken, requireAdmin, async (req:
 
     res.json(b2b);
   } catch (err) {
+    logger.error({ err }, "Verify B2B error");
     res.status(500).json({ error: "B2B tasdiqlashda xatolik." });
   }
 });

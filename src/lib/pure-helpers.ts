@@ -41,3 +41,19 @@ export function safeCompare(a: string, b: string): boolean {
     return false;
   }
 }
+
+export const PUBLIC_USER_SELECT = {
+  id: true,
+  email: true,
+  name: true,
+  role: true,
+  joinDate: true,
+  avatarUrl: true,
+  coverUrl: true,
+  averageRating: true,
+  totalReviews: true,
+  isVip: true,
+  emailVerified: true,
+  verified: true
+} as const;
+

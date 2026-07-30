@@ -13,3 +13,6 @@ dev.db-journal
 # Backup/eksport skriptlari mahalliy vaqtinchalik fayllar yaratishi mumkin
 /backup-tmp/
 /export-tmp/
+app.zip
+bun.lock
+.secret_*

@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import { Startup, UserProfileData, Category } from '../types';
 import { apiFetch as fetch } from '../lib/api';
+import { AdminB2BTab } from './admin/AdminB2BTab';
 
 interface AdminPageProps {
   user: UserProfileData;
@@ -125,9 +126,11 @@ export default function AdminPage({
   const [isAddingSponsor, setIsAddingSponsor] = useState(false);
 
   // Active view tab state & Audit Logs state
-  const ADMIN_TABS = ['dashboard', 'analytics', 'listings', 'users', 'categories', 'disputes', 'reports', 'sponsors', 'audit', 'settings', 'support'] as const;
+  const ADMIN_TABS = ['dashboard', 'analytics', 'listings', 'users', 'categories', 'disputes', 'reports', 'sponsors', 'audit', 'settings', 'support', 'refunds', 'b2b'] as const;
   type AdminTab = typeof ADMIN_TABS[number];
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
+  const [escrowRefunds, setEscrowRefunds] = useState<any[]>([]);
+  const [isLoadingEscrowRefunds, setIsLoadingEscrowRefunds] = useState(false);
   const location = useLocation();
   // 93-band: bildirishnomalardagi "/admin?tab=disputes" kabi havolalar avval
   // hech qanday tabga o'tkazmasdi (AdminPage URL query'ni o'qimasdi) —
@@ -257,6 +260,41 @@ export default function AdminPage({
       console.error("Fetch escrow disputes error:", err);
     } finally {
       setIsLoadingEscrowDisputes(false);
+    }
+  };
+
+  const fetchEscrowRefunds = async () => {
+    try {
+      setIsLoadingEscrowRefunds(true);
+      const res = await fetch('/api/admin/escrow-refunds');
+      if (res.ok) {
+        const data = await res.json();
+        setEscrowRefunds(data);
+      }
+    } catch (err) {
+      console.error("Fetch escrow refunds error:", err);
+    } finally {
+      setIsLoadingEscrowRefunds(false);
+    }
+  };
+
+  const handleCompleteRefund = async (paymentId: string) => {
+    if (!confirm("Haqiqatan ham CoinGate orqali pul qaytarilganini tasdiqlaysizmi?")) return;
+    try {
+      const res = await fetch(`/api/admin/escrow-refunds/${paymentId}/complete`, {
+        method: "POST"
+      });
+      if (res.ok) {
+        onActionToast("Pul qaytarish muvaffaqiyatli yakunlandi deb belgilandi.");
+        fetchEscrowRefunds();
+        fetchAuditLogs();
+      } else {
+        const errData = await res.json();
+        onActionToast(errData.error || "Xatolik yuz berdi.");
+      }
+    } catch (err) {
+      console.error("Complete refund error:", err);
+      onActionToast("Tarmoq xatoligi.");
     }
   };
 
@@ -604,6 +642,7 @@ export default function AdminPage({
       fetchAdminStats();
       fetchDisputes();
       fetchEscrowDisputes();
+      fetchEscrowRefunds();
       fetchReports();
       fetchAuditLogs();
       fetchSettings();
@@ -617,6 +656,9 @@ export default function AdminPage({
   useEffect(() => {
     if (activeTab === 'analytics') {
       fetchAnalytics(analyticsPeriod);
+    }
+    if (activeTab === 'refunds') {
+      fetchEscrowRefunds();
     }
   }, [activeTab, analyticsPeriod]);
 
@@ -1281,6 +1323,30 @@ export default function AdminPage({
         >
           <span className="material-symbols-outlined text-sm">support_agent</span>
           Murojaatlar
+        </button>
+
+        <button
+          onClick={() => setActiveTab('refunds')}
+          className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
+            activeTab === 'refunds'
+              ? 'text-[#f0b90b] border-[#f0b90b]'
+              : 'text-[#8892b0] border-transparent hover:text-white'
+          }`}
+        >
+          <span className="material-symbols-outlined text-sm">payments</span>
+          Qaytarishlar ({escrowRefunds.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab('b2b')}
+          className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
+            activeTab === 'b2b'
+              ? 'text-[#f0b90b] border-[#f0b90b]'
+              : 'text-[#8892b0] border-transparent hover:text-white'
+          }`}
+        >
+          <span className="material-symbols-outlined text-sm">business_center</span>
+          B2B So'rovlar
         </button>
 
         <button
@@ -2122,6 +2188,65 @@ export default function AdminPage({
         </div>
       )}
 
+      {activeTab === 'refunds' && (
+        <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
+          <div className="flex justify-between items-center border-b border-white/5 pb-4">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="material-symbols-outlined text-amber-400">payments</span>
+              Qaytarish talab qilinadigan to'lovlar (Refund Required) ({escrowRefunds.length})
+            </h2>
+            <button
+              onClick={fetchEscrowRefunds}
+              className="px-4 py-2 bg-secondary-container/10 text-secondary-container rounded-xl font-bold text-xs hover:bg-secondary-container/20 transition-all flex items-center gap-2"
+            >
+              <span className="material-symbols-outlined text-sm">refresh</span>
+              Yangilash
+            </button>
+          </div>
+
+          {isLoadingEscrowRefunds ? (
+            <div className="py-12 text-center text-on-primary-container text-sm">Yuklanmoqda...</div>
+          ) : escrowRefunds.length === 0 ? (
+            <div className="py-12 text-center text-on-primary-container space-y-2">
+              <span className="material-symbols-outlined text-4xl opacity-40">task_alt</span>
+              <p className="text-sm font-bold">Kutilayotgan qaytarishlar mavjud emas</p>
+              <p className="text-xs">Barcha moliyaviy amaliyotlar joyida.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {escrowRefunds.map((payment) => (
+                <div key={payment.id} className="bg-[#0b1426] border border-amber-500/30 rounded-2xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded font-bold">Qaytarish kutilmoqda</span>
+                      <span className="text-xs text-on-primary-container font-mono">ID: {payment.id}</span>
+                    </div>
+                    <h4 className="font-bold text-white text-base">{payment.startup?.name || 'Noma\'lum loyiha'}</h4>
+                    <p className="text-sm text-on-primary-container">
+                      Xaridor: <span className="text-white font-medium">{payment.user?.name || payment.user?.email || `User #${payment.userId}`}</span> ({payment.user?.email})
+                    </p>
+                    <div className="flex items-center gap-4 text-xs text-on-primary-container mt-1">
+                      <span>Summa: <strong className="text-white">{payment.amount} {payment.currency}</strong></span>
+                      <span>Sana: {new Date(payment.createdAt).toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => handleCompleteRefund(payment.id)}
+                      className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-black font-extrabold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-md"
+                    >
+                      <span className="material-symbols-outlined text-xs">done_all</span>
+                      Qaytarish bajarildi (CoinGate)
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {activeTab === 'reports' && (
         <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
           <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4">
@@ -2635,6 +2760,10 @@ export default function AdminPage({
             </div>
           )}
         </div>
+      )}
+
+      {activeTab === 'b2b' && (
+        <AdminB2BTab onActionToast={onActionToast} />
       )}
     </div>
   );

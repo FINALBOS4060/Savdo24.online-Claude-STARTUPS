@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import crypto from "crypto";
+import { logger } from "../lib/logger";
 // 115-bosqich (server.ts modullashtirish, ARXITEKTURA 3-band): bu fayl
 // server.ts'dan ko'chirildi (--- TOP BOOST --- va --- VIP --- bloklari,
 // shu jumladan faqat shu yerda ishlatiladigan calculateTopPrice/
@@ -76,7 +77,7 @@ router.post("/top-boost/create", authenticateToken, async (req: AuthRequest, res
 
     // 7-MUAMMO: COINGATE_API_TOKEN sozlanmagan bo'lsa va production bo'lsa, oldindan xatolik qaytarish (muvaffaqiyatsiz to'lov simulyatoriga tushib qolmaslik uchun)
     if (process.env.NODE_ENV === "production" && !coingateToken) {
-      console.error("COINGATE_API_TOKEN sozlanmagan (production)");
+      logger.error("COINGATE_API_TOKEN sozlanmagan (production)");
       return res.status(503).json({ error: "To'lov tizimi vaqtincha mavjud emas." });
     }
 
@@ -126,7 +127,7 @@ router.post("/top-boost/create", authenticateToken, async (req: AuthRequest, res
           paymentUrl = orderData.payment_url;
         }
       } catch (err) {
-        console.error("CoinGate error in top boost create:", err);
+        logger.error({ err }, "CoinGate error in top boost create");
       }
     }
 
@@ -136,7 +137,7 @@ router.post("/top-boost/create", authenticateToken, async (req: AuthRequest, res
 
     res.json({ paymentUrl });
   } catch (err) {
-    console.error("TOP boost create error:", err);
+    logger.error({ err }, "TOP boost create error");
     res.status(500).json({ error: "To'lov yaratishda xatolik." });
   }
 });
@@ -194,7 +195,7 @@ router.post("/vip/create", authenticateToken, async (req: AuthRequest, res: Resp
 
     // 7-MUAMMO: COINGATE_API_TOKEN sozlanmagan bo'lsa va production bo'lsa, oldindan xatolik qaytarish (muvaffaqiyatsiz to'lov simulyatoriga tushib qolmaslik uchun)
     if (process.env.NODE_ENV === "production" && !coingateToken) {
-      console.error("COINGATE_API_TOKEN sozlanmagan (production)");
+      logger.error("COINGATE_API_TOKEN sozlanmagan (production)");
       return res.status(503).json({ error: "To'lov tizimi vaqtincha mavjud emas." });
     }
 
@@ -242,7 +243,7 @@ router.post("/vip/create", authenticateToken, async (req: AuthRequest, res: Resp
           paymentUrl = orderData.payment_url;
         }
       } catch (err) {
-        console.error("CoinGate error in vip create:", err);
+        logger.error({ err }, "CoinGate error in vip create");
       }
     }
 
@@ -252,7 +253,7 @@ router.post("/vip/create", authenticateToken, async (req: AuthRequest, res: Resp
 
     res.json({ paymentUrl });
   } catch (err) {
-    console.error("VIP create error:", err);
+    logger.error({ err }, "VIP create error");
     res.status(500).json({ error: "To'lov yaratishda xatolik." });
   }
 });

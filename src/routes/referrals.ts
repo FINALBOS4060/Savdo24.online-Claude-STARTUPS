@@ -1,6 +1,8 @@
 import { Router, Response } from "express";
 import crypto from "crypto";
 import { financialActionLimiter } from "../lib/rateLimiters";
+import { PUBLIC_USER_SELECT } from "../lib/pure-helpers";
+import { logger } from "../lib/logger";
 // 114-bosqich (server.ts modullashtirish, ARXITEKTURA 3-band): bu fayl
 // server.ts'dan ko'chirildi (referrals/generate, /apply, /my-stats,
 // admin/referrals bloklari). Naqsh b2b.ts bilan bir xil (ikkita router:
@@ -44,7 +46,7 @@ router.post("/generate", authenticateToken, financialActionLimiter, async (req: 
 
     res.json({ code: referral.code });
   } catch (err) {
-    console.error("Referral generate error:", err);
+    logger.error({ err }, "Referral generate error");
     res.status(500).json({ error: "Referral kod yaratishda xatolik." });
   }
 });
@@ -57,7 +59,7 @@ router.get("/apply", authenticateToken, async (req: AuthRequest, res: Response) 
   try {
     const referral = await prisma.referral.findUnique({
       where: { code, isActive: true },
-      include: { referrer: true }
+      include: { referrer: { select: PUBLIC_USER_SELECT } }
     });
 
     if (!referral) {
@@ -90,7 +92,7 @@ router.get("/my-stats", authenticateToken, async (req: AuthRequest, res: Respons
       }
     });
 
-    const totalEarned = referrals.reduce((sum: number, r: any) => sum + r.rewards.reduce((s: number, rw: any) => s + rw.rewardAmount, 0), 0);
+    const totalEarned = referrals.reduce((sum: number, r: any) => sum + r.rewards.reduce((s: number, rw: any) => s + Number(rw.rewardAmount), 0), 0);
     const referralCount = await getReferralCount(req.user.id);
     const tier = getReferralTier(referralCount);
 
@@ -127,5 +129,39 @@ adminReferralsRouter.get("/", authenticateToken, requireAdmin, async (req: AuthR
     res.json(allReferrals);
   } catch (err) {
     res.status(500).json({ error: "Admin ma'lumotlarini yuklashda xatolik." });
+  }
+});
+
+// GET /api/admin/referrals/rewards-pending — Pending or earned referral rewards awaiting payout
+adminReferralsRouter.get("/rewards-pending", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const pendingRewards = await prisma.referralReward.findMany({
+      where: { status: { in: ["pending", "earned"] } },
+      include: {
+        referral: {
+          include: {
+            referrer: { select: { id: true, name: true, email: true } }
+          }
+        }
+      },
+      orderBy: { createdAt: "asc" }
+    });
+    res.json(pendingRewards);
+  } catch (err) {
+    res.status(500).json({ error: "Kutilayotgan mukofotlarni yuklashda xatolik." });
+  }
+});
+
+// POST /api/admin/referrals/rewards/:id/complete — Mark referral reward as paid_out
+adminReferralsRouter.post("/rewards/:id/complete", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const updated = await prisma.referralReward.update({
+      where: { id },
+      data: { status: "paid_out" }
+    });
+    res.json({ success: true, reward: updated });
+  } catch (err) {
+    res.status(500).json({ error: "Mukofotni to'langan deb belgilashda xatolik." });
   }
 });

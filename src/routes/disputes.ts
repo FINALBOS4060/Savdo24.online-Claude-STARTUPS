@@ -1,5 +1,6 @@
 import { Router, Response } from "express";
 import { financialActionLimiter } from "../lib/rateLimiters";
+import { logger } from "../lib/logger";
 // 112-bosqich (server.ts modullashtirish, ARXITEKTURA 3-band): bu fayl
 // server.ts'dan ko'chirildi (POST/GET/PATCH /api/disputes bloki).
 // Naqsh auth.ts/support.ts/sponsor-channels.ts/b2b.ts bilan bir xil.
@@ -56,7 +57,7 @@ router.post("/", authenticateToken, financialActionLimiter, async (req: AuthRequ
 
     res.status(201).json(dispute);
   } catch (err: any) {
-    console.error("Create dispute error:", err);
+    logger.error({ err }, "Create dispute error");
     res.status(500).json({ error: "Nizo ochishda xatolik yuz berdi." });
   }
 });
@@ -105,7 +106,7 @@ router.get("/", authenticateToken, requireAdmin, async (req: AuthRequest, res: R
       totalPages: Math.ceil(total / safeLimit)
     });
   } catch (err: any) {
-    console.error("Get disputes error:", err);
+    logger.error({ err }, "Get disputes error");
     res.status(500).json({ error: "Nizolarni olishda xatolik yuz berdi." });
   }
 });
@@ -165,11 +166,11 @@ router.patch("/:id", authenticateToken, requireAdmin, async (req: AuthRequest, r
         targetId: String(disputeId),
         details: adminNote ? `Nizo statusi: ${status}. Izoh: ${adminNote}` : `Nizo statusi: ${status}`
       }
-    }).catch((e: any) => console.error("Audit log error:", e));
+    }).catch((e: any) => logger.error({ err: e }, "Audit log error"));
 
     res.json(updated);
   } catch (err: any) {
-    console.error("Update dispute error:", err);
+    logger.error({ err }, "Update dispute error");
     res.status(500).json({ error: "Nizoni yangilashda xatolik yuz berdi." });
   }
 });

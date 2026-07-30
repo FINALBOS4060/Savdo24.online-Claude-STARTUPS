@@ -1186,6 +1186,12 @@ export default function ProfilePage({
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2 text-sm text-on-primary-container">
                       <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px]">payments</span>{payment.amount} {payment.currency}</span>
                       <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px]">calendar_today</span>{new Date(payment.createdAt).toLocaleDateString()}</span>
+                      {payment.status === 'refund_required' && (
+                        <span className="px-2 py-0.5 bg-amber-500/15 text-amber-400 text-xs rounded-md font-bold">Qaytarish jarayonda (Refund in progress)</span>
+                      )}
+                      {payment.status === 'refund_completed' && (
+                        <span className="px-2 py-0.5 bg-emerald-500/15 text-emerald-400 text-xs rounded-md font-bold">Pul qaytarildi (Refunded)</span>
+                      )}
                     </div>
                   </div>
                   {payment.startup && payment.startup.deliveryUrl ? (

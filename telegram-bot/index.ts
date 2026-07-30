@@ -1,6 +1,7 @@
 import { Bot, Context, session, SessionFlavor, InputFile } from "grammy";
 import dotenv from "dotenv";
 import path from "path";
+import { logger } from "../src/lib/logger";
 
 // Load environment variables from process.cwd() or root .env
 dotenv.config();
@@ -251,7 +252,7 @@ async function showProduct(ctx: any, id: string) {
         // Rasm yuborib bo'lmasa (masalan Telegram tomonidan noto'g'ri format
         // deb rad etilsa), foydalanuvchi hech narsa olmay qolmasligi uchun
         // oddiy matnli xabarga qaytamiz.
-        console.error("replyWithPhoto error, falling back to text:", photoErr);
+        logger.error({ err: photoErr }, "replyWithPhoto error, falling back to text");
         await ctx.reply(message, {
           parse_mode: "HTML",
           reply_markup: { inline_keyboard: keyboard }
@@ -328,7 +329,7 @@ bot.callbackQuery(/^buy_(.+)$/, async (ctx) => {
     }
 
   } catch (err) {
-    console.error("Buy callback error:", err);
+    logger.error({ err }, "Buy callback error");
     await ctx.reply("Xatolik yuz berdi, iltimos qayta urinib ko'ring.");
   }
 });

@@ -363,7 +363,7 @@ router.post("/forgot-password", passwordResetLimiter, async (req: Request, res: 
     }
 
     if (user.isBanned) {
-      console.log(`[Forgot Password] Banned user attempted password reset: ${email}`);
+      logger.info({ email }, "[Forgot Password] Banned user attempted password reset");
       return res.json({ success: true, message: genericMessage });
     }
 

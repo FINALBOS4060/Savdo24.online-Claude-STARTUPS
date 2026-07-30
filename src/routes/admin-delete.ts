@@ -1,5 +1,6 @@
 import { Router, Response } from "express";
 import { prisma, authenticateToken, requireAdmin, AuthRequest } from "../../server";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -44,11 +45,11 @@ router.delete("/startups/:id", authenticateToken, requireAdmin, async (req: Auth
         targetId: id,
         details: `Startup and all related records deleted`
       }
-    }).catch((e: any) => console.error("Audit log error:", e));
+    }).catch((e: any) => logger.error({ err: e }, "Audit log error"));
 
     res.json({ success: true, message: "Loyiha va unga tegishli barcha ma'lumotlar muvaffaqiyatli o'chirildi." });
   } catch (err: any) {
-    console.error("Delete startup error:", err);
+    logger.error({ err }, "Delete startup error");
     res.status(500).json({ error: "E'lonni o'chirishda xatolik yuz berdi." });
   }
 });
@@ -71,11 +72,11 @@ router.delete("/ideas/:id", authenticateToken, requireAdmin, async (req: AuthReq
         targetId: String(id),
         details: `Idea ${id} and its votes deleted`
       }
-    }).catch((e: any) => console.error("Audit log error:", e));
+    }).catch((e: any) => logger.error({ err: e }, "Audit log error"));
 
     res.json({ success: true, message: "Izoh muvaffaqiyatli o'chirildi." });
   } catch (err) {
-    console.error("Admin delete idea error:", err);
+    logger.error({ err }, "Admin delete idea error");
     res.status(500).json({ error: "Izohni o'chirishda xatolik yuz berdi." });
   }
 });

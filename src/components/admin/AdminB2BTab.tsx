@@ -1,0 +1,183 @@
+import React, { useState, useEffect } from 'react';
+import { apiFetch as fetch } from '../../lib/api';
+
+interface AdminB2BTabProps {
+  onActionToast: (message: string) => void;
+}
+
+export const AdminB2BTab: React.FC<AdminB2BTabProps> = ({ onActionToast }) => {
+  const [b2bAccounts, setB2bAccounts] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  const fetchB2bAccounts = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/admin/b2b');
+      if (res.ok) {
+        const data = await res.json();
+        setB2bAccounts(data.b2bAccounts || []);
+      }
+    } catch (err) {
+      console.error("Fetch B2B accounts error:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchB2bAccounts();
+  }, []);
+
+  const handleVerify = async (id: string, verified: boolean) => {
+    setUpdatingId(id);
+    try {
+      const res = await fetch(`/api/admin/b2b/${id}/verify`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ verified })
+      });
+      if (res.ok) {
+        onActionToast(verified ? "B2B hisob muvaffaqiyatli tasdiqlandi!" : "B2B hisob rad etildi.");
+        fetchB2bAccounts();
+      } else {
+        const data = await res.json();
+        onActionToast(data.error || "Xatolik yuz berdi.");
+      }
+    } catch (err) {
+      console.error("Verify B2B error:", err);
+      onActionToast("Tarmoq xatosi yuz berdi.");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const pendingAccounts = b2bAccounts.filter(b => !b.verified);
+  const verifiedAccounts = b2bAccounts.filter(b => b.verified);
+
+  return (
+    <div className="space-y-8">
+      {/* Pending B2B Requests */}
+      <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
+        <div className="flex justify-between items-center border-b border-white/5 pb-4">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <span className="material-symbols-outlined text-[#f0b90b]">business_center</span>
+            Tasdiqlash kutilayotgan B2B arizalar ({pendingAccounts.length})
+          </h2>
+          <button
+            onClick={fetchB2bAccounts}
+            className="px-4 py-2 bg-secondary-container/10 text-secondary-container rounded-xl font-bold text-xs hover:bg-secondary-container/20 transition-all flex items-center gap-2 cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-sm">refresh</span>
+            Yangilash
+          </button>
+        </div>
+
+        {isLoading ? (
+          <div className="py-12 text-center text-on-primary-container text-sm">Yuklanmoqda...</div>
+        ) : pendingAccounts.length === 0 ? (
+          <div className="py-12 text-center text-on-primary-container space-y-2">
+            <span className="material-symbols-outlined text-4xl opacity-40">task_alt</span>
+            <p className="text-sm font-bold">Kutilayotgan B2B arizalar mavjud emas</p>
+            <p className="text-xs">Barcha arizalar ko'rib chiqilgan.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {pendingAccounts.map((b2b) => (
+              <div key={b2b.id} className="bg-[#0b1426] border border-[#f0b90b]/30 rounded-2xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs rounded font-bold">Kutilmoqda</span>
+                    <span className="text-xs text-on-primary-container font-mono">ID: {b2b.id}</span>
+                  </div>
+                  <h4 className="font-bold text-white text-base">{b2b.companyName}</h4>
+                  <p className="text-sm text-on-primary-container">
+                    Foydalanuvchi: <span className="text-white font-medium">{b2b.user?.name || b2b.user?.email || `User #${b2b.userId}`}</span> ({b2b.user?.email})
+                  </p>
+                  <div className="flex items-center gap-4 text-xs text-on-primary-container mt-1">
+                    <span>Soliq ID / STIR: <strong className="text-white font-mono">{b2b.taxId || 'Ko\'rsatilmagan'}</strong></span>
+                    <span>Chegirma: <strong className="text-emerald-400">{b2b.discount}%</strong></span>
+                    <span>Sana: {new Date(b2b.createdAt).toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => handleVerify(b2b.id, true)}
+                    disabled={updatingId === b2b.id}
+                    className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-black font-extrabold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md disabled:opacity-50"
+                  >
+                    <span className="material-symbols-outlined text-sm">check_circle</span>
+                    {updatingId === b2b.id ? "Jarayonda..." : "Tasdiqlash"}
+                  </button>
+                  <button
+                    onClick={() => handleVerify(b2b.id, false)}
+                    disabled={updatingId === b2b.id}
+                    className="px-4 py-2.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <span className="material-symbols-outlined text-sm">cancel</span>
+                    Rad etish
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Verified B2B Accounts */}
+      <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
+        <div className="flex justify-between items-center border-b border-white/5 pb-4">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <span className="material-symbols-outlined text-emerald-400">verified</span>
+            Tasdiqlangan B2B Hisoblar ({verifiedAccounts.length})
+          </h2>
+        </div>
+
+        {isLoading ? (
+          <div className="py-12 text-center text-on-primary-container text-sm">Yuklanmoqda...</div>
+        ) : verifiedAccounts.length === 0 ? (
+          <div className="py-12 text-center text-on-primary-container space-y-2">
+            <span className="material-symbols-outlined text-4xl opacity-40">domain_disabled</span>
+            <p className="text-sm font-bold">Tasdiqlangan B2B hisoblar mavjud emas</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {verifiedAccounts.map((b2b) => (
+              <div key={b2b.id} className="bg-[#0b1426] border border-emerald-500/30 rounded-2xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs rounded font-bold">Tasdiqlangan</span>
+                    <span className="text-xs text-on-primary-container font-mono">ID: {b2b.id}</span>
+                  </div>
+                  <h4 className="font-bold text-white text-base">{b2b.companyName}</h4>
+                  <p className="text-sm text-on-primary-container">
+                    Foydalanuvchi: <span className="text-white font-medium">{b2b.user?.name || b2b.user?.email || `User #${b2b.userId}`}</span> ({b2b.user?.email})
+                  </p>
+                  <div className="flex items-center gap-4 text-xs text-on-primary-container mt-1">
+                    <span>Soliq ID / STIR: <strong className="text-white font-mono">{b2b.taxId || 'Ko\'rsatilmagan'}</strong></span>
+                    <span>Chegirma: <strong className="text-emerald-400">{b2b.discount}%</strong></span>
+                    <span>Sana: {new Date(b2b.createdAt).toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => handleVerify(b2b.id, false)}
+                    disabled={updatingId === b2b.id}
+                    className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 font-bold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                  >
+                    <span className="material-symbols-outlined text-xs">block</span>
+                    Bekor qilish
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

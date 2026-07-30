@@ -135,6 +135,8 @@ model Idea {
   authorName String // agar login qilmagan bo'lsa ham ism kiritsin
   upvotes    Int      @default(0)
   createdAt  DateTime @default(now())
+
+  @@index([startupId])
 }
 
 model Subscriber {
@@ -162,6 +164,9 @@ model Review {
   buyer     User     @relation(fields: [buyerId], references: [id], name: "BuyerReviews")
   sellerId  Int // sotuvchini alohida ko'rsatish uchun
   createdAt DateTime @default(now())
+
+  @@index([startupId])
+  @@index([sellerId])
 }
 
 model Dispute {
@@ -289,6 +294,8 @@ model Conversation {
   messages      Message[]
 
   @@unique([startupId, buyerId, sellerId])
+  @@index([buyerId])
+  @@index([sellerId])
 }
 
 model Message {
@@ -299,6 +306,8 @@ model Message {
   content        String
   readAt         DateTime?
   createdAt      DateTime     @default(now())
+
+  @@index([conversationId])
 }
 
 model Referral {
@@ -313,6 +322,8 @@ model Referral {
   isActive          Boolean          @default(true)
   createdAt         DateTime         @default(now())
   rewards           ReferralReward[]
+
+  @@index([referrerId])
 }
 
 model ReferralReward {
@@ -323,6 +334,9 @@ model ReferralReward {
   rewardAmount Decimal
   status       String   @default("pending") // pending, earned, paid_out
   createdAt    DateTime @default(now())
+
+  @@index([referralId])
+  @@index([paymentId])
 }
 
 model ListingTier {

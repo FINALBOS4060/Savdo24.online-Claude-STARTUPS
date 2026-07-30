@@ -1,4 +1,5 @@
 import { Router, Response } from "express";
+import { logger } from "../lib/logger";
 // 110-bosqich (server.ts modullashtirish, ARXITEKTURA 3-band): bu fayl
 // server.ts'dan ko'chirildi. Naqsh auth.ts/support.ts bilan bir xil —
 // umumiy prisma/middleware'lar "../../server"'dan import qilinadi.
@@ -19,7 +20,7 @@ router.get("/", authenticateToken, requireAdmin, async (req: AuthRequest, res: R
     });
     res.json(channels);
   } catch (err: any) {
-    console.error("Get sponsor channels error:", err);
+    logger.error({ err }, "Get sponsor channels error");
     res.status(500).json({ error: "Sponsor kanallarni olishda xatolik yuz berdi." });
   }
 });
@@ -54,11 +55,11 @@ router.post("/", authenticateToken, requireAdmin, async (req: AuthRequest, res: 
         targetId: String(channel.id),
         details: `Yangi sponsor kanal qo'shildi: ${displayName} (@${channelUsername})`
       }
-    }).catch((e: any) => console.error("Audit log error:", e));
+    }).catch((e: any) => logger.error({ err: e }, "Audit log error"));
 
     res.status(201).json(channel);
   } catch (err: any) {
-    console.error("Create sponsor channel error:", err);
+    logger.error({ err }, "Create sponsor channel error");
     res.status(500).json({ error: "Sponsor kanalni qo'shishda xatolik yuz berdi." });
   }
 });
@@ -94,11 +95,11 @@ router.patch("/:id", authenticateToken, requireAdmin, async (req: AuthRequest, r
         targetId: String(id),
         details: `Sponsor kanal yangilandi (ID: ${id})`
       }
-    }).catch((e: any) => console.error("Audit log error:", e));
+    }).catch((e: any) => logger.error({ err: e }, "Audit log error"));
 
     res.json(updated);
   } catch (err: any) {
-    console.error("Update sponsor channel error:", err);
+    logger.error({ err }, "Update sponsor channel error");
     res.status(500).json({ error: "Sponsor kanalni yangilashda xatolik yuz berdi." });
   }
 });
@@ -123,11 +124,11 @@ router.delete("/:id", authenticateToken, requireAdmin, async (req: AuthRequest, 
         targetId: String(id),
         details: `Sponsor kanal o'chirildi (ID: ${id})`
       }
-    }).catch((e: any) => console.error("Audit log error:", e));
+    }).catch((e: any) => logger.error({ err: e }, "Audit log error"));
 
     res.json({ success: true });
   } catch (err: any) {
-    console.error("Delete sponsor channel error:", err);
+    logger.error({ err }, "Delete sponsor channel error");
     res.status(500).json({ error: "Sponsor kanalni o'chirishda xatolik yuz berdi." });
   }
 });

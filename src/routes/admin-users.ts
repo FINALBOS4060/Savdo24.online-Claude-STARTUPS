@@ -1,4 +1,5 @@
 import { Router, Response } from "express";
+import { logger } from "../lib/logger";
 // 118-bosqich (server.ts modullashtirish, ARXITEKTURA 3-band): bu fayl
 // server.ts'dan ko'chirildi (Admin foydalanuvchilarni boshqarish: ro'yxat,
 // bloklash, tafsilot, VIP berish, rol o'zgartirish, o'chirish). Router
@@ -65,7 +66,7 @@ router.get("/", authenticateToken, requireAdmin, async (req: AuthRequest, res: R
       pages: Math.ceil(total / Number(limit))
     });
   } catch (err: any) {
-    console.error("Get admin users error:", err);
+    logger.error({ err }, "Get admin users error");
     res.status(500).json({ error: "Foydalanuvchilarni yuklashda xatolik yuz berdi." });
   }
 });
@@ -93,7 +94,7 @@ router.patch("/:id/ban", authenticateToken, requireAdmin, async (req: AuthReques
 
     res.json({ success: true, isBanned: user.isBanned });
   } catch (err: any) {
-    console.error("Ban user error:", err);
+    logger.error({ err }, "Ban user error");
     res.status(500).json({ error: "Amalni bajarishda xatolik yuz berdi." });
   }
 });
@@ -138,17 +139,33 @@ router.get("/:id", authenticateToken, requireAdmin, async (req: AuthRequest, res
 
     res.json({
       user: {
-        ...user,
-        password: "", // Hide password
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        googleId: user.googleId,
+        authProvider: user.authProvider,
+        verified: user.verified,
+        joinDate: user.joinDate,
+        avatarUrl: user.avatarUrl,
+        coverUrl: user.coverUrl,
+        walletConnected: user.walletConnected,
+        walletAddress: user.walletAddress,
+        emailVerified: user.emailVerified,
+        averageRating: avgRating,
+        totalReviews: user.totalReviews,
+        isBanned: user.isBanned,
+        isVip: user.isVip,
+        vipExpiresAt: user.vipExpiresAt,
+        telegramUserId: user.telegramUserId,
         totalStartups: user._count.startups,
         totalPurchases: user._count.payments,
         totalSoldAmount: totalSoldAmount._sum.amount || 0,
-        averageRating: avgRating,
       },
       auditLogs
     });
   } catch (err) {
-    console.error("Admin get user details error:", err);
+    logger.error({ err }, "Admin get user details error");
     res.status(500).json({ error: "Ma'lumotlarni yuklashda xatolik." });
   }
 });
@@ -289,7 +306,7 @@ router.delete("/:id", authenticateToken, requireAdmin, async (req: AuthRequest, 
     });
     res.json({ success: true });
   } catch (err) {
-    console.error("Delete user error:", err);
+    logger.error({ err }, "Delete user error");
     res.status(500).json({ error: "Hisobni o'chirishda xatolik." });
   }
 });

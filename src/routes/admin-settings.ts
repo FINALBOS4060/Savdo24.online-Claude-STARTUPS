@@ -1,5 +1,6 @@
 import { Router, Response } from "express";
 import { encryptSecret } from "../lib/crypto";
+import { logger } from "../lib/logger";
 // 119-bosqich (server.ts modullashtirish, ARXITEKTURA 3-band): bu fayl
 // server.ts'dan ko'chirildi (Admin sozlamalarni ko'rish/yangilash).
 // maskValue faqat shu yerda ishlatilgani sabab birga ko'chirildi.
@@ -87,7 +88,7 @@ router.get("/", authenticateToken, requireAdmin, async (req: AuthRequest, res: R
     }
     res.json(results);
   } catch (err: any) {
-    console.error("Get admin settings error:", err);
+    logger.error({ err }, "Get admin settings error");
     res.status(500).json({ error: "Sozlamalarni olishda xatolik yuz berdi." });
   }
 });
@@ -130,11 +131,11 @@ router.put("/:key", authenticateToken, requireAdmin, async (req: AuthRequest, re
         targetId: key,
         details: `Admin ${adminName}, ${key} sozlamasini yangiladi.`
       }
-    }).catch((e: any) => console.error("Audit log error:", e));
+    }).catch((e: any) => logger.error({ err: e }, "Audit log error"));
 
     res.json({ success: true, key, value: maskValue(value) });
   } catch (err: any) {
-    console.error(`Save setting error for ${key}:`, err);
+    logger.error({ err, key }, "Save setting error");
     res.status(500).json({ error: "Sozlamani saqlashda xatolik yuz berdi." });
   }
 });

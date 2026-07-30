@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { financialActionLimiter } from "../lib/rateLimiters";
+import { logger } from "../lib/logger";
 // 113-bosqich (server.ts modullashtirish, ARXITEKTURA 3-band): bu fayl
 // server.ts'dan ko'chirildi (POST /api/reviews va GET /api/users/:id/reviews).
 // Naqsh support.ts bilan bir xil: router "/api" ostiga mount qilinadi,
@@ -111,7 +112,7 @@ router.post("/reviews", authenticateToken, financialActionLimiter, async (req: A
 
     res.status(201).json(review);
   } catch (err: any) {
-    console.error("Create review error:", err);
+    logger.error({ err }, "Create review error");
     res.status(500).json({ error: "Sharh yozishda xatolik yuz berdi." });
   }
 });
@@ -160,7 +161,7 @@ router.get("/users/:id/reviews", async (req: Request, res: Response) => {
       sellerName: user?.name || "Noma'lum"
     });
   } catch (err: any) {
-    console.error("Get reviews error:", err);
+    logger.error({ err }, "Get reviews error");
     res.status(500).json({ error: "Sharhlarni olishda xatolik yuz berdi." });
   }
 });

@@ -75,6 +75,14 @@ qilinishi tavsiya etiladi — shundagina bosqichlar orasidagi haqiqiy
 `git diff`/`git log` tarixi saqlanadi va noto'g'ri versiyani serverga
 tashlab qo'yish xavfi kamayadi.
 
+## Ijtimoiy tarmoqlar uchun havola oldindan ko'rinishi (Link Preview / Bot Meta Handler)
+Loyihada individual startap sahifalari (`/startup/:id`) Telegram, Facebook, WhatsApp kabi ijtimoiy tarmoqlar orqali ulashilganda to'g'ri `og:title`, `og:description` va `og:image` preview ko'rsatishi uchun **Bot Meta Handler** mexanizmi joriy etildi (`src/lib/botMetaHandler.ts`).
+
+### Nima uchun to'liq SSR emas, shu yondashuv tanlandi?
+1. **Oddiylik va Barqarorlik:** Butun React ilovasini SSR qilish (Next.js yoki Remix'ga o'tish) mavjud Express + Vite SPA arxitekturasini tubdan o'zgartirishni talab qiladi va murakkablikni keskin oshiradi.
+2. **Botlar uchun Maqsadli Render:** Telegrambot, facebookexternalhit, Twitterbot kabi ijtimoiy tarmoq crawler'lari sahifani so'raganda, bazadan loyiha ma'lumotlari olinib, statik `index.html` ichidagi `og:*` teglari dinamik to'ldirib yuboriladi. Oddiy foydalanuvchilar esa odatdagidek tezkor va to'liq SPA ilovasini qabul qiladi.
+3. **Xavfsizlik (XSS Himoyasi):** Bazadan keluvchi har qanday foydalanuvchi kiritgan ma'lumot (`startup.name`, `startup.description`) HTML'ga qo'shilishidan oldin `escapeHtml()` orqali qat'iy tozalanadi (sanitized), bu esa Stored XSS zaifliklarining oldini oladi.
+
 ## Texnologiyalar
 - **Frontend:** React, Tailwind CSS, Lucide Icons, Motion (`motion/react`)
 - **Backend:** Node.js, Express, Prisma (PostgreSQL / SQLite)

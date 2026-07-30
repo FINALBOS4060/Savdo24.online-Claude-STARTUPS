@@ -30,6 +30,7 @@ import nodemailer from "nodemailer";
 import Stripe from "stripe";
 import cron from "node-cron";
 import dotenv from "dotenv";
+import { logger } from "./src/lib/logger";
 import { z } from "zod";
 import {
   ideaLimiter,
@@ -41,6 +42,7 @@ import {
   authLimiter
 } from "./src/lib/rateLimiters";
 import { CATEGORY_FIELDS } from "./src/categoryFields";
+import { createBotMetaHandler } from "./src/lib/botMetaHandler";
 
 dotenv.config();
 
@@ -111,25 +113,31 @@ function getSecret(envVar: string, minLength: number): string {
     return value;
   }
 
+  if (process.env.NODE_ENV === "production" && !process.env.APPLET_ID) {
+    console.error(`\n❌ XATOLIK: Production muhitida "${envVar}" o'zgaruvchisi sozlanmagan yoki uning uzunligi yetarli emas (kamida ${minLength} ta belgi kutilmoqda)!`);
+    console.error(`💡 Iltimos, serverni ishga tushirishdan oldin ".env" faylida yoki deployment muhitida ushbu o'zgaruvchini qo'lda sozlang.\n`);
+    process.exit(1);
+  }
+
   // Local fallback file to ensure container/server startup stability when env variables are not provided
   try {
     const secretFilePath = path.join(process.cwd(), `.secret_${envVar}`);
     if (fs.existsSync(secretFilePath)) {
       const savedSecret = fs.readFileSync(secretFilePath, "utf8").trim();
       if (savedSecret && savedSecret.length >= minLength) {
-        console.warn(`⚠️ ${envVar} topilmadi — saqlangan fayldan avto-kalit yuklandi (${secretFilePath}).`);
+        console.warn(`⚠️ OGOHLANTIRISH (Development/Sandbox): "${envVar}" topilmadi — saqlangan fayldan avto-kalit yuklandi (${secretFilePath}).`);
         return savedSecret;
       }
     }
     const generated = crypto.randomBytes(32).toString('hex');
     fs.writeFileSync(secretFilePath, generated, "utf8");
-    console.warn(`⚠️ ${envVar} muhit o'zgaruvchisi sozlanmagan — yangi avto-kalit generatsiya qilindi (${secretFilePath}).`);
+    console.warn(`⚠️ OGOHLANTIRISH (Development/Sandbox): "${envVar}" muhit o'zgaruvchisi sozlanmagan — yangi tasodifiy kalit generatsiya qilindi va kelajakda barqaror ulanish uchun quyidagi faylda saqlandi:\n👉 ${secretFilePath}\n`);
     return generated;
   } catch (fileErr) {
-    console.warn(`⚠️ ${envVar} avto-kalit yaratishda xatolik:`, fileErr);
+    console.warn(`⚠️ OGOHLANTIRISH (Development/Sandbox): "${envVar}" avto-kalit faylini yaratishda xatolik yuz berdi:`, fileErr);
   }
 
-  console.warn(`⚠️ ${envVar} topilmadi — vaqtinchalik kalit generatsiya qilindi.`);
+  console.warn(`⚠️ OGOHLANTIRISH (Development/Sandbox): "${envVar}" topilmadi — vaqtinchalik tasodifiy kalit generatsiya qilindi. Bu kalit har gal server qayta tushganda o'zgaradi!`);
   return crypto.randomBytes(32).toString('hex');
 }
 
@@ -137,8 +145,8 @@ function getSecret(envVar: string, minLength: number): string {
 // ko'chirildi (sof funksiyalar, DB'ga bog'liq emas — avtomatik test yozish
 // uchun). Bu yerda faqat qayta eksport qilinadi, boshqa fayllardagi
 // `from "../../server"` importlari o'zgarishsiz ishlayveradi.
-import { escapeHtml, getReferralTier, safeCompare } from "./src/lib/pure-helpers";
-export { escapeHtml, getReferralTier, safeCompare };
+import { escapeHtml, getReferralTier, safeCompare, PUBLIC_USER_SELECT } from "./src/lib/pure-helpers";
+export { escapeHtml, getReferralTier, safeCompare, PUBLIC_USER_SELECT };
 
 export const JWT_SECRET = getSecret("JWT_SECRET", 32);
 const ENCRYPTION_KEY = getSecret("ENCRYPTION_KEY", 32);
@@ -347,6 +355,52 @@ async function autoReleaseEscrows() {
     }
   } catch (err) {
     console.error("Escrow auto-release error:", err);
+  }
+}
+
+async function checkPendingRefunds() {
+  try {
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+    const [overdueRefunds, overdueRewards] = await Promise.all([
+      prisma.payment.findMany({
+        where: {
+          status: "refund_required",
+          updatedAt: { lt: threeDaysAgo }
+        }
+      }),
+      prisma.referralReward.findMany({
+        where: {
+          status: { in: ["pending", "earned"] },
+          createdAt: { lt: threeDaysAgo }
+        }
+      })
+    ]);
+
+    if (overdueRefunds.length > 0 || overdueRewards.length > 0) {
+      const admins = await prisma.user.findMany({ where: { role: "Admin" } });
+      for (const admin of admins) {
+        if (overdueRefunds.length > 0) {
+          await createNotification(
+            admin.id,
+            "SYSTEM",
+            "Eslatma: Kechiktirilgan qaytarishlar",
+            `${overdueRefunds.length} ta to'lov 3 kundan ortiq vaqtdan beri qaytarishni (refund) kutmoqda. Iltimos CoinGate orqali tekshiring.`,
+            "/admin"
+          );
+        }
+        if (overdueRewards.length > 0) {
+          await createNotification(
+            admin.id,
+            "SYSTEM",
+            "Eslatma: Kechiktirilgan referral mukofotlari",
+            `${overdueRewards.length} ta referral mukofoti 3 kundan ortiq vaqtdan beri to'lanishni kutmoqda.`,
+            "/admin"
+          );
+        }
+      }
+    }
+  } catch (err) {
+    console.error("checkPendingRefunds error:", err);
   }
 }
 
@@ -1056,7 +1110,7 @@ app.get("/api/users/me/earnings", authenticateToken, async (req: AuthRequest, re
       orderBy: { createdAt: "desc" }
     });
 
-    const totalEarnings = completedSales.reduce((acc: number, p: any) => acc + (p.sellerPayoutAmount || 0), 0);
+    const totalEarnings = completedSales.reduce((acc: number, p: any) => acc + (p.sellerPayoutAmount ? Number(p.sellerPayoutAmount) : 0), 0);
 
     res.json({
       totalEarnings,
@@ -1096,7 +1150,10 @@ app.get("/api/users/me/reviews-received", authenticateToken, async (req: AuthReq
     const userId = req.user!.id;
     const reviews = await prisma.review.findMany({
       where: { sellerId: userId },
-      include: { buyer: true, startup: true },
+      include: {
+        buyer: { select: PUBLIC_USER_SELECT },
+        startup: true
+      },
       orderBy: { createdAt: "desc" }
     });
     
@@ -1167,7 +1224,7 @@ app.get("/api/ai/price-suggestion", async (req: Request, res: Response) => {
 
     let avgPrice = 100; // base price
     if (similar.length > 0) {
-      avgPrice = similar.reduce((sum: number, s: any) => sum + s.price, 0) / similar.length;
+      avgPrice = similar.reduce((sum: number, s: any) => sum + Number(s.price), 0) / similar.length;
     }
 
     const featureBoost = featuresList.length * 50; 
@@ -1277,7 +1334,7 @@ app.post("/api/listings/:id/upgrade", authenticateToken, async (req: AuthRequest
 
     // In a real app, this would redirect to payment
     // For now, let's create a payment record and return a simulation URL or similar
-    const totalAmount = tier.pricePerDay * tier.durationDays;
+    const totalAmount = Number(tier.pricePerDay) * tier.durationDays;
     const orderId = "UPG-" + crypto.randomBytes(4).toString('hex').toUpperCase();
     const secureToken = crypto.randomBytes(24).toString('hex');
 
@@ -2019,9 +2076,14 @@ app.post("/api/ideas/:id/upvote", upvoteLimiter, async (req: Request, res: Respo
   }
 
   if (!voterKey) {
+    let guestId = req.cookies?.guest_id;
+    if (!guestId) {
+      guestId = crypto.randomUUID();
+      res.cookie("guest_id", guestId, { maxAge: 365 * 24 * 60 * 60 * 1000, httpOnly: true, sameSite: "lax" });
+    }
     const ip = req.ip || req.socket.remoteAddress || "unknown";
     const userAgent = req.headers["user-agent"] || "unknown";
-    const rawKey = `guest-${ip}-${userAgent}`;
+    const rawKey = `guest-${guestId}-${ip}-${userAgent}`;
     voterKey = crypto.createHash("sha256").update(rawKey).digest("hex");
   }
 
@@ -2170,36 +2232,57 @@ app.get("/api/files/:fileId", async (req, res) => {
   try {
     const { fileId } = req.params;
 
-    // Check cache first
+    let fileUrl = "";
     const cached = fileUrlCache.get(fileId);
     if (cached && cached.expiresAt > Date.now()) {
-      return res.redirect(cached.url);
+      fileUrl = cached.url;
+    } else {
+      const telegramBotToken = await getSetting("TELEGRAM_BOT_TOKEN");
+      
+      if (!telegramBotToken) {
+        return res.status(500).send("Telegram Bot Token kiritilmagan.");
+      }
+
+      // 1. Get file path from Telegram
+      const pathRes = await fetch(`https://api.telegram.org/bot${telegramBotToken}/getFile?file_id=${fileId}`);
+      const pathData: any = await pathRes.json();
+      
+      if (!pathData.ok) {
+        logger.error({ pathData }, "Telegram getFile error");
+        return res.status(404).send("Fayl Telegram'da topilmadi.");
+      }
+
+      fileUrl = `https://api.telegram.org/file/bot${telegramBotToken}/${pathData.result.file_path}`;
+      
+      // Set cache (expires in 50 minutes)
+      fileUrlCache.set(fileId, { url: fileUrl, expiresAt: Date.now() + 50 * 60 * 1000 });
     }
 
-    const telegramBotToken = await getSetting("TELEGRAM_BOT_TOKEN");
-    
-    if (!telegramBotToken) {
-      return res.status(500).send("Telegram Bot Token kiritilmagan.");
+    // 2. Fetch the actual file URL and stream it to the client
+    const fileRes = await fetch(fileUrl);
+    if (!fileRes.ok) {
+      logger.error({ status: fileRes.status, statusText: fileRes.statusText }, "Error fetching file from Telegram");
+      return res.status(fileRes.status).send("Faylni yuklab olishda xatolik yuz berdi.");
     }
 
-    // 1. Get file path from Telegram
-    const pathRes = await fetch(`https://api.telegram.org/bot${telegramBotToken}/getFile?file_id=${fileId}`);
-    const pathData: any = await pathRes.json();
-    
-    if (!pathData.ok) {
-      console.error("Telegram getFile error:", pathData);
-      return res.status(404).send("Fayl Telegram'da topilmadi.");
-    }
+    const contentType = fileRes.headers.get("content-type") || "application/octet-stream";
+    const contentLength = fileRes.headers.get("content-length");
 
-    // 2. Redirect to the actual file URL on Telegram's servers
-    const fileUrl = `https://api.telegram.org/file/bot${telegramBotToken}/${pathData.result.file_path}`;
-    
-    // Set cache (expires in 50 minutes)
-    fileUrlCache.set(fileId, { url: fileUrl, expiresAt: Date.now() + 50 * 60 * 1000 });
-    
-    res.redirect(fileUrl);
+    res.setHeader("Content-Type", contentType);
+    if (contentLength) {
+      res.setHeader("Content-Length", contentLength);
+    }
+    // Set caching headers for the client browser
+    res.setHeader("Cache-Control", "public, max-age=31536000");
+
+    if (fileRes.body) {
+      const { Readable } = await import("stream");
+      Readable.fromWeb(fileRes.body as any).pipe(res);
+    } else {
+      res.status(500).send("Fayl tarkibi bo'sh.");
+    }
   } catch (err) {
-    console.error("GET /api/files/:fileId error:", err);
+    logger.error({ err }, "GET /api/files/:fileId error");
     res.status(500).send("Faylni yuklab olishda xatolik.");
   }
 });
@@ -3346,92 +3429,7 @@ app.get("/sitemap.xml", async (req: Request, res: Response) => {
 });
 
 // Dynamic SEO for Startup Pages
-const botAgents = [
-  "facebookexternalhit",
-  "TelegramBot",
-  "Twitterbot",
-  "slackbot",
-  "LinkedInBot",
-  "WhatsApp",
-  "Googlebot",
-  "Bingbot"
-];
-
-app.get("/startup/:id", async (req, res, next) => {
-  const userAgent = req.headers["user-agent"] || "";
-  const isBot = botAgents.some(bot => userAgent.toLowerCase().includes(bot.toLowerCase()));
-
-  // User instructions mentioned "ayniqsa ijtimoiy tarmoq botlari", 
-  // but it's safer to always serve dynamic tags for shared links even for humans.
-  // However, I will follow the intent: bot check is a good filter to avoid overhead for humans if desired.
-  // But shared links previews ONLY happen via bots.
-  if (!isBot && process.env.NODE_ENV !== "production") {
-    return next();
-  }
-
-  try {
-    const { id } = req.params;
-    const startup = await prisma.startup.findUnique({ where: { id } });
-
-    if (!startup) {
-      return next();
-    }
-
-    const distPath = path.join(process.cwd(), "dist");
-    const indexPath = process.env.NODE_ENV === "production" 
-      ? path.join(distPath, "index.html")
-      : path.join(process.cwd(), "index.html");
-
-    if (!fs.existsSync(indexPath)) {
-      return next();
-    }
-
-    let html = fs.readFileSync(indexPath, "utf8");
-    const appUrl = await getSetting("APP_URL") || "https://savdo24.online";
-
-    // XAVFSIZLIK: startup.name/description/image bazadan kelayotgan foydalanuvchi
-    // kiritgan matn (sotuvchi tomonidan yozilgan) — bu HTML sahifasiga to'g'ridan-to'g'ri
-    // qo'yilishidan oldin ALBATTA escape qilinishi shart, aks holda loyiha nomiga
-    // </title><script>...</script> kabi kod kiritilib, ushbu sahifaga kirgan HAR BIR
-    // (production'dagi barcha, botlar ham, oddiy foydalanuvchilar ham) tashrif
-    // buyuruvchida ishga tushadigan saqlanadigan (stored) XSS hosil bo'lardi.
-    const rawTitle = `${startup.name} — Savdo24`;
-    const rawDescription = startup.description.substring(0, 160);
-    let rawImage = startup.image || "https://savdo24.online/og-image.png";
-    if (rawImage.startsWith("/")) {
-      rawImage = `${appUrl}${rawImage}`;
-    }
-    const rawUrl = `${appUrl}/startup/${id}`;
-
-    const title = escapeHtml(rawTitle);
-    const description = escapeHtml(rawDescription);
-    const image = escapeHtml(rawImage);
-    const url = escapeHtml(rawUrl);
-
-    // Replace Title
-    html = html.replace(/<title>.*?<\/title>/g, `<title>${title}</title>`);
-    
-    // Replace Meta Description
-    html = html.replace(/<meta name="description" content=".*?" \/>/g, `<meta name="description" content="${description}" />`);
-    
-    // Replace OG Tags
-    html = html.replace(/<meta property="og:url" content=".*?" \/>/g, `<meta property="og:url" content="${url}" />`);
-    html = html.replace(/<meta property="og:title" content=".*?" \/>/g, `<meta property="og:title" content="${title}" />`);
-    html = html.replace(/<meta property="og:description" content=".*?" \/>/g, `<meta property="og:description" content="${description}" />`);
-    html = html.replace(/<meta property="og:image" content=".*?" \/>/g, `<meta property="og:image" content="${image}" />`);
-
-    // Replace Twitter Tags
-    html = html.replace(/<meta property="twitter:url" content=".*?" \/>/g, `<meta property="twitter:url" content="${url}" />`);
-    html = html.replace(/<meta property="twitter:title" content=".*?" \/>/g, `<meta property="twitter:title" content="${title}" />`);
-    html = html.replace(/<meta property="twitter:description" content=".*?" \/>/g, `<meta property="twitter:description" content="${description}" />`);
-    html = html.replace(/<meta property="twitter:image" content=".*?" \/>/g, `<meta property="twitter:image" content="${image}" />`);
-
-    res.send(html);
-  } catch (err) {
-    console.error("SEO Inject error:", err);
-    next();
-  }
-});
+app.get("/startup/:id", createBotMetaHandler(prisma, getSetting));
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -3454,11 +3452,15 @@ app.get("/startup/:id", async (req, res, next) => {
     res.status(500).json({ error: "Kutilmagan xatolik yuz berdi. Iltimos qaytadan urinib ko'ring." });
   });
 
-  httpServer.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-    // Darhol bir marta tekshirib qo'yamiz
-    expireTopBoosts();
-  });
+  if (process.env.NODE_ENV !== "test" && !process.argv.includes("--test")) {
+    httpServer.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+      // Darhol bir marta tekshirib qo'yamiz
+      expireTopBoosts();
+    });
+  } else {
+    console.log("Test mode: Skipping httpServer.listen to avoid EADDRINUSE.");
+  }
 
   // Scheduled Tasks (Internal Cron)
   // Har soatda muddati o'tgan Top boostlarni o'chirish
@@ -3471,6 +3473,12 @@ app.get("/startup/:id", async (req, res, next) => {
   cron.schedule("0 3 * * *", () => {
     console.log("[CRON] Running autoReleaseEscrows...");
     autoReleaseEscrows();
+  });
+
+  // Har kuni soat 08:00 da kechiktirilgan refundlarni tekshirish
+  cron.schedule("0 8 * * *", () => {
+    console.log("[CRON] Running checkPendingRefunds...");
+    checkPendingRefunds();
   });
 
   // Har haftalik newsletter yuborish (Dushanba kuni 09:00)

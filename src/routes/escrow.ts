@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { financialActionLimiter } from "../lib/rateLimiters";
+import { logger } from "../lib/logger";
 // 126-bosqich (server.ts modullashtirish, ARXITEKTURA 3-band): bu fayl
 // server.ts'dan ko'chirildi (GET /api/escrow/my-purchases, POST
 // /api/escrow/release, POST /api/escrow/dispute, GET+PATCH
@@ -173,7 +174,7 @@ router.get("/admin/escrow-disputes", authenticateToken, requireAdmin, async (req
     });
     res.json(disputes);
   } catch (err: any) {
-    console.error("Get escrow disputes error:", err);
+    logger.error({ err }, "Get escrow disputes error");
     res.status(500).json({ error: "Escrow nizolarini olishda xatolik yuz berdi." });
   }
 });
@@ -223,7 +224,7 @@ router.patch("/admin/escrow-disputes/:id", authenticateToken, requireAdmin, asyn
       await prisma.payment.update({
         where: { id: disputeResolution.escrow.paymentId },
         data: { status: "refund_required" }
-      }).catch((e: any) => console.error("Payment status refund_required'ga o'tkazishda xatolik:", e));
+      }).catch((e: any) => logger.error({ err: e }, "Payment status refund_required'ga o'tkazishda xatolik"));
     }
 
     await prisma.disputeResolution.update({
@@ -255,12 +256,80 @@ router.patch("/admin/escrow-disputes/:id", authenticateToken, requireAdmin, asyn
         targetId: String(disputeResolution.id),
         details: `Escrow nizosi (to'lov ID: ${disputeResolution.paymentId}) hal qilindi: ${resolution}.`
       }
-    }).catch((e: any) => console.error("Audit log error:", e));
+    }).catch((e: any) => logger.error({ err: e }, "Audit log error"));
 
     res.json({ success: true });
   } catch (err: any) {
-    console.error("Resolve escrow dispute error:", err);
+    logger.error({ err }, "Resolve escrow dispute error");
     res.status(500).json({ error: "Nizoni hal qilishda xatolik yuz berdi." });
+  }
+});
+
+// GET /api/admin/escrow-refunds (pending refunds)
+router.get("/admin/escrow-refunds", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const payments = await prisma.payment.findMany({
+      where: { status: "refund_required" },
+      include: {
+        startup: { select: { id: true, name: true, price: true } },
+        user: { select: { id: true, name: true, email: true } },
+        escrow: true
+      },
+      orderBy: { createdAt: "desc" }
+    });
+    res.json(payments);
+  } catch (err: any) {
+    logger.error({ err }, "Get pending escrow refunds error");
+    res.status(500).json({ error: "Qaytarish talab qilinadigan to'lovlarni olishda xatolik." });
+  }
+});
+
+// POST /api/admin/escrow-refunds/:paymentId/complete (mark refund as completed)
+router.post("/admin/escrow-refunds/:paymentId/complete", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+  const { paymentId } = req.params;
+  try {
+    const payment = await prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: { startup: true }
+    });
+
+    if (!payment) {
+      return res.status(404).json({ error: "To'lov topilmadi." });
+    }
+
+    if (payment.status !== "refund_required") {
+      return res.status(400).json({ error: "Bu to'lov qaytarish talab qilinadigan holatda emas." });
+    }
+
+    await prisma.payment.update({
+      where: { id: paymentId },
+      data: { status: "refund_completed" }
+    });
+
+    if (payment.userId) {
+      await createNotification(
+        payment.userId,
+        "SYSTEM",
+        "Pul qaytarildi (Refund)",
+        `"${payment.startup?.name || 'Mahsulot'}" uchun CoinGate orqali mablag'ingiz muvaffaqiyatli qaytarildi.`,
+        `/profile?tab=purchases`
+      );
+    }
+
+    await prisma.auditLog.create({
+      data: {
+        adminId: req.user?.id || 0,
+        adminEmail: req.user?.email,
+        action: "complete_escrow_refund",
+        targetId: paymentId,
+        details: `To'lov (ID: ${paymentId}) bo'yicha pul qaytarish CoinGate'da bajarildi deb belgilandi.`
+      }
+    }).catch((e: any) => logger.error({ err: e }, "Audit log error"));
+
+    res.json({ success: true, message: "Pul qaytarish yakunlandi deb belgilandi." });
+  } catch (err: any) {
+    logger.error({ err }, "Complete escrow refund error");
+    res.status(500).json({ error: "Pul qaytarishni yakunlashda xatolik." });
   }
 });
 

@@ -1,4 +1,6 @@
 import { Router, Response } from "express";
+import { PUBLIC_USER_SELECT } from "../lib/pure-helpers";
+import { logger } from "../lib/logger";
 // 120-bosqich (server.ts modullashtirish, ARXITEKTURA 3-band): bu fayl
 // server.ts'dan ko'chirildi (GET /api/admin/audit-logs va GET /api/admin/stats).
 // Naqsh auth.ts/support.ts/sponsor-channels.ts/b2b.ts/disputes.ts bilan bir xil.
@@ -39,7 +41,7 @@ router.get("/audit-logs", authenticateToken, requireAdmin, async (req: AuthReque
       totalPages: Math.ceil(total / safeLimit)
     });
   } catch (err: any) {
-    console.error("Get audit logs error:", err);
+    logger.error({ err }, "Get audit logs error");
     res.status(500).json({ error: "Audit loglarni olishda xatolik yuz berdi." });
   }
 });
@@ -75,7 +77,7 @@ router.get("/stats", authenticateToken, requireAdmin, async (req: AuthRequest, r
       prisma.dispute.findMany({
         take: 5,
         orderBy: { createdAt: "desc" },
-        include: { buyer: true }
+        include: { buyer: { select: PUBLIC_USER_SELECT } }
       }),
       prisma.report.findMany({
         take: 5,
@@ -125,7 +127,7 @@ router.get("/stats", authenticateToken, requireAdmin, async (req: AuthRequest, r
       }
     });
   } catch (err: any) {
-    console.error("Get stats error:", err);
+    logger.error({ err }, "Get stats error");
     res.status(500).json({ error: "Statistikani olishda xatolik yuz berdi." });
   }
 });

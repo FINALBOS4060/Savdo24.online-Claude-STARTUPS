@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
+import { logger } from "../lib/logger";
 import { 
   prisma, 
   sendEmail, 
@@ -75,7 +76,7 @@ router.post("/support", supportLimiter, async (req: Request, res: Response) => {
 
     res.json({ success: true, message: "Xabaringiz muvaffaqiyatli yuborildi. Tez orada siz bilan bog'lanamiz." });
   } catch (err: any) {
-    console.error("Support ticket error:", err);
+    logger.error({ err }, "Support ticket error");
     res.status(500).json({ error: "Xabarni yuborishda xatolik yuz berdi." });
   }
 });
@@ -94,7 +95,7 @@ router.get("/admin/support-tickets", authenticateToken, requireAdmin, async (req
     });
     res.json(tickets);
   } catch (err) {
-    console.error("Get support tickets error:", err);
+    logger.error({ err }, "Get support tickets error");
     res.status(500).json({ error: "Xatolik yuz berdi." });
   }
 });
@@ -125,12 +126,12 @@ router.patch("/admin/support-tickets/:id/status", authenticateToken, requireAdmi
         details: `Support ticket status updated to ${result.data.status}`
       }
     }).catch((auditErr: any) => {
-      console.error("Audit log yozishda xatolik (support ticket):", auditErr);
+      logger.error({ err: auditErr }, "Audit log yozishda xatolik (support ticket)");
     });
 
     res.json(ticket);
   } catch (err) {
-    console.error("Update ticket error:", err);
+    logger.error({ err }, "Update ticket error");
     res.status(500).json({ error: "Xatolik yuz berdi." });
   }
 });
@@ -191,7 +192,7 @@ router.post("/reports", authenticateToken, reportLimiter, async (req: AuthReques
     if (err?.code === "P2002") {
       return res.status(409).json({ error: "Siz ushbu e'lon yoki izoh bo'yicha allaqachon shikoyat qoldirgansiz." });
     }
-    console.error("Create report error:", err);
+    logger.error({ err }, "Create report error");
     res.status(500).json({ error: "Shikoyat yuborishda xatolik yuz berdi." });
   }
 });
@@ -220,7 +221,7 @@ router.get("/reports", authenticateToken, requireAdmin, async (req: AuthRequest,
       totalPages: Math.ceil(total / safeLimit)
     });
   } catch (err) {
-    console.error("Get reports error:", err);
+    logger.error({ err }, "Get reports error");
     res.status(500).json({ error: "Shikoyatlarni olishda xatolik yuz berdi." });
   }
 });
@@ -255,7 +256,7 @@ router.patch("/reports/:id/status", authenticateToken, requireAdmin, async (req:
 
     res.json(updated);
   } catch (err) {
-    console.error("Update report status error:", err);
+    logger.error({ err }, "Update report status error");
     res.status(500).json({ error: "Shikoyatni yangilashda xatolik yuz berdi." });
   }
 });

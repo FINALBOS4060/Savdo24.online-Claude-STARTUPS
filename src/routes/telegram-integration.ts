@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { logger } from "../lib/logger";
 // 116-bosqich (server.ts modullashtirish, ARXITEKTURA 3-band): bu fayl
 // server.ts'dan ko'chirildi (Telegram bot bilan ishlaydigan 5 endpoint:
 // link, user-stats, verify, sponsor-channels, deliver). Router
@@ -55,7 +56,7 @@ router.post("/link", async (req: Request, res: Response) => {
 
     res.json({ success: true, name: user.name });
   } catch (err: any) {
-    console.error("Telegram link error:", err);
+    logger.error({ err }, "Telegram link error");
     res.status(500).json({ error: "Hisobni bog'lashda xatolik yuz berdi." });
   }
 });
@@ -84,7 +85,7 @@ router.get("/user-stats/:telegramUserId", async (req: Request, res: Response) =>
 
     const referral = await prisma.referral.findFirst({ where: { referrerId: user.id, isActive: true } });
     const referralCount = await getReferralCount(user.id);
-    const totalEarned = user.referrals.reduce((sum: number, r: any) => sum + r.rewards.reduce((s: number, rw: any) => s + rw.rewardAmount, 0), 0);
+    const totalEarned = user.referrals.reduce((sum: number, r: any) => sum + r.rewards.reduce((s: number, rw: any) => s + Number(rw.rewardAmount), 0), 0);
 
     // MUHIM: `User` modelida "balance" degan maydon UMUMAN mavjud emas (prisma/schema.prisma'ni
     // tekshiring) — shuning uchun avval bu yerda ishlatilgan `user.balance` doim `undefined`
@@ -94,7 +95,7 @@ router.get("/user-stats/:telegramUserId", async (req: Request, res: Response) =>
     const completedSales = await prisma.payment.findMany({
       where: { status: "completed", startup: { userId: user.id } }
     });
-    const balance = completedSales.reduce((sum: number, p: any) => sum + (p.sellerPayoutAmount || 0), 0);
+    const balance = completedSales.reduce((sum: number, p: any) => sum + (p.sellerPayoutAmount ? Number(p.sellerPayoutAmount) : 0), 0);
 
     res.json({
       name: user.name,
@@ -127,7 +128,7 @@ router.get("/verify/:token", async (req: Request, res: Response) => {
     }
     res.json({ success: true, startupId: delivery.startupId });
   } catch (err: any) {
-    console.error("Verify telegram token error:", err);
+    logger.error({ err }, "Verify telegram token error");
     res.status(500).json({ error: "Havolani tasdiqlashda xatolik yuz berdi." });
   }
 });
@@ -152,7 +153,7 @@ router.get("/sponsor-channels", async (req: Request, res: Response) => {
     });
     res.json(channels);
   } catch (err: any) {
-    console.error("Get sponsor channels error:", err);
+    logger.error({ err }, "Get sponsor channels error");
     res.status(500).json({ error: "Sponsor kanallarni yuklashda xatolik yuz berdi." });
   }
 });
@@ -192,7 +193,7 @@ router.post("/deliver/:token", async (req: Request, res: Response) => {
     const startup = await prisma.startup.findUnique({ where: { id: delivery.startupId } });
     res.json({ deliveryUrl: startup?.deliveryUrl });
   } catch (err: any) {
-    console.error("Deliver telegram error:", err);
+    logger.error({ err }, "Deliver telegram error");
     res.status(500).json({ error: "Loyiha havolasini yuborishda xatolik yuz berdi." });
   }
 });
