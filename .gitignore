@@ -15,4 +15,5 @@ dev.db-journal
 /export-tmp/
 app.zip
 bun.lock
+tuzatish.txt
 .secret_*

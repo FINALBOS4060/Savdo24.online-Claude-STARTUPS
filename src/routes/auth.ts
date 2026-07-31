@@ -311,7 +311,7 @@ router.get("/me", async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Tizimga kirilmagan (Sessiya muddati tugagan)." });
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const decoded = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
     });

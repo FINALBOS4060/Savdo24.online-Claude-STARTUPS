@@ -3510,49 +3510,49 @@ app.get("/startup/:id", createBotMetaHandler(prisma, getSetting));
 
   // 12-MUAMMO: Global API xatolarini Telegram orqali adminga yuborish
   app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-    console.error("Kutilmagan server xatosi:", err);
+    logger.error({ err }, "Kutilmagan server xatosi");
     notifyAdminTelegram(`🔴 <b>API XATOSI</b>\n\n<b>Yo'l:</b> ${req.method} ${req.originalUrl}\n<b>Xato:</b> <code>${(err?.stack || String(err)).slice(0, 3000)}</code>`);
     res.status(500).json({ error: "Kutilmagan xatolik yuz berdi. Iltimos qaytadan urinib ko'ring." });
   });
 
   if (process.env.NODE_ENV !== "test" && !process.argv.includes("--test")) {
     httpServer.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server running on http://localhost:${PORT}`);
+      logger.info(`Server running on http://localhost:${PORT}`);
       // Darhol bir marta tekshirib qo'yamiz
       expireTopBoosts();
     });
   } else {
-    console.log("Test mode: Skipping httpServer.listen to avoid EADDRINUSE.");
+    logger.info("Test mode: Skipping httpServer.listen to avoid EADDRINUSE.");
   }
 
   // Scheduled Tasks (Internal Cron)
   // Har soatda muddati o'tgan Top boostlarni o'chirish
   cron.schedule("0 * * * *", () => {
-    console.log("[CRON] Running expireTopBoosts...");
+    logger.info("[CRON] Running expireTopBoosts...");
     expireTopBoosts();
   });
 
   // Har kuni soat 03:00 da escrow to'lovlarini tekshirish
   cron.schedule("0 3 * * *", () => {
-    console.log("[CRON] Running autoReleaseEscrows...");
+    logger.info("[CRON] Running autoReleaseEscrows...");
     autoReleaseEscrows();
   });
 
   // Har kuni soat 08:00 da kechiktirilgan refundlarni tekshirish
   cron.schedule("0 8 * * *", () => {
-    console.log("[CRON] Running checkPendingRefunds...");
+    logger.info("[CRON] Running checkPendingRefunds...");
     checkPendingRefunds();
   });
 
   // Har haftalik newsletter yuborish (Dushanba kuni 09:00)
   cron.schedule("0 9 * * 1", () => {
-    console.log("[CRON] Running sendWeeklyNewsletter...");
+    logger.info("[CRON] Running sendWeeklyNewsletter...");
     sendWeeklyNewsletter();
   });
 
   // Har soatda Telegram fayl keshini tozalash
   cron.schedule("0 * * * *", () => {
-    console.log("[CRON] Cleaning fileUrlCache...");
+    logger.info("[CRON] Cleaning fileUrlCache...");
     const now = Date.now();
     for (const [key, value] of fileUrlCache.entries()) {
       if (value.expiresAt < now) {
@@ -3567,13 +3567,13 @@ app.get("/startup/:id", createBotMetaHandler(prisma, getSetting));
 
   // Har kuni soat 04:00 da tunda ma'lumotlar bazasini zaxiralash
   cron.schedule("0 4 * * *", async () => {
-    console.log("[CRON] Running daily database backup...");
+    logger.info("[CRON] Running daily database backup...");
     try {
       const { runBackup } = await import("./scripts/backup-db");
       await runBackup();
-      console.log("[CRON] Daily backup completed successfully.");
+      logger.info("[CRON] Daily backup completed successfully.");
     } catch (err) {
-      console.error("[CRON] Daily backup failed:", err);
+      logger.error({ err }, "[CRON] Daily backup failed");
     }
   });
 
@@ -3583,13 +3583,13 @@ app.get("/startup/:id", createBotMetaHandler(prisma, getSetting));
   // tushirilardi. Haftalik statistik zaxira hech qachon avtomatik
   // yuborilmasdi. Endi har yakshanba soat 02:00 da avtomatik ishga tushadi.
   cron.schedule("0 2 * * 0", async () => {
-    console.log("[CRON] Running weekly GitHub stats export...");
+    logger.info("[CRON] Running weekly GitHub stats export...");
     try {
       const { exportToGithub } = await import("./scripts/export-to-github");
       await exportToGithub();
-      console.log("[CRON] Weekly GitHub export completed.");
+      logger.info("[CRON] Weekly GitHub export completed.");
     } catch (err) {
-      console.error("[CRON] Weekly GitHub export failed:", err);
+      logger.error({ err }, "[CRON] Weekly GitHub export failed");
     }
   });
 }
@@ -3597,10 +3597,10 @@ app.get("/startup/:id", createBotMetaHandler(prisma, getSetting));
 start();
 
 process.on("SIGTERM", () => {
-  console.log("SIGTERM received, closing server...");
+  logger.info("SIGTERM received, closing server...");
   process.exit(0);
 });
 process.on("SIGINT", () => {
-  console.log("SIGINT received, closing server...");
+  logger.info("SIGINT received, closing server...");
   process.exit(0);
 });

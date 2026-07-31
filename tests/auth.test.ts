@@ -13,6 +13,8 @@ before(() => {
 
 after(async () => {
   await cleanupTestDatabase();
+  await prisma.$disconnect().catch(() => {});
+  setTimeout(() => process.exit(0), 100);
 });
 
 test('1) to\'g\'ri parol bilan login muvaffaqiyatli bo\'lishi', async () => {

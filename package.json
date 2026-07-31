@@ -14,6 +14,7 @@
     "restore": "tsx scripts/restore-db.ts",
     "export-github": "tsx scripts/export-to-github.ts",
     "clean": "rm -rf dist server.js",
+    "check-schema": "tsx scripts/check-schema-drift.ts",
     "test": "NODE_ENV=test tsx --test tests/*.test.ts",
     "lint": "npx prisma generate --schema=prisma/schema.sqlite.prisma && npx prisma generate --schema=prisma/schema.prisma && tsc --noEmit"
   },
