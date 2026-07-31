@@ -40,8 +40,10 @@ import {
   uploadLimiter,
   paymentStatusLimiter,
   globalLimiter,
-  authLimiter
+  authLimiter,
+  clientErrorLimiter
 } from "./src/lib/rateLimiters";
+import { splitAmount, roundToCents, PLATFORM_FEE_PERCENT } from "./src/lib/money";
 import { CATEGORY_FIELDS } from "./src/categoryFields";
 import { createBotMetaHandler } from "./src/lib/botMetaHandler";
 
@@ -71,18 +73,34 @@ export async function getTransporter() {
   });
 }
 
-export async function sendEmail(to: string, subject: string, html: string) {
-  try {
-    const transporter = await getTransporter();
-    if (!transporter) return;
-    await transporter.sendMail({
-      from: "\"Savdo24\" <noreply@savdo24.online>",
-      to,
-      subject,
-      html
-    });
-  } catch (err) {
-    logger.error({ err }, "Email yuborishda xatolik");
+export async function sendEmail(to: string, subject: string, html: string, isCritical: boolean = false) {
+  const send = async () => {
+    try {
+      const transporter = await getTransporter();
+      if (!transporter) return false;
+      await transporter.sendMail({
+        from: "\"Savdo24\" <noreply@savdo24.online>",
+        to,
+        subject,
+        html
+      });
+      return true;
+    } catch (err) {
+      logger.error({ err }, `Email yuborishda xatolik: ${subject}`);
+      return false;
+    }
+  };
+
+  let success = await send();
+  
+  if (!success && isCritical) {
+    logger.warn(`Email yuborilmadi, qayta urinilmoqda: ${subject}`);
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    success = await send();
+  }
+
+  if (!success && isCritical) {
+    await notifyAdminTelegram(`⚠️ Kritik email yuborilmadi: ${to}, mavzu: ${subject}`);
   }
 }
 
@@ -114,7 +132,7 @@ function getSecret(envVar: string, minLength: number): string {
     return value;
   }
 
-  if (process.env.NODE_ENV === "production" && !process.env.APPLET_ID) {
+  if (process.env.NODE_ENV === "production" && !process.env.SANDBOX_MODE) {
     logger.error(`\n❌ XATOLIK: Production muhitida "${envVar}" o'zgaruvchisi sozlanmagan yoki uning uzunligi yetarli emas (kamida ${minLength} ta belgi kutilmoqda)!`);
     logger.error(`💡 Iltimos, serverni ishga tushirishdan oldin ".env" faylida yoki deployment muhitida ushbu o'zgaruvchini qo'lda sozlang.\n`);
     process.exit(1);
@@ -1175,6 +1193,14 @@ app.get("/api/users/me/reviews-received", authenticateToken, async (req: AuthReq
     console.error("Get reviews received error:", err);
     res.status(500).json({ error: "Qabul qilingan sharhlarni yuklashda xatolik yuz berdi." });
   }
+});
+
+// --- ERROR REPORTING ---
+app.post("/api/client-error-report", clientErrorLimiter, async (req: Request, res: Response) => {
+  const { message, stack, componentStack, url, browser } = req.body;
+  const errorMsg = `🔴 <b>FRONTEND XATOSI</b>\n\n<b>URL:</b> ${escapeHtml(url)}\n<b>Brauzer:</b> ${escapeHtml(browser)}\n<b>Xato:</b> <code>${escapeHtml(String(message).slice(0, 300))}</code>\n<b>Stack:</b> <code>${escapeHtml(String(stack).slice(0, 300))}</code>\n<b>Komponent:</b> <code>${escapeHtml(String(componentStack).slice(0, 300))}</code>`;
+  await notifyAdminTelegram(errorMsg).catch(() => {});
+  res.sendStatus(200);
 });
 
 // --- ANALYTICS ---
@@ -2767,8 +2793,13 @@ async function finalizeCompletedPayment(payment: any): Promise<string> {
     }
 
     const numAmount = Number(payment.amount);
-    const platformFeeAmount = updatedStatus === "completed" ? numAmount * 0.05 : null;
-    const sellerPayoutAmount = updatedStatus === "completed" ? numAmount * 0.95 : null;
+    let platformFeeAmount = null;
+    let sellerPayoutAmount = null;
+    if (updatedStatus === "completed") {
+      const { fee, payout } = splitAmount(numAmount, PLATFORM_FEE_PERCENT);
+      platformFeeAmount = fee;
+      sellerPayoutAmount = payout;
+    }
 
     await prisma.payment.update({
       where: { id: payment.id },
@@ -2794,7 +2825,7 @@ async function finalizeCompletedPayment(payment: any): Promise<string> {
           data: { refereeId: payment.userId || 0 }
         });
         
-        const rewardAmount = (numAmount * Number(referral.commissionPercent)) / 100;
+        const rewardAmount = roundToCents((numAmount * Number(referral.commissionPercent)) / 100);
         await prisma.referralReward.create({
           data: {
             referralId: referral.id,
@@ -2854,14 +2885,16 @@ async function finalizeCompletedPayment(payment: any): Promise<string> {
         await sendEmail(
           buyer.email,
           "Xarid muvaffaqiyatli yakunlandi",
-          `<p>Tabriklaymiz! Siz <b>${escapeHtml(startup.name)}</b> loyihasini muvaffaqiyatli sotib oldingiz.</p><p>Loyiha fayllari va tafsilotlari tez orada sizga yetkaziladi.</p>`
+          `<p>Tabriklaymiz! Siz <b>${escapeHtml(startup.name)}</b> loyihasini muvaffaqiyatli sotib oldingiz.</p><p>Loyiha fayllari va tafsilotlari tez orada sizga yetkaziladi.</p>`,
+          true
         );
         // To Seller
         if (startup.user) {
           await sendEmail(
             startup.user.email,
             "Loyihangiz sotildi!",
-            `<p>Tabriklaymiz! Sizning <b>${escapeHtml(startup.name)}</b> loyihangiz sotib olindi.</p><p>To'lov qabul qilindi. Tafsilotlar uchun dashboardni ko'ring.</p>`
+            `<p>Tabriklaymiz! Sizning <b>${escapeHtml(startup.name)}</b> loyihangiz sotib olindi.</p><p>To'lov qabul qilindi. Tafsilotlar uchun dashboardni ko'ring.</p>`,
+            true
           );
         }
       }

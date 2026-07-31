@@ -5,10 +5,6 @@ import { Startup, UserProfileData, ProfileTab, Category, Notification } from './
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import MobileNav from './components/MobileNav';
-import BrowsePage from './components/BrowsePage';
-import DetailPage from './components/DetailPage';
-import CheckoutPage from './components/CheckoutPage';
-import SellPage from './components/SellPage';
 import IdeasRatingPage from './components/IdeasRatingPage';
 import SupportPage from './components/SupportPage';
 import MessagesPage from './components/MessagesPage';
@@ -23,6 +19,10 @@ import { io } from 'socket.io-client';
 
 const AdminPage = lazy(() => import('./components/AdminPage'));
 const ProfilePage = lazy(() => import('./components/ProfilePage'));
+const BrowsePage = lazy(() => import('./components/BrowsePage'));
+const DetailPage = lazy(() => import('./components/DetailPage'));
+const CheckoutPage = lazy(() => import('./components/CheckoutPage'));
+const SellPage = lazy(() => import('./components/SellPage'));
 
 export default function App() {
   const navigate = useNavigate();
@@ -141,7 +141,6 @@ export default function App() {
             });
             const data = await res.json();
             if (res.ok) {
-              localStorage.setItem('savdo24_token', data.accessToken);
               setIsAuthenticated(true);
               setUser(data.user);
               showToast(`Xush kelibsiz, ${data.user.name}!`);
@@ -187,12 +186,8 @@ export default function App() {
   // Sync state with global fetch token updates
   useEffect(() => {
     const handleAuthChange = (e: any) => {
-      if (e.detail.token && e.detail.token !== 'cookie_authenticated') {
-        localStorage.setItem('savdo24_token', e.detail.token);
-      }
       setIsAuthenticated(!!e.detail.token);
       if (e.detail.logout) {
-        localStorage.removeItem('savdo24_token');
         setUser({
           name: 'Mehmon',
           role: 'Xaridor',
@@ -214,9 +209,6 @@ export default function App() {
         const res = await fetch('/api/auth/me');
         if (res.ok) {
           const data = await res.json();
-          if (data.accessToken) {
-            localStorage.setItem('savdo24_token', data.accessToken);
-          }
           setUser(data.user);
           setIsAuthenticated(true);
         } else {
@@ -433,7 +425,6 @@ export default function App() {
       const data = await res.json();
 
       if (res.ok) {
-        localStorage.setItem('savdo24_token', data.accessToken);
         setIsAuthenticated(true);
         setUser(data.user);
         showToast(`Xush kelibsiz, ${data.user.name}!`);
@@ -483,7 +474,6 @@ export default function App() {
 
       if (res.ok) {
         const data = await res.json();
-        localStorage.setItem('savdo24_token', data.accessToken);
         setIsAuthenticated(true);
         setUser(data.user);
         showToast(`Muvaffaqiyatli ro'yxatdan o'tdingiz, ${data.user.name}!`);
@@ -512,7 +502,6 @@ export default function App() {
     } catch (err) {
       console.error("Error logging out from server:", err);
     }
-    localStorage.removeItem('savdo24_token');
     setIsAuthenticated(false);
     setUser({
       name: 'Mehmon',
@@ -581,22 +570,24 @@ export default function App() {
           <AnimatePresence mode="wait">
             <Routes location={location} key={location.pathname}>
               <Route path="/" element={
-                <motion.div
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -15 }}
-                  transition={{ duration: 0.25, ease: 'easeInOut' }}
-                >
-                  <BrowsePage
-                    setView={setView}
-                    setSelectedStartupId={setSelectedStartupId}
-                    searchQuery={searchQuery}
-                    onActionToast={showToast}
-                    user={user}
-                    categories={categories}
-                    isLoading={isLoadingStartups}
-                  />
-                </motion.div>
+                <Suspense fallback={<div className="text-white p-8 text-center">Yuklanmoqda...</div>}>
+                  <motion.div
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -15 }}
+                    transition={{ duration: 0.25, ease: 'easeInOut' }}
+                  >
+                    <BrowsePage
+                      setView={setView}
+                      setSelectedStartupId={setSelectedStartupId}
+                      searchQuery={searchQuery}
+                      onActionToast={showToast}
+                      user={user}
+                      categories={categories}
+                      isLoading={isLoadingStartups}
+                    />
+                  </motion.div>
+                </Suspense>
               } />
 
               <Route path="/profile" element={
@@ -657,24 +648,26 @@ export default function App() {
               } />
 
               <Route path="/startup/:id" element={
-                <motion.div
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -15 }}
-                  transition={{ duration: 0.25, ease: 'easeInOut' }}
-                >
-                  <DetailPage
-                    startups={startups}
-                    setView={setView}
-                    bookmarkedIds={bookmarkedIds}
-                    toggleBookmark={toggleBookmark}
-                    onActionToast={showToast}
-                    setCheckoutAmount={setCheckoutAmount}
-                    user={user}
-                    categories={categories}
-                    setSelectedStartupId={setSelectedStartupId}
-                  />
-                </motion.div>
+                <Suspense fallback={<div className="text-white p-8 text-center">Yuklanmoqda...</div>}>
+                  <motion.div
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -15 }}
+                    transition={{ duration: 0.25, ease: 'easeInOut' }}
+                  >
+                    <DetailPage
+                      startups={startups}
+                      setView={setView}
+                      bookmarkedIds={bookmarkedIds}
+                      toggleBookmark={toggleBookmark}
+                      onActionToast={showToast}
+                      setCheckoutAmount={setCheckoutAmount}
+                      user={user}
+                      categories={categories}
+                      setSelectedStartupId={setSelectedStartupId}
+                    />
+                  </motion.div>
+                </Suspense>
               } />
 
               <Route path="/edit-startup/:id" element={
@@ -698,38 +691,42 @@ export default function App() {
               } />
 
               <Route path="/checkout" element={
-                <motion.div
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -15 }}
-                  transition={{ duration: 0.25, ease: 'easeInOut' }}
-                >
-                  <CheckoutPage
-                    amount={checkoutAmount}
-                    user={user}
-                    setUser={setUser}
-                    onActionToast={showToast}
-                    setView={setView}
-                    onSuccessPayment={handleSuccessPayment}
-                    startup={selectedStartup}
-                  />
-                </motion.div>
+                <Suspense fallback={<div className="text-white p-8 text-center">Yuklanmoqda...</div>}>
+                  <motion.div
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -15 }}
+                    transition={{ duration: 0.25, ease: 'easeInOut' }}
+                  >
+                    <CheckoutPage
+                      amount={checkoutAmount}
+                      user={user}
+                      setUser={setUser}
+                      onActionToast={showToast}
+                      setView={setView}
+                      onSuccessPayment={handleSuccessPayment}
+                      startup={selectedStartup}
+                    />
+                  </motion.div>
+                </Suspense>
               } />
 
               <Route path="/sell" element={
-                <motion.div
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -15 }}
-                  transition={{ duration: 0.25, ease: 'easeInOut' }}
-                >
-                  <SellPage
-                    onAddStartup={handleAddStartup}
-                    onActionToast={showToast}
-                    setView={setView}
-                    categories={categories}
-                  />
-                </motion.div>
+                <Suspense fallback={<div className="text-white p-8 text-center">Yuklanmoqda...</div>}>
+                  <motion.div
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -15 }}
+                    transition={{ duration: 0.25, ease: 'easeInOut' }}
+                  >
+                    <SellPage
+                      onAddStartup={handleAddStartup}
+                      onActionToast={showToast}
+                      setView={setView}
+                      categories={categories}
+                    />
+                  </motion.div>
+                </Suspense>
               } />
 
               <Route path="/admin" element={

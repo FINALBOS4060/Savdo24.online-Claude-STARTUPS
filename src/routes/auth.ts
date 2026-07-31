@@ -16,7 +16,7 @@ import {
   escapeHtml,
   AuthRequest
 } from "../../server";
-import { authLimiter, passwordResetLimiter } from "../lib/rateLimiters";
+import { authLimiter, authAccountLimiter, passwordResetLimiter } from "../lib/rateLimiters";
 
 const router = Router();
 
@@ -71,7 +71,7 @@ function clearAuthCookies(res: Response) {
 }
 
 // 1. POST /api/auth/register
-router.post("/register", authLimiter, async (req: Request, res: Response) => {
+router.post("/register", [authLimiter, authAccountLimiter], async (req: Request, res: Response) => {
   const result = registerSchema.safeParse(req.body);
   if (!result.success) {
     const errors = (result.error as any).errors.map((e: any) => e.message).join(" ");
@@ -157,7 +157,7 @@ router.post("/register", authLimiter, async (req: Request, res: Response) => {
 });
 
 // 2. POST /api/auth/login
-router.post("/login", authLimiter, async (req: Request, res: Response) => {
+router.post("/login", [authLimiter, authAccountLimiter], async (req: Request, res: Response) => {
   const result = loginSchema.safeParse(req.body);
   if (!result.success) {
     const errors = (result.error as any).errors.map((e: any) => e.message).join(" ");
@@ -398,7 +398,8 @@ router.post("/forgot-password", passwordResetLimiter, async (req: Request, res: 
           <hr style="border: none; border-top: 1px solid #18202c; margin: 20px 0;" />
           <p style="font-size: 11px; color: #8892b0; text-align: center;">Savdo24 — Startaplar va raqamli loyihalar bozori</p>
         </div>
-      `
+      `,
+      true
     );
 
     res.json({ success: true, message: genericMessage });

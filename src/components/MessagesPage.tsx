@@ -57,8 +57,7 @@ export default function MessagesPage({ user, onActionToast }: MessagesPageProps)
   }, [selectedConversation]);
 
   useEffect(() => {
-    const token = localStorage.getItem('savdo24_token');
-    const newSocket = io({ auth: { token } });
+    const newSocket = io({ withCredentials: true });
     setSocket(newSocket);
 
     newSocket.on('new_message', (message: any) => {
@@ -137,7 +136,7 @@ export default function MessagesPage({ user, onActionToast }: MessagesPageProps)
                             </button>
                         )}
                         {messages.map(msg => (
-                            <div key={msg.id} className={`mb-2 p-2 rounded ${msg.senderId === user.id ? 'bg-secondary-container text-black ml-auto' : 'bg-white/10 text-white'}`} style={{maxWidth: '70%'}}>
+                            <div key={msg.id} className={`mb-2 p-2 rounded max-w-[70%] ${msg.senderId === user.id ? 'bg-secondary-container text-black ml-auto' : 'bg-white/10 text-white'}`}>
                                 {msg.content}
                             </div>
                         ))}

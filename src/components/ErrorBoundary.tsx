@@ -21,6 +21,22 @@ export default class ErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("Error caught by boundary:", error, errorInfo);
+
+    const errorKey = `${error.name}:${error.message}`;
+    if (sessionStorage.getItem(errorKey)) return;
+    sessionStorage.setItem(errorKey, 'true');
+
+    fetch('/api/client-error-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: error.message,
+        stack: error.stack,
+        componentStack: errorInfo.componentStack,
+        url: window.location.href,
+        browser: navigator.userAgent
+      })
+    }).catch(() => {});
   }
 
   render() {

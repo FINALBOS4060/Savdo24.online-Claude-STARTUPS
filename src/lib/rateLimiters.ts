@@ -4,7 +4,16 @@ export const authLimiter = rateLimit({
   validate: false,
   windowMs: 15 * 60 * 1000,
   max: 5,
+  keyGenerator: (req: any) => `${req.ip || "unknown"}:${req.body?.email || 'unknown'}`,
   message: { error: "Juda ko'p so'rov yuborildi. Iltimos, 15 daqiqadan so'ng qayta urinib ko'ring." }
+});
+
+export const authAccountLimiter = rateLimit({
+  validate: false,
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyGenerator: (req: any) => `${req.body?.email || 'unknown'}`,
+  message: { error: "Ushbu hisob uchun juda ko'p urinish. Iltimos, 15 daqiqadan so'ng qayta urinib ko'ring." }
 });
 
 export const ideaLimiter = rateLimit({
@@ -41,6 +50,7 @@ export const passwordResetLimiter = rateLimit({
   validate: false,
   windowMs: 60 * 60 * 1000,
   max: 3,
+  keyGenerator: (req: any) => `${req.ip || "unknown"}:${req.body?.email || 'unknown'}`,
   message: { error: "Juda ko'p urinish. Iltimos, 1 soatdan so'ng qayta urinib ko'ring." }
 });
 
@@ -76,4 +86,11 @@ export const financialActionLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 15,
   message: { error: "Juda ko'p urinish. Iltimos, 15 daqiqadan so'ng qayta urinib ko'ring." }
+});
+
+export const clientErrorLimiter = rateLimit({
+  validate: false,
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 5,
+  message: { error: "Too many error reports." }
 });
