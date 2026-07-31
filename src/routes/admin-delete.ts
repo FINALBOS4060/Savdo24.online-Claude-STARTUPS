@@ -1,5 +1,5 @@
 import { Router, Response } from "express";
-import { prisma, authenticateToken, requireAdmin, AuthRequest } from "../../server";
+import { prisma, authenticateToken, requireAdmin, AuthRequest } from "../lib/context";
 import { logger } from "../lib/logger";
 
 const router = Router();

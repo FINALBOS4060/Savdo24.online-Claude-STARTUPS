@@ -9,7 +9,7 @@ import {
   requireAdmin,
   createNotification,
   AuthRequest
-} from "../../server";
+} from "../lib/context";
 
 import { parsePagination } from "../lib/pagination";
 

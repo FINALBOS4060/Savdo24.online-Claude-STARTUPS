@@ -10,9 +10,9 @@ import { logger } from "../lib/logger";
 import {
   prisma,
   getSetting,
-  safeCompare,
   getReferralCount
-} from "../../server";
+} from "../lib/context";
+import { safeCompare } from "../lib/pure-helpers";
 
 const router = Router();
 

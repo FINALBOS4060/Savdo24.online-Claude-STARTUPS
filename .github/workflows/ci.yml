@@ -50,6 +50,9 @@ jobs:
           npx prisma generate --schema=prisma/schema.sqlite.prisma
           npx prisma generate --schema=prisma/schema.prisma
 
+      - name: Check Schema Drift
+        run: npx tsx scripts/check-schema-drift.ts
+
       # HAQIQIY tip-tekshiruv — @types/node/@types/express to'liq mavjud,
       # sandbox'dagi "--noResolve" bilan solishtirganda bu butunlay
       # boshqa (ancha qattiqroq) tekshiruv.

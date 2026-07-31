@@ -12,7 +12,7 @@ import {
   authenticateToken,
   getSetting,
   AuthRequest
-} from "../../server";
+} from "../lib/context";
 
 const router = Router();
 

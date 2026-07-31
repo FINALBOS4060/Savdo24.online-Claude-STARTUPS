@@ -144,7 +144,6 @@ test('1) faqat xaridor (buyer) o\'z tranzaksiyasini release qila olishi, boshqa 
     data: {
       paymentId,
       status: 'held',
-      autoReleaseDays: 7,
       holdEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     }
   });
@@ -213,7 +212,6 @@ test('2) dispute ochilgandan keyin pul faqat admin tomonidan hal qilinishi, oddi
     data: {
       paymentId,
       status: 'held',
-      autoReleaseDays: 7,
       holdEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     }
   });

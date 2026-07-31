@@ -16,7 +16,7 @@ import {
   requireAdmin,
   createNotification,
   AuthRequest
-} from "../../server";
+} from "../lib/context";
 
 const router = Router();
 

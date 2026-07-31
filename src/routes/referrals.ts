@@ -1,7 +1,7 @@
 import { Router, Response } from "express";
 import crypto from "crypto";
 import { financialActionLimiter } from "../lib/rateLimiters";
-import { PUBLIC_USER_SELECT } from "../lib/pure-helpers";
+import { PUBLIC_USER_SELECT, getReferralTier } from "../lib/pure-helpers";
 import { logger } from "../lib/logger";
 // 114-bosqich (server.ts modullashtirish, ARXITEKTURA 3-band): bu fayl
 // server.ts'dan ko'chirildi (referrals/generate, /apply, /my-stats,
@@ -11,10 +11,9 @@ import {
   prisma,
   authenticateToken,
   requireAdmin,
-  getReferralTier,
   getReferralCount,
   AuthRequest
-} from "../../server";
+} from "../lib/context";
 
 import { parsePagination } from "../lib/pagination";
 

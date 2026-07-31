@@ -8,7 +8,7 @@ import {
   authenticateToken,
   requireAdmin,
   AuthRequest
-} from "../../server";
+} from "../lib/context";
 
 const router = Router();
 

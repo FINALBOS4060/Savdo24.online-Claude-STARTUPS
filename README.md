@@ -10,6 +10,7 @@ Loyihada ma'lumotlarni yo'qotishdan himoya qilish uchun ko'p bosqichli zaxiralas
 - **Har kuni:** Serverning ichki `node-cron` vazifasi (`server.ts`) har kuni soat 04:00 da bazaning to'liq zaxirasini (SQL dump yoki JSON) yaratadi.
 - **Telegram:** Zaxira fayli AES-256-GCM algoritmi bilan shifrlanadi va maxsus Telegram kanaliga yuboriladi.
 - **Cloud S3:** Agar sozlangan bo'lsa, zaxira nusxasi Contabo S3 Object Storage'ga ham yuklanadi.
+- **Google Drive:** Agar sozlangan bo'lsa, zaxira nusxasi Google Drive papkasiga ham avtomatik yuklanadi.
 - **Deploy:** `deploy.sh` skripti bazaga `prisma db push` qo'llashdan oldin `npm run backup` ni avtomatik chaqirib, xavfsizlik zaxirasini oladi (agar zaxira muvaffaqiyatsiz bo'lsa, deploy davom etishdan oldin tasdiq so'raydi).
 
 **Qo'lda zaxira olish:**

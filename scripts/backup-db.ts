@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import { encryptSecret, decryptSecret } from '../src/lib/crypto';
 import { fileURLToPath } from 'url';
+import { uploadToGoogleDrive } from '../src/lib/googleDrive';
 
 dotenv.config();
 
@@ -202,8 +203,15 @@ export async function runBackup() {
     }
   }
 
-  // Send to Telegram if configured
-  await sendToTelegram(tempFilePath, filename);
+  // Prepare encrypted buffer for S3 and Google Drive uploads
+  const encryptionKey = process.env.ENCRYPTION_KEY;
+  const rawBuffer = Buffer.isBuffer(uploadContent) ? uploadContent : Buffer.from(uploadContent);
+  const encryptedUploadContent = (encryptionKey && encryptionKey.length >= 32)
+    ? encryptBackupBuffer(rawBuffer, encryptionKey)
+    : rawBuffer;
+  const encryptedFilename = (encryptionKey && encryptionKey.length >= 32)
+    ? `${filename}.enc`
+    : filename;
 
   // Load S3 settings
   const endpoint = await getSetting("CONTABO_S3_ENDPOINT");
@@ -211,65 +219,84 @@ export async function runBackup() {
   const secretAccessKey = await getSetting("CONTABO_SECRET_KEY");
   const bucketName = await getSetting("CONTABO_BUCKET_NAME");
 
-  // Upload to S3 if configured
-  if (!endpoint || !accessKeyId || !secretAccessKey || !bucketName) {
-    console.warn("\n[Warning] Contabo S3 credentials are not configured in your settings / .env!");
-    console.log(`Local backup file saved at: ${tempFilePath}`);
-    console.log("Please configure CONTABO_S3_ENDPOINT, CONTABO_ACCESS_KEY, CONTABO_SECRET_KEY, and CONTABO_BUCKET_NAME to enable cloud backup uploads.");
-    await prismaClient.$disconnect();
-    return;
+  // Load Google Drive settings
+  const gdClientEmail = await getSetting("GOOGLE_DRIVE_CLIENT_EMAIL");
+  const gdPrivateKey = await getSetting("GOOGLE_DRIVE_PRIVATE_KEY");
+  const gdFolderId = await getSetting("GOOGLE_DRIVE_FOLDER_ID");
+
+  console.log("\nStarting multi-destination parallel backups (Telegram, S3, Google Drive)...");
+
+  const backupTasks: Array<Promise<any>> = [];
+
+  // 1. Telegram Task
+  backupTasks.push(
+    sendToTelegram(tempFilePath, filename).catch((err) =>
+      console.error("[Telegram Backup Error]:", err)
+    )
+  );
+
+  // 2. Contabo S3 Task
+  if (endpoint && accessKeyId && secretAccessKey && bucketName) {
+    if (!encryptionKey || encryptionKey.length < 32) {
+      console.error("\n[S3] CRITICAL ERROR: ENCRYPTION_KEY is not defined or too short (min 32 chars). Cloud backup will NOT be uploaded unencrypted.");
+    } else {
+      backupTasks.push(
+        (async () => {
+          console.log(`[S3] Initializing S3 Client connecting to ${endpoint}...`);
+          const s3 = new S3Client({
+            endpoint,
+            region: 'us-east-1',
+            credentials: { accessKeyId, secretAccessKey },
+            forcePathStyle: true
+          });
+
+          console.log(`[S3] Uploading "${encryptedFilename}" to bucket "${bucketName}"...`);
+          await s3.send(new PutObjectCommand({
+            Bucket: bucketName,
+            Key: `backups/${encryptedFilename}`,
+            Body: encryptedUploadContent,
+            ContentType: 'application/octet-stream'
+          }));
+          console.log(`🎉 [S3] Upload Succeeded! Backed up to backups/${encryptedFilename}`);
+        })().catch((s3Err) => console.error("[S3 Upload Error]:", s3Err))
+      );
+    }
+  } else {
+    console.log("[S3] Credentials not fully configured. Skipping S3 upload.");
   }
 
-  // MUHIM: bu yerda avval bazaning to'liq nusxasi (parol xeshlari, refresh
-  // tokenlar, to'lovlar va h.k.) HECH QANDAY shifrlanmasdan uchinchi tomon S3
-  // xotirasiga yuklanardi — Telegram orqali yuborishda esa AES-256-GCM bilan
-  // shifrlash SHART qilib qo'yilgan edi (ENCRYPTION_KEY bo'lmasa yuborilmaydi).
-  // Bu nomuvofiqlik jiddiy xavfsizlik zaifligi edi. Endi S3 uchun ham xuddi
-  // shu shifrlash qo'llaniladi.
-  const encryptionKey = process.env.ENCRYPTION_KEY;
-  if (!encryptionKey || encryptionKey.length < 32) {
-    console.error("\n[S3] CRITICAL ERROR: ENCRYPTION_KEY is not defined or too short (min 32 chars). Cloud backup will NOT be uploaded unencrypted.");
-    console.log(`Local (unencrypted) backup file remains at: ${tempFilePath}`);
-    await prismaClient.$disconnect();
-    return;
+  // 3. Google Drive Task
+  if (gdClientEmail && gdPrivateKey) {
+    if (!encryptionKey || encryptionKey.length < 32) {
+      console.error("\n[Google Drive] CRITICAL ERROR: ENCRYPTION_KEY is not defined or too short (min 32 chars). Drive backup will NOT be uploaded unencrypted.");
+    } else {
+      backupTasks.push(
+        uploadToGoogleDrive(encryptedUploadContent, encryptedFilename, {
+          clientEmail: gdClientEmail,
+          privateKey: gdPrivateKey,
+          folderId: gdFolderId
+        }).catch((gdErr) => console.error("[Google Drive Upload Error]:", gdErr))
+      );
+    }
+  } else {
+    console.log("[Google Drive] Credentials not fully configured. Skipping Google Drive upload.");
   }
-  const rawBuffer = Buffer.isBuffer(uploadContent) ? uploadContent : Buffer.from(uploadContent);
-  const encryptedUploadContent = encryptBackupBuffer(rawBuffer, encryptionKey);
-  const encryptedFilename = `${filename}.enc`;
 
+  // Execute all backup destinations in parallel
+  await Promise.allSettled(backupTasks);
+
+  // Clean up temporary local backup file
   try {
-    console.log(`\nInitializing S3 Client connecting to ${endpoint}...`);
-    const s3 = new S3Client({
-      endpoint,
-      region: 'us-east-1', 
-      credentials: {
-        accessKeyId,
-        secretAccessKey
-      },
-      forcePathStyle: true 
-    });
-
-    console.log(`Uploading encrypted "${encryptedFilename}" to Contabo bucket "${bucketName}"...`);
-    await s3.send(new PutObjectCommand({
-      Bucket: bucketName,
-      Key: `backups/${encryptedFilename}`,
-      Body: encryptedUploadContent,
-      ContentType: 'application/octet-stream'
-    }));
-
-    console.log(`\n🎉 Cloud Upload Succeeded! Backed up to backups/${encryptedFilename}`);
-    
-    // Clean up local file
     if (fs.existsSync(tempFilePath)) {
       fs.unlinkSync(tempFilePath);
       console.log("Temporary local backup file cleaned up successfully.");
     }
-    console.log("Backup process completed successfully.");
-  } catch (s3Err) {
-    console.error("S3 Upload failed:", s3Err);
-  } finally {
-    await prismaClient.$disconnect();
+  } catch (cleanErr) {
+    console.warn("Could not clean up temp backup file:", cleanErr);
   }
+
+  console.log("Backup process completed.");
+  await prismaClient.$disconnect();
 }
 
 // CLI execution

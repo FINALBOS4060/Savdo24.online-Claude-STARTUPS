@@ -10,9 +10,9 @@ import {
   requireAdmin,
   createNotification,
   sendEmail,
-  escapeHtml,
   AuthRequest
-} from "../../server";
+} from "../lib/context";
+import { escapeHtml } from "../lib/pure-helpers";
 
 const router = Router();
 

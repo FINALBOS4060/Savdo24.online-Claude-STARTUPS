@@ -7,9 +7,9 @@ import {
   notifyAdminTelegram, 
   authenticateToken, 
   requireAdmin, 
-  escapeHtml,
   AuthRequest 
-} from "../../server";
+} from "../lib/context";
+import { escapeHtml } from "../lib/pure-helpers";
 import { supportLimiter, reportLimiter } from "../lib/rateLimiters";
 
 const router = Router();

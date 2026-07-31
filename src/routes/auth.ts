@@ -5,7 +5,7 @@ import crypto from "crypto";
 import { z } from "zod";
 import { logger } from "../lib/logger";
 
-// We import shared instances and helpers from main server file
+// We import shared instances and helpers from context
 import {
   prisma,
   JWT_SECRET,
@@ -13,9 +13,9 @@ import {
   sendEmail,
   authenticateToken,
   getSetting,
-  escapeHtml,
   AuthRequest
-} from "../../server";
+} from "../lib/context";
+import { escapeHtml } from "../lib/pure-helpers";
 import { authLimiter, authAccountLimiter, passwordResetLimiter } from "../lib/rateLimiters";
 
 const router = Router();
