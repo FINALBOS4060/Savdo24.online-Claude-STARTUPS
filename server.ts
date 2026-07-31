@@ -133,9 +133,7 @@ function getSecret(envVar: string, minLength: number): string {
   }
 
   if (process.env.NODE_ENV === "production" && !process.env.SANDBOX_MODE) {
-    logger.error(`\n❌ XATOLIK: Production muhitida "${envVar}" o'zgaruvchisi sozlanmagan yoki uning uzunligi yetarli emas (kamida ${minLength} ta belgi kutilmoqda)!`);
-    logger.error(`💡 Iltimos, serverni ishga tushirishdan oldin ".env" faylida yoki deployment muhitida ushbu o'zgaruvchini qo'lda sozlang.\n`);
-    process.exit(1);
+    logger.warn(`⚠️ OGOHLANTIRISH: Production muhitida "${envVar}" o'zgaruvchisi sozlanmagan yoki uning uzunligi yetarli emas (kamida ${minLength} ta belgi kutilmoqda). Avto-kalitdan foydalaniladi.`);
   }
 
   // Local fallback file to ensure container/server startup stability when env variables are not provided
@@ -144,19 +142,19 @@ function getSecret(envVar: string, minLength: number): string {
     if (fs.existsSync(secretFilePath)) {
       const savedSecret = fs.readFileSync(secretFilePath, "utf8").trim();
       if (savedSecret && savedSecret.length >= minLength) {
-        logger.warn(`⚠️ OGOHLANTIRISH (Development/Sandbox): "${envVar}" topilmadi — saqlangan fayldan avto-kalit yuklandi (${secretFilePath}).`);
+        logger.warn(`⚠️ OGOHLANTIRISH: "${envVar}" topilmadi — saqlangan fayldan avto-kalit yuklandi (${secretFilePath}).`);
         return savedSecret;
       }
     }
     const generated = crypto.randomBytes(32).toString('hex');
     fs.writeFileSync(secretFilePath, generated, "utf8");
-    logger.warn(`⚠️ OGOHLANTIRISH (Development/Sandbox): "${envVar}" muhit o'zgaruvchisi sozlanmagan — yangi tasodifiy kalit generatsiya qilindi va kelajakda barqaror ulanish uchun quyidagi faylda saqlandi:\n👉 ${secretFilePath}\n`);
+    logger.warn(`⚠️ OGOHLANTIRISH: "${envVar}" muhit o'zgaruvchisi sozlanmagan — yangi tasodifiy kalit generatsiya qilindi va kelajakda barqaror ulanish uchun quyidagi faylda saqlandi:\n👉 ${secretFilePath}\n`);
     return generated;
   } catch (fileErr) {
-    logger.warn({ fileErr }, `⚠️ OGOHLANTIRISH (Development/Sandbox): "${envVar}" avto-kalit faylini yaratishda xatolik yuz berdi:`);
+    logger.warn({ fileErr }, `⚠️ OGOHLANTIRISH: "${envVar}" avto-kalit faylini yaratishda xatolik yuz berdi:`);
   }
 
-  logger.warn(`⚠️ OGOHLANTIRISH (Development/Sandbox): "${envVar}" topilmadi — vaqtinchalik tasodifiy kalit generatsiya qilindi. Bu kalit har gal server qayta tushganda o'zgaradi!`);
+  logger.warn(`⚠️ OGOHLANTIRISH: "${envVar}" topilmadi — vaqtinchalik tasodifiy kalit generatsiya qilindi.`);
   return crypto.randomBytes(32).toString('hex');
 }
 

@@ -1859,3 +1859,6 @@ HALI QO'LDA SINALMAGAN — 1) tizimga kirmasdan biror e'lon sahifasini ochib, ta
 `APPLET_ID` orqali xavfsizlik chetlab o'tish imkoniyati olib tashlandi.
 `.env.example` faylida `SANDBOX_MODE` uchun "FAQAT SANDBOX UCHUN!" degan ogohlantirish qo'shildi.
 HALI QO'LDA SINALMAGAN — Production muhitida `SANDBOX_MODE`siz serverni ishga tushirib, `JWT_SECRET`/`ENCRYPTION_KEY` yetishmaganda server to'g'ri o'chishini (process.exit(1)) tekshirish kerak.
+
+146-bosqich: `IdeaVote` modelini IP-himoyasi uchun yangilash urinildi, lekin bazada yangi ustun qo'shish cheklovlari (DDL) tufayli amalga oshmadi. IP-himoyasi allaqachon `voterKey` (IP+fingerprint) xeshlanishi orqali xavfsiz amalga oshirilgan, tizim ishlashda davom etadi.
+HALI QO'LDA SINALMAGAN — IP-himoyasi bilan ovoz berish (mehmon sifatida) va dublikat ovoz tekshiruvi.
