@@ -82,6 +82,7 @@ router.get("/:id/messages", authenticateToken, async (req: AuthRequest, res: Res
   try {
     const { id } = req.params;
     const userId = req.user!.id;
+    const before = req.query.before as string;
 
     const conversation = await prisma.conversation.findUnique({ where: { id } });
     if (!conversation || (conversation.buyerId !== userId && conversation.sellerId !== userId)) {
@@ -89,11 +90,18 @@ router.get("/:id/messages", authenticateToken, async (req: AuthRequest, res: Res
     }
 
     const messages = await prisma.message.findMany({
-      where: { conversationId: id },
+      where: {
+        conversationId: id,
+        ...(before ? { createdAt: { lt: new Date(before) } } : {})
+      },
       orderBy: { createdAt: "desc" },
       take: 50
     });
-    res.json(messages.reverse());
+
+    res.json({
+      messages: messages.reverse(),
+      hasMore: messages.length === 50
+    });
   } catch (err: any) {
     logger.error({ err }, "Get messages error");
     res.status(500).json({ error: "Xabarlarni yuklashda xatolik yuz berdi." });

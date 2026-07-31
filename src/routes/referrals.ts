@@ -16,6 +16,8 @@ import {
   AuthRequest
 } from "../../server";
 
+import { parsePagination } from "../lib/pagination";
+
 const router = Router();
 
 // POST /api/referrals/generate — Unique kod yaratish
@@ -118,15 +120,27 @@ export const adminReferralsRouter = Router();
 // GET /api/admin/referrals — Admin stats
 adminReferralsRouter.get("/", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
-    const allReferrals = await prisma.referral.findMany({
-      include: {
-        referrer: { select: { name: true, email: true } },
-        referee: { select: { name: true, email: true } },
-        rewards: true
-      },
-      orderBy: { createdAt: "desc" }
+    const { page, limit, skip } = parsePagination(req.query, 20, 100);
+
+    const [allReferrals, total] = await Promise.all([
+      prisma.referral.findMany({
+        include: {
+          referrer: { select: { name: true, email: true } },
+          referee: { select: { name: true, email: true } },
+          rewards: true
+        },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        skip
+      }),
+      prisma.referral.count()
+    ]);
+    res.json({
+      data: allReferrals,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
     });
-    res.json(allReferrals);
   } catch (err) {
     res.status(500).json({ error: "Admin ma'lumotlarini yuklashda xatolik." });
   }

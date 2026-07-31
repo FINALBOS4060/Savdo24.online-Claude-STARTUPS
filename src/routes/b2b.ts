@@ -11,6 +11,8 @@ import {
   AuthRequest
 } from "../../server";
 
+import { parsePagination } from "../lib/pagination";
+
 const router = Router();
 
 router.post("/onboard", authenticateToken, async (req: AuthRequest, res: Response) => {
@@ -74,9 +76,7 @@ export const adminB2bRouter = Router();
 // GET /api/admin/b2b — Barcha B2B hisoblarni olish (Admin)
 adminB2bRouter.get("/", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 50;
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = parsePagination(req.query, 50, 100);
 
     const [b2bAccounts, totalCount] = await Promise.all([
       prisma.b2BAccount.findMany({

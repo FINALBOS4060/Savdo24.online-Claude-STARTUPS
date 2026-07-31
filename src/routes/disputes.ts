@@ -111,6 +111,8 @@ router.get("/", authenticateToken, requireAdmin, async (req: AuthRequest, res: R
   }
 });
 
+const ALLOWED_DISPUTE_STATUSES = ["open", "reviewing", "resolved", "rejected"];
+
 // PATCH /api/disputes/:id — Nizoni yangilash (Admin)
 router.patch("/:id", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   const disputeId = parseInt(req.params.id, 10);
@@ -121,6 +123,10 @@ router.patch("/:id", authenticateToken, requireAdmin, async (req: AuthRequest, r
 
   if (!status) {
     return res.status(400).json({ error: "Status ko'rsatilishi lozim." });
+  }
+
+  if (!ALLOWED_DISPUTE_STATUSES.includes(status)) {
+    return res.status(400).json({ error: "Yaroqsiz status qiymati." });
   }
 
   try {

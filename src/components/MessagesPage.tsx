@@ -12,6 +12,8 @@ export default function MessagesPage({ user, onActionToast }: MessagesPageProps)
   const [conversations, setConversations] = useState<any[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [socket, setSocket] = useState<Socket | null>(null);
   const [sendingMessage, setSendingMessage] = useState(false);
@@ -23,6 +25,24 @@ export default function MessagesPage({ user, onActionToast }: MessagesPageProps)
   // aylanmasdi — suhbat ochilganda yoki yangi xabar kelganda foydalanuvchi
   // har safar qo'lda pastga aylantirishi kerak edi.
   const messagesEndRef = React.useRef<HTMLDivElement | null>(null);
+  
+  const fetchMessages = async (convId: string, before?: string, isOlder = false) => {
+    const requestId = ++selectRequestIdRef.current;
+    const url = `/api/conversations/${convId}/messages${before ? `?before=${before}` : ''}`;
+    const res = await fetch(url);
+    if (requestId !== selectRequestIdRef.current) return;
+    if (res.ok) {
+        const data = await res.json();
+        if (isOlder) {
+            setMessages(prev => [...data.messages, ...prev]);
+            setHasMore(data.hasMore);
+        } else {
+            setMessages(data.messages);
+            setHasMore(data.hasMore);
+        }
+    }
+  };
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ block: 'end' });
   }, [messages, selectedConversation?.id]);
@@ -64,11 +84,15 @@ export default function MessagesPage({ user, onActionToast }: MessagesPageProps)
   const selectConversation = async (conv: any) => {
     setSelectedConversation(conv);
     setMessages([]); // eski suhbat xabarlari yangi sarlavha ostida bir lahza ko'rinib qolmasligi uchun
-    const requestId = ++selectRequestIdRef.current;
-    const res = await fetch(`/api/conversations/${conv.id}/messages`);
-    if (requestId !== selectRequestIdRef.current) return; // eskirgan javob, tashlab yuborildi
-    if(res.ok) setMessages(await res.json());
+    await fetchMessages(conv.id);
     await fetch(`/api/conversations/${conv.id}/read`, { method: 'PATCH' });
+  };
+  
+  const handleLoadOlder = async () => {
+      if(loadingOlder || messages.length === 0) return;
+      setLoadingOlder(true);
+      await fetchMessages(selectedConversation.id, messages[0].createdAt, true);
+      setLoadingOlder(false);
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -107,6 +131,11 @@ export default function MessagesPage({ user, onActionToast }: MessagesPageProps)
             {selectedConversation ? (
                 <>
                     <div className="flex-grow p-4 overflow-y-auto">
+                        {hasMore && (
+                            <button onClick={handleLoadOlder} disabled={loadingOlder} className="w-full text-center text-xs text-on-primary-container p-2 hover:text-white disabled:opacity-50">
+                                {loadingOlder ? 'Yuklanmoqda...' : 'Oldingi xabarlarni yuklash'}
+                            </button>
+                        )}
                         {messages.map(msg => (
                             <div key={msg.id} className={`mb-2 p-2 rounded ${msg.senderId === user.id ? 'bg-secondary-container text-black ml-auto' : 'bg-white/10 text-white'}`} style={{maxWidth: '70%'}}>
                                 {msg.content}

@@ -4,6 +4,7 @@
 // Batafsil: README.md dagi "Ma'lumotlar xavfsizligi" bo'limiga qarang.
 
 import express, { Request, Response, NextFunction } from "express";
+import { JwtPayload } from "./src/types";
 import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
@@ -81,7 +82,7 @@ export async function sendEmail(to: string, subject: string, html: string) {
       html
     });
   } catch (err) {
-    console.error("Email yuborishda xatolik:", err);
+    logger.error({ err }, "Email yuborishda xatolik");
   }
 }
 
@@ -97,12 +98,12 @@ import { OAuth2Client } from "google-auth-library";
 
 // 12-MUAMMO: Kutilmagan unhandledRejection xatolarini Telegram orqali adminga yuborish va serverni saqlab qolish
 process.on("unhandledRejection", (reason) => {
-  console.error("Ushlanmagan promise xatosi:", reason);
+  logger.error({ reason }, "Ushlanmagan promise xatosi");
   notifyAdminTelegram(`🔴 <b>KUTILMAGAN SERVER XATOSI (unhandledRejection)</b>\n\n<code>${String(reason).slice(0, 3500)}</code>`).catch(() => {});
 });
 // 12-MUAMMO: Kutilmagan uncaughtException xatolarini Telegram orqali adminga yuborish va serverni saqlab qolish
 process.on("uncaughtException", (err) => {
-  console.error("Ushlanmagan istisno:", err);
+  logger.error({ err }, "Ushlanmagan istisno");
   notifyAdminTelegram(`🔴 <b>KUTILMAGAN SERVER XATOSI (uncaughtException)</b>\n\n<code>${(err?.stack || String(err)).slice(0, 3500)}</code>`).catch(() => {});
 });
 
@@ -114,8 +115,8 @@ function getSecret(envVar: string, minLength: number): string {
   }
 
   if (process.env.NODE_ENV === "production" && !process.env.APPLET_ID) {
-    console.error(`\n❌ XATOLIK: Production muhitida "${envVar}" o'zgaruvchisi sozlanmagan yoki uning uzunligi yetarli emas (kamida ${minLength} ta belgi kutilmoqda)!`);
-    console.error(`💡 Iltimos, serverni ishga tushirishdan oldin ".env" faylida yoki deployment muhitida ushbu o'zgaruvchini qo'lda sozlang.\n`);
+    logger.error(`\n❌ XATOLIK: Production muhitida "${envVar}" o'zgaruvchisi sozlanmagan yoki uning uzunligi yetarli emas (kamida ${minLength} ta belgi kutilmoqda)!`);
+    logger.error(`💡 Iltimos, serverni ishga tushirishdan oldin ".env" faylida yoki deployment muhitida ushbu o'zgaruvchini qo'lda sozlang.\n`);
     process.exit(1);
   }
 
@@ -125,19 +126,19 @@ function getSecret(envVar: string, minLength: number): string {
     if (fs.existsSync(secretFilePath)) {
       const savedSecret = fs.readFileSync(secretFilePath, "utf8").trim();
       if (savedSecret && savedSecret.length >= minLength) {
-        console.warn(`⚠️ OGOHLANTIRISH (Development/Sandbox): "${envVar}" topilmadi — saqlangan fayldan avto-kalit yuklandi (${secretFilePath}).`);
+        logger.warn(`⚠️ OGOHLANTIRISH (Development/Sandbox): "${envVar}" topilmadi — saqlangan fayldan avto-kalit yuklandi (${secretFilePath}).`);
         return savedSecret;
       }
     }
     const generated = crypto.randomBytes(32).toString('hex');
     fs.writeFileSync(secretFilePath, generated, "utf8");
-    console.warn(`⚠️ OGOHLANTIRISH (Development/Sandbox): "${envVar}" muhit o'zgaruvchisi sozlanmagan — yangi tasodifiy kalit generatsiya qilindi va kelajakda barqaror ulanish uchun quyidagi faylda saqlandi:\n👉 ${secretFilePath}\n`);
+    logger.warn(`⚠️ OGOHLANTIRISH (Development/Sandbox): "${envVar}" muhit o'zgaruvchisi sozlanmagan — yangi tasodifiy kalit generatsiya qilindi va kelajakda barqaror ulanish uchun quyidagi faylda saqlandi:\n👉 ${secretFilePath}\n`);
     return generated;
   } catch (fileErr) {
-    console.warn(`⚠️ OGOHLANTIRISH (Development/Sandbox): "${envVar}" avto-kalit faylini yaratishda xatolik yuz berdi:`, fileErr);
+    logger.warn({ fileErr }, `⚠️ OGOHLANTIRISH (Development/Sandbox): "${envVar}" avto-kalit faylini yaratishda xatolik yuz berdi:`);
   }
 
-  console.warn(`⚠️ OGOHLANTIRISH (Development/Sandbox): "${envVar}" topilmadi — vaqtinchalik tasodifiy kalit generatsiya qilindi. Bu kalit har gal server qayta tushganda o'zgaradi!`);
+  logger.warn(`⚠️ OGOHLANTIRISH (Development/Sandbox): "${envVar}" topilmadi — vaqtinchalik tasodifiy kalit generatsiya qilindi. Bu kalit har gal server qayta tushganda o'zgaradi!`);
   return crypto.randomBytes(32).toString('hex');
 }
 
@@ -156,14 +157,14 @@ const fileUrlCache = new Map<string, { url: string; expiresAt: number }>();
 
 // Coingate production check
 if (process.env.NODE_ENV === "production" && !process.env.COINGATE_API_TOKEN) {
-  console.warn("⚠️ DIQQAT: Production muhitida COINGATE_API_TOKEN topilmadi. To'lov tizimi ishlamaydi!");
+  logger.warn("⚠️ DIQQAT: Production muhitida COINGATE_API_TOKEN topilmadi. To'lov tizimi ishlamaydi!");
 }
 
 let googleClient: OAuth2Client | null = null;
 function getGoogleClient() {
   if (!googleClient) {
     if (!process.env.GOOGLE_CLIENT_ID) {
-      console.warn("GOOGLE_CLIENT_ID topilmadi. Google bilan kirish ishlamasligi mumkin.");
+      logger.warn("GOOGLE_CLIENT_ID topilmadi. Google bilan kirish ishlamasligi mumkin.");
       return null;
     }
     googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -194,7 +195,7 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
 export const isPostgres = !!(process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith("postgres"));
 
 if (process.env.NODE_ENV === "production" && !isPostgres) {
-  console.warn("⚠️ OGOOHLANTIRISH: Production muhitida DATABASE_URL to'g'ri PostgreSQL ulanish satri bilan sozlanmagan! SQLite ulanishidan foydalaniladi.");
+  logger.warn("⚠️ OGOOHLANTIRISH: Production muhitida DATABASE_URL to'g'ri PostgreSQL ulanish satri bilan sozlanmagan! SQLite ulanishidan foydalaniladi.");
 }
 
 export const prisma: any = isPostgres 
@@ -216,12 +217,12 @@ export async function getSetting(key: string): Promise<string | null> {
           const decrypted = decryptSecret(dbSetting.value);
           return decrypted;
         } catch (decryptErr) {
-          console.error(`Error decrypting setting ${key}:`, decryptErr);
+          logger.error({ decryptErr }, `Error decrypting setting ${key}:`);
         }
       }
     }
   } catch (err) {
-    console.error(`Error in getSetting for ${key}:`, err);
+    logger.error({ err }, `Error in getSetting for ${key}:`);
   }
   return process.env[key] || null;
 }
@@ -244,7 +245,7 @@ export async function trackEvent(event: string, userId?: number, targetId?: stri
       }
     });
   } catch (err) {
-    console.error("Analytics tracking error:", err);
+    logger.error({ err }, "Analytics tracking error");
   }
 }
 
@@ -294,7 +295,7 @@ async function autoReleaseEscrows() {
       }
     });
 
-    console.log(`Checking ${escrowsToRelease.length} escrows for auto-release...`);
+    logger.info(`Checking ${escrowsToRelease.length} escrows for auto-release...`);
 
     const paymentIds = escrowsToRelease.map((e: any) => e.paymentId);
     const activeDisputes = await prisma.dispute.findMany({
@@ -346,15 +347,15 @@ async function autoReleaseEscrows() {
               );
             }
             
-            console.log(`Auto-released escrow for payment ${escrow.paymentId}`);
+            logger.info(`Auto-released escrow for payment ${escrow.paymentId}`);
           } catch (itemErr) {
-            console.error(`Error auto-releasing escrow for payment ${escrow.paymentId}:`, itemErr);
+            logger.error({ itemErr }, `Error auto-releasing escrow for payment ${escrow.paymentId}:`);
           }
         }));
       }
     }
   } catch (err) {
-    console.error("Escrow auto-release error:", err);
+    logger.error({ err }, "Escrow auto-release error");
   }
 }
 
@@ -400,7 +401,7 @@ async function checkPendingRefunds() {
       }
     }
   } catch (err) {
-    console.error("checkPendingRefunds error:", err);
+    logger.error({ err }, "checkPendingRefunds error");
   }
 }
 
@@ -416,10 +417,10 @@ async function expireTopBoosts() {
       }
     });
     if (result.count > 0) {
-      console.log(`[CRON] Expired ${result.count} top boosts.`);
+      logger.info(`[CRON] Expired ${result.count} top boosts.`);
     }
   } catch (err) {
-    console.error("Error in expireTopBoosts:", err);
+    logger.error({ err }, "Error in expireTopBoosts");
   }
 }
 
@@ -492,14 +493,14 @@ async function sendWeeklyNewsletter() {
         try {
           await sendEmail(user.email, "📬 Savdo24 Haftalik Digest", html);
         } catch (emailErr) {
-          console.error(`Error sending weekly digest to ${user.email}:`, emailErr);
+          logger.error({ emailErr }, `Error sending weekly digest to ${user.email}:`);
         }
       }));
     }
 
-    console.log("Weekly newsletter sent to", users.length, "users.");
+    logger.info(`Weekly newsletter sent to ${users.length} users.`);
   } catch (err) {
-    console.error("Newsletter error:", err);
+    logger.error({ err }, "Newsletter error");
   }
 }
 
@@ -565,7 +566,7 @@ app.post("/api/payments/stripe-webhook", express.raw({ type: "application/json" 
   const webhookSecret = await getSetting("STRIPE_WEBHOOK_SECRET") || process.env.STRIPE_WEBHOOK_SECRET;
 
   if (!webhookSecret || !sig) {
-    console.error("Stripe webhook: STRIPE_WEBHOOK_SECRET yoki stripe-signature header topilmadi.");
+    logger.error("Stripe webhook: STRIPE_WEBHOOK_SECRET yoki stripe-signature header topilmadi.");
     return res.status(400).json({ error: "Webhook not configured." });
   }
 
@@ -578,7 +579,7 @@ app.post("/api/payments/stripe-webhook", express.raw({ type: "application/json" 
   try {
     event = stripe.webhooks.constructEvent(req.body, sig as string, webhookSecret);
   } catch (err: any) {
-    console.error("Stripe webhook signature tekshiruvi muvaffaqiyatsiz:", err.message);
+    logger.error({ errMsg: err.message }, "Stripe webhook signature tekshiruvi muvaffaqiyatsiz:");
     return res.status(400).json({ error: `Webhook signature error: ${err.message}` });
   }
 
@@ -588,13 +589,13 @@ app.post("/api/payments/stripe-webhook", express.raw({ type: "application/json" 
       const orderId = session.metadata?.orderId;
 
       if (!orderId) {
-        console.error("Stripe webhook: session.metadata.orderId topilmadi.", session.id);
+        logger.error({ sessionId: session.id }, "Stripe webhook: session.metadata.orderId topilmadi.");
         return res.json({ received: true });
       }
 
       const payment = await prisma.payment.findUnique({ where: { id: orderId } });
       if (!payment) {
-        console.error("Stripe webhook: to'lov topilmadi:", orderId);
+        logger.error({ orderId }, "Stripe webhook: to'lov topilmadi:");
         return res.json({ received: true });
       }
 
@@ -610,7 +611,7 @@ app.post("/api/payments/stripe-webhook", express.raw({ type: "application/json" 
       // To'langan summa haqiqatan ham kutilgan summaga mos kelishini tekshirish
       const paidAmount = (session.amount_total ?? 0) / 100;
       if (Math.abs(paidAmount - Number(payment.amount)) > 0.01) {
-        console.warn(`Stripe webhook: summa mos kelmadi. Kutilgan: ${payment.amount}, Kelgan: ${paidAmount}`);
+        logger.warn(`Stripe webhook: summa mos kelmadi. Kutilgan: ${payment.amount}, Kelgan: ${paidAmount}`);
         return res.status(400).json({ error: "Payment amount mismatch." });
       }
 
@@ -882,7 +883,7 @@ export async function authenticateToken(req: AuthRequest, res: Response, next: N
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
     const user = await prisma.user.findUnique({ where: { id: decoded.id } });
     if (!user || user.isBanned) {
       return res.status(403).json({ error: "Sizning hisobingiz bloklangan yoki topilmadi." });
@@ -1187,7 +1188,7 @@ app.post("/api/analytics/track", async (req: Request, res: Response) => {
   const token = req.cookies?.token || (req.headers.authorization && req.headers.authorization.split(' ')[1]);
   if (token) {
     try {
-      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
       userId = decoded.id;
     } catch {}
   }
@@ -1441,7 +1442,7 @@ app.get("/api/startups", async (req: Request, res: Response) => {
       adminCheckToken = authHeader && authHeader.split(" ")[1];
     }
     if (adminCheckToken) {
-      const decoded = jwt.verify(adminCheckToken, JWT_SECRET) as any;
+      const decoded = jwt.verify(adminCheckToken, JWT_SECRET) as JwtPayload;
       if (decoded?.role === "Admin") isRequestingAdmin = true;
       if (decoded?.id) requestingUserId = decoded.id;
     }
@@ -1568,7 +1569,7 @@ app.get("/api/startups/:id", async (req: Request, res: Response) => {
     }
     if (token) {
       try {
-        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
         currentUser = await prisma.user.findUnique({ where: { id: decoded.id } });
       } catch (err) {}
     }
@@ -1657,6 +1658,11 @@ const createStartupSchema = z.object({
     return !isNaN(parsed) && parsed > 0;
   }, {
     message: "Narx musbat son bo'lishi shart."
+  }).refine((val) => {
+    const parsed = parseFloat(String(val));
+    return parsed <= 1000000;
+  }, {
+    message: "Narx 1000000 dan oshmasligi kerak."
   }).transform((val) => parseFloat(String(val))),
   
   listingType: z.string().optional().nullable(),
@@ -1706,6 +1712,13 @@ app.post("/api/startups", authenticateToken, async (req: AuthRequest, res: Respo
     deliveryUrl,
     attributes,
   } = parsed.data;
+
+  const validCategory = await prisma.category.findFirst({
+    where: { id: category }
+  });
+  if (!validCategory) {
+    return res.status(400).json({ error: "Yaroqsiz kategoriya tanlandi." });
+  }
 
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user?.id } });
@@ -1774,6 +1787,15 @@ app.patch("/api/startups/:id", authenticateToken, async (req: AuthRequest, res: 
     return res.status(400).json({ error: parsed.error.issues[0].message });
   }
   const validatedData = parsed.data;
+
+  if (validatedData.category) {
+    const validCategory = await prisma.category.findFirst({
+      where: { id: validatedData.category }
+    });
+    if (!validCategory) {
+      return res.status(400).json({ error: "Yaroqsiz kategoriya tanlandi." });
+    }
+  }
 
   try {
     const startup = await prisma.startup.findUnique({ where: { id } });
@@ -2017,7 +2039,7 @@ app.post("/api/startups/:id/ideas", ideaLimiter, async (req: Request, res: Respo
 
     if (token) {
       try {
-        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
         userId = decoded.id;
         if (!finalAuthorName) {
           finalAuthorName = decoded.name;
@@ -3023,6 +3045,10 @@ app.post("/api/payments/webhook", async (req: Request, res: Response) => {
       }
     }
 
+    if (!coingateToken || !id) {
+      logger.warn({ order_id }, "Webhook COINGATE_API_TOKEN yoki id yo'qligi sababli mustaqil tasdiqlanmadi — faqat callback token bilan cheklanmoqda.");
+    }
+
     // CoinGate statuses: paid or completed mean successful payment
     const isCompleted = verifiedStatus === "paid" || verifiedStatus === "completed";
 
@@ -3431,13 +3457,13 @@ app.get("/sitemap.xml", async (req: Request, res: Response) => {
 // Dynamic SEO for Startup Pages
 app.get("/startup/:id", createBotMetaHandler(prisma, getSetting));
 
-  if (process.env.NODE_ENV !== "production") {
+  if (process.env.NODE_ENV !== "production" && process.env.NODE_ENV !== "test") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
-  } else {
+  } else if (process.env.NODE_ENV === "production") {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {

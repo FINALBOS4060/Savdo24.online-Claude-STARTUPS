@@ -76,9 +76,24 @@ router.patch("/:id/ban", authenticateToken, requireAdmin, async (req: AuthReques
   try {
     const { id } = req.params;
     const { isBanned } = req.body;
+    const userId = Number(id);
+
+    if (userId === req.user!.id && isBanned) {
+      return res.status(400).json({ error: "O'z hisobingizni bloklay olmaysiz." });
+    }
+
+    const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+    if (!targetUser) return res.status(404).json({ error: "Foydalanuvchi topilmadi." });
+
+    if (targetUser.role === "Admin" && isBanned) {
+      const unbannedAdminCount = await prisma.user.count({ where: { role: "Admin", isBanned: false } });
+      if (unbannedAdminCount <= 1) {
+        return res.status(400).json({ error: "Tizimda kamida bitta bloklanmagan Admin qolishi kerak." });
+      }
+    }
 
     const user = await prisma.user.update({
-      where: { id: Number(id) },
+      where: { id: userId },
       data: { isBanned }
     });
 
@@ -269,6 +284,9 @@ router.delete("/:id", authenticateToken, requireAdmin, async (req: AuthRequest, 
     const userReferralIds = (
       await prisma.referral.findMany({ where: { referrerId: userId }, select: { id: true } })
     ).map((r: any) => r.id);
+    const refereeReferralIds = (
+      await prisma.referral.findMany({ where: { refereeId: userId }, select: { id: true } })
+    ).map((r: any) => r.id);
 
     await prisma.$transaction([
       ...(userConversationIds.length > 0
@@ -286,7 +304,14 @@ router.delete("/:id", authenticateToken, requireAdmin, async (req: AuthRequest, 
       ...(userReferralIds.length > 0
         ? [prisma.referralReward.deleteMany({ where: { referralId: { in: userReferralIds } } })]
         : []),
+      prisma.notification.deleteMany({ where: { userId } }),
       prisma.referral.deleteMany({ where: { referrerId: userId } }),
+      ...(refereeReferralIds.length > 0
+        ? [prisma.referralReward.deleteMany({ where: { referralId: { in: refereeReferralIds } } })]
+        : []),
+      ...(refereeReferralIds.length > 0
+        ? [prisma.referral.deleteMany({ where: { refereeId: userId } })]
+        : []),
       prisma.refreshToken.deleteMany({ where: { userId } }),
       prisma.review.deleteMany({ where: { buyerId: userId } }),
       prisma.dispute.deleteMany({ where: { buyerId: userId } }),

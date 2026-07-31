@@ -104,3 +104,12 @@ declare global {
   }
 }
 
+
+export interface JwtPayload {
+  id: number;
+  email: string;
+  name: string;
+  role: string;
+  iat?: number;
+  exp?: number;
+}

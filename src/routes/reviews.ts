@@ -25,6 +25,10 @@ router.post("/reviews", authenticateToken, financialActionLimiter, async (req: A
     return res.status(400).json({ error: "Barcha maydonlarni to'ldiring." });
   }
 
+  if (comment.length > 1000) {
+    return res.status(400).json({ error: "Sharh matni 1000 belgidan oshmasligi kerak." });
+  }
+
   const ratingInt = parseInt(rating, 10);
   if (isNaN(ratingInt) || ratingInt < 1 || ratingInt > 5) {
     return res.status(400).json({ error: "Reyting 1 dan 5 gacha bo'lishi kerak." });

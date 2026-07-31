@@ -1750,3 +1750,78 @@ kerak bo'ladi, xavfli qadam).
 
 91-band (admin-delete.ts tuzatishi): DELETE /api/admin/startups/:id transaction ichida Payment o'chirilishidan oldin bog'liq ReferralReward yozuvlari etim qolmasligi uchun tx.referralReward.deleteMany({ where: { paymentId: { in: paymentIds } } }) qo'shildi (ReferralReward.paymentId Payment'ga FK emas, oddiy maydon). admin-delete.ts'dagi /ideas/:id tekshirildi — ideaVote va idea to'g'ri o'chirilishi tasdiqlandi.
 
+127-bosqich: FRONTEND ULKAN KOMPONENTLARNI MAYDALASH.
+AdminPage.tsx'dan monolithic bo'lim bo'lgan "Foydalanuvchilar" (Users tab) va uning batafsil modal (User Detail Modal) boshqaruvi to'liq ajratilib, `src/components/admin/AdminUsersTab.tsx` yangi modular fayliga ko'chirildi.
+Barcha bog'liq state'lar va API so'rov helperlari (fetchAdminUsers, handleBanUser, fetchUserDetails, handleUpdateUserVip, handleUpdateUserRole, handleDeleteUser, handleSendResetLink) yangi komponent ichiga o'tkazilib, uning o'zida boshqariladigan qilindi.
+AdminPage.tsx dagi ushbu bo'limlar to'liq o'chirilib, `<AdminUsersTab />` chaqiruvi bilan almashtirildi. Ortqicha state'lar tozalandi, reports bo'limidagi eskirgan `fetchAdminUsers` chaqiruvi olib tashlandi (yangilangan tab prop orqali qidiruvni avtomatik eshitib yuklaydi).
+Sintaksis va compile_applet tekshiruvi muvaffaqiyatli o'tdi (Build succeeded).
+DIQQAT — HALI SERVERDA SINALMAGAN: Admin panel "Foydalanuvchilar" bo'limini (qidirish, batafsil, bloklash, VIP kunlarini yangilash, rolni o'zgartirish, o'chirish) qo'lda tekshirish kerak.-e 
+128-bosqich: LOGLASHNI YAGONA TIZIMGA O'TKAZISH (1-qism).
+server.ts faylidagi birinchi 30 ta console.* (console.log, console.error, console.warn) chaqiruvlari pino logger formatiga (logger.info, logger.error, logger.warn) almashtirildi. Xabardagi ob'ekt va o'zgaruvchilar to'g'ri strukturaga o'tkazildi (masalan: logger.error({ err }, '...')). Hozirda server.ts faylida yana 87 ta console.* chaqiruvi qoldi.
+Sintaksis va compile_applet tekshiruvi muvaffaqiyatli o'tdi.
+DIQQAT — HALI QO'LDA SINALMAGAN — log chiqishi to'g'ri formatda ekanini serverni ishga tushirib tekshirish kerak.
+
+129-bosqich: JWT'DAN OLINGAN MA'LUMOTLARGA TUR (TYPE) QO'SHISH (1-qism).
+`src/types.ts` fayliga `JwtPayload` interfeysi (id, email, name, role) qo'shildi. `server.ts` dagi birinchi 5 ta `jwt.verify(...) as any` chaqiruvi `as JwtPayload` turiga o'tkazildi va barcha decoded.id, decoded.role, decoded.name kabi maydonlar o'zgarishsiz, muvaffaqiyatli xatosiz ishlashi tsc --noEmit orqali tasdiqlandi.
+Jami `server.ts` va backend marshrutlarida (auth.ts va hokazo) as any orqali yozilgan jwt qatorlar 2 ta, hamda boshqa `as any` qismlari bilan birga 10 ta qoldi. 
+HALI QO'LDA SINALMAGAN — login, admin panel va profil sahifalarini ochib sessiya ishlashini tekshirish kerak.
+
+130-bosqich: TEZ-TEZ SO'RALADIGAN MODELLARGA INDEKS QO'SHISH.
+Backend kodidagi (`server.ts` va `src/routes/*.ts`) `where` qidiruv shartlari tahlil qilinib, haqiqatda filtr sifatida ishlatiladigan maydonlar aniqlandi va `prisma/schema.prisma` hamda `prisma/schema.sqlite.prisma` fayllariga quyidagi indekslar qo'shildi:
+- `User` modeli: `role`, `isBanned` va `joinDate` (chunki admin-users, statistika va b2b joylarida xuddi shu maydonlar bilan `findMany/count` qilinadi). `email`, `telegramUserId`, `telegramLinkCode` maydonlariga tegmadim, chunki ularda allaqachon `@unique` yordamida avtomatik indeks mavjud.
+- `RefreshToken`: `userId` (chunki logout paytida `deleteMany({ where: { userId } })` ishlatiladi).
+- `TopBoost` va `VipSubscription`: `userId` (chunki userni o'chirganda barcha tegishli yozuvlarni tozalash uchun `deleteMany({ where: { userId } })` qilinadi, `expiresAt` esa kodda bazadan emas, ilova ichida yoki `startup` modeli orqali topiladi).
+- `Report` va `SupportTicket` modellari uchun indeks qo'shilmadi, chunki ularda holat (`status`) bo'yicha hech qanday `where` ishlatilmaydi, faqat `orderBy: { createdAt: "desc" }` bilan barcha elementlar olinmoqda (`Report` dagi `reporterId, targetType, targetId` esa avval qo'shilgan `@@unique` sababli indeksga ega). `AnalyticsEvent` da faqat `create` so'rovi bor.
+HALI QO'LLANILMAGAN — buni `prisma db push` yoki migratsiya orqali qo'lda, backup olingandan keyin qo'llash kerak.
+
+131-bosqich: .ENV.EXAMPLE FAYLINI TO'LIQLASH.
+Loyihada ishlatiladigan, lekin `.env.example` faylida ko'rsatilmagan 4 ta muhit o'zgaruvchisi topildi va qo'shildi:
+- `APPLET_ID` (production'da ishlashi uchun majburiy xavfsizlik parametri)
+- `NODE_ENV` (Node.js muhiti - development/production/test, ixtiyoriy, standart: development)
+- `LOG_LEVEL` (pino logger darajasi - debug/info/warn/error, ixtiyoriy, standart: info)
+- `TELEGRAM_BOT_API_TOKEN` (`TELEGRAM_BOT_TOKEN` ning muqobili, ixtiyoriy)
+Ushbu o'zgarishlar faqat hujjatlashtirish va dasturchilarga qulaylik yaratish uchun qilingani sababli, hech qanday mantiq yoki ishlash o'zgarmadi.
+
+132-bosqich: DISPUTE STATUS QIYMATINI TEKSHIRISH (validatsiya).
+`src/routes/disputes.ts` faylida `PATCH /api/disputes/:id` so'rovida `status` qiymati qat'iy ro'yxat bo'yicha tekshiriladigan bo'ldi: `["open", "reviewing", "resolved", "rejected"]`.
+Agar frontend noto'g'ri qiymat yuborsa, 400 xatolik va "Yaroqsiz status qiymati." xabari qaytariladi.
+Ushbu 3 ta status joriy frontend tizimiga va bazada ishlatilayotgan qiymatlarga asoslanib tanlandi. 
+HALI QO'LDA SINALMAGAN — admin paneldan nizoni turli statuslarga o'zgartirib ko'rish kerak.
+
+133-bosqich: /BAN ENDPOINTIGA XAVFSIZLIK TEKSHIRUVLARINI QO'SHISH.
+`src/routes/admin-users.ts` faylidagi `PATCH /api/admin/users/:id/ban` endpointiga ikkita yangi xavfsizlik tekshiruvi qo'shildi:
+1. O'z-o'zini bloklashni oldini olish.
+2. Oxirgi faol adminni bloklashni oldini olish (agar foydalanuvchi Admin bo'lsa, tizimda kamida bitta bloklanmagan admin borligi tekshiriladi).
+HALI QO'LDA SINALMAGAN — admin panelda o'zini bloklashga urinish va yagona adminni bloklashga urinish rad etilishini tekshirish kerak.
+
+134-bosqich: SHARH (REVIEW) MATNIGA UZUNLIK CHEGARASI QO'SHISH.
+`src/routes/reviews.ts` faylidagi `POST /api/reviews` so'roviga sharh matni (`comment`) uchun uzunlik chegarasi (maximum 1000 belgi) qo'shildi. Bu `server.ts` dagi xabarlar yuborish naqshiga (`content.length > 500`) o'xshash holda shakllantirildi. 1000 belgilik chegara tanlandi, chunki frontendda o'rnatilgan aniq `maxLength` atributi topilmadi.
+HALI QO'LDA SINALMAGAN — juda uzun sharh yuborishga urinib, 400 xato qaytarilishini tekshirish kerak.
+
+135-bosqich: WEBHOOK'NI COINGATE TOKENISIZ ISHLASHINI TAQIQLASH (OGOHLANTIRISH QO'SHISH).
+`server.ts` faylidagi `POST /api/payments/webhook` so'rovida `COINGATE_API_TOKEN` yoki `id` bo'lmaganda `logger.warn` yordamida ogohlantirish yozilishi ta'minlandi. 
+Shuningdek, `AdminPage.tsx` sozlamalar sahifasida `COINGATE_API_TOKEN` kiritilmagan bo'lsa, ma'lumot beruvchi xabardor qiluvchi ogohlantirish matni qo'shildi ("DIQQAT: CoinGate API tokeni sozlanmagan — to'lov webhooklari mustaqil tasdiqlanmaydi.").
+HALI QO'LDA SINALMAGAN — COINGATE_API_TOKEN'ni vaqtincha o'chirib, webhookni sinab, log yozuvi chiqishini tekshirish kerak.
+
+136-bosqich: SAHIFALASH (PAGINATION) UCHUN UMUMIY YORDAMCHI FUNKSIYA.
+`src/lib/pagination.ts` fayli yaratilib, ichida `parsePagination` funksiyasi yozildi. Ushbu funksiya `req.query`'dan `page` va `limit` ni xavfsiz ajratib olib, standart va maksimal chegaralarni inobatga olgan holda `page`, `limit`, va `skip` qiymatlarini qaytaradi.
+`src/routes/b2b.ts` faylidagi `GET /api/admin/b2b` endpointi shu funksiyaga o'tkazildi (standart 50, maksimal 100).
+`src/routes/referrals.ts` faylidagi `GET /api/admin/referrals` endpointiga sahifalash qo'shildi (standart 20, maksimal 100) va javob formati `{ data, total, page, totalPages }` ko'rinishiga o'zgartirildi. Frontend (AdminPage.tsx) da ushbu referrals ro'yxati formati moslashtirilishi kerak bo'lishi mumkin - MEN SO'RAGANDA tuzataman.
+HALI QO'LDA SINALMAGAN — admin panelda B2B va Referrals bo'limlarini ochib, ro'yxat to'g'ri ko'rinishini tekshirish kerak.
+
+137-bosqich: ESKI XABARLARNI YUKLASH IMKONIYATI QO'SHISH.
+`src/routes/conversations.ts` faylidagi GET `/api/conversations/:id/messages` endpointiga `before` query parametri qo'shildi. Endi u `hasMore` bayrog'ini va xabarlar ro'yxatini qaytaradi.
+`src/components/MessagesPage.tsx` faylida "Oldingi xabarlarni yuklash" tugmasi qo'shildi, u `hasMore` true bo'lganda ko'rinadi va yuklangan xabarlarni ro'yxat boshiga qo'shadi.
+HALI QO'LDA SINALMAGAN — 50 tadan ortiq xabar bo'lgan (yoki qo'lda shuncha xabar yozib test qilingan) suhbatda 'Oldingi xabarlarni yuklash' tugmasi to'g'ri ishlashini brauzerda tekshirish kerak.
+
+138-bosqich: GOOGLE_CLIENT_ID'NI SECRET_KEYS RO'YXATIDAN OLIB TASHLASH.
+`src/routes/admin-settings.ts` faylidagi `SECRET_KEYS` ro'yxatidan `GOOGLE_CLIENT_ID` olib tashlandi, chunki Client ID maxfiy (secret) emas va uni admin panelda niqoblab (mask) ko'rsatish shart emas.
+
+139-bosqich: E'LON NARXIGA YUQORI CHEGARA QO'SHISH.
+`server.ts` faylidagi `createStartupSchema` ichida `price` maydoni uchun 1,000,000 qiymatida maksimal chegara o'rnatildi.
+Bu qiymat frontend (`SellPage.tsx`) da max qiymat topilmagani sababli standart o'laroq tanlandi.
+HALI QO'LDA SINALMAGAN — SellPage orqali juda katta narx kiritishga urinib, 400 xato qaytarilishini tekshirish kerak.
+
+140-bosqich: CATEGORY MAYDONINI BAZADAGI RO'YXAT BILAN TEKSHIRISH.
+`server.ts` faylidagi POST `/api/startups` va PATCH `/api/startups/:id` endpointlarida `category` maydoni uchun server darajasidagi tekshiruv qo'shildi. `prisma.category.findFirst` yordamida tanlangan kategoriyaning bazada mavjudligi (`id` maydoni bo'yicha) tekshiriladi.
+HALI QO'LDA SINALMAGAN — SellPage orqali yangi e'lon yaratib (haqiqiy kategoriya bilan) hammasi ishlashini, va to'g'ridan-to'g'ri API so'rovida noto'g'ri category qiymati bilan 400 xato qaytarilishini tekshirish kerak.

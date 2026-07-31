@@ -47,6 +47,10 @@ model User {
   referredBy         Referral[] @relation("RefereeReferrals")
   b2bAccount         B2BAccount?
   auditLogs          AuditLog[]
+
+  @@index([role])
+  @@index([isBanned])
+  @@index([joinDate])
 }
 
 model Category {
@@ -195,6 +199,8 @@ model RefreshToken {
   ip        String?
   expiresAt DateTime
   createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Report {
@@ -268,6 +274,8 @@ model TopBoost {
   startsAt    DateTime @default(now())
   expiresAt   DateTime
   createdAt   DateTime @default(now())
+
+  @@index([userId])
 }
 
 model VipSubscription {
@@ -279,6 +287,8 @@ model VipSubscription {
   startsAt    DateTime @default(now())
   expiresAt   DateTime
   createdAt   DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Conversation {
