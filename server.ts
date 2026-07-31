@@ -2177,25 +2177,26 @@ async function createPaymentOrder(userId: number, startupId: string, referralCod
   // bu qo'lda qaytarish talab qiladi). Endi shu userId+startupId uchun
   // eski "pending" buyurtmalar yangisi yaratilishidan oldin "cancelled"
   // qilinadi.
-  await prisma.payment.updateMany({
-    where: { userId, startupId, status: "pending" },
-    data: { status: "cancelled" }
-  }).catch(() => {});
-
-  await prisma.payment.create({
-    data: {
-      id: orderId,
-      amount: realAmount,
-      status: "pending",
-      currency: "USDT",
-      userId: userId,
-      startupId: startupId,
-      callbackToken: secureToken,
-      gateway: "coingate",
-      source: paymentSource,
-      referralId: referralId
-    },
-  });
+  await prisma.$transaction([
+    prisma.payment.updateMany({
+      where: { userId, startupId, status: "pending" },
+      data: { status: "cancelled" }
+    }),
+    prisma.payment.create({
+      data: {
+        id: orderId,
+        amount: realAmount,
+        status: "pending",
+        currency: "USDT",
+        userId: userId,
+        startupId: startupId,
+        callbackToken: secureToken,
+        gateway: "coingate",
+        source: paymentSource,
+        referralId: referralId
+      },
+    })
+  ]);
 
   let paymentUrl = "";
   let useStripe = false;
@@ -3037,7 +3038,8 @@ app.get("/api/notifications", authenticateToken, async (req: AuthRequest, res: R
   try {
     const notifications = await prisma.notification.findMany({
       where: { userId: req.user!.id },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
+      take: 50
     });
     res.json(notifications);
   } catch (err) {

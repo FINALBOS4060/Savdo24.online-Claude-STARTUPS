@@ -127,15 +127,12 @@ router.post("/escrow/dispute", authenticateToken, financialActionLimiter, async 
 
     // 5-MUAMMO: Hardcoded admin ID (1) o'rniga barcha haqiqiy adminlarni topib, ularga bildirishnoma yuborish
     const admins = await prisma.user.findMany({ where: { role: "Admin" } });
-    await Promise.all(admins.map((admin: any) =>
+    await Promise.all(admins.map((admin: { id: number }) =>
       createNotification(
         admin.id,
         "SYSTEM",
         "Yangi Escrow Nizosi",
         `To'lov #${paymentId} bo'yicha nizo ochildi.`,
-        // 93-band: "/admin/disputes" haqiqiy route emas edi (faqat "/admin" bor,
-        // "*" catch-all uni "/" ga qaytarardi) — endi mavjud "/admin" route +
-        // AdminPage o'zi o'qiydigan ?tab= query orqali to'g'ri tabga o'tkaziladi.
         `/admin?tab=disputes`
       )
     ));
@@ -173,7 +170,7 @@ router.get("/admin/escrow-disputes", authenticateToken, requireAdmin, async (req
       orderBy: { createdAt: "desc" }
     });
     res.json(disputes);
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error({ err }, "Get escrow disputes error");
     res.status(500).json({ error: "Escrow nizolarini olishda xatolik yuz berdi." });
   }
@@ -181,7 +178,7 @@ router.get("/admin/escrow-disputes", authenticateToken, requireAdmin, async (req
 
 router.patch("/admin/escrow-disputes/:id", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
-  const { resolution, adminNote } = req.body;
+  const { resolution, adminNote } = req.body as { resolution?: string; adminNote?: string };
 
   if (resolution !== "released" && resolution !== "refunded") {
     return res.status(400).json({ error: "Qaror faqat 'released' yoki 'refunded' bo'lishi mumkin." });
@@ -224,7 +221,7 @@ router.patch("/admin/escrow-disputes/:id", authenticateToken, requireAdmin, asyn
       await prisma.payment.update({
         where: { id: disputeResolution.escrow.paymentId },
         data: { status: "refund_required" }
-      }).catch((e: any) => logger.error({ err: e }, "Payment status refund_required'ga o'tkazishda xatolik"));
+      }).catch((e: unknown) => logger.error({ err: e }, "Payment status refund_required'ga o'tkazishda xatolik"));
     }
 
     await prisma.disputeResolution.update({
@@ -256,10 +253,10 @@ router.patch("/admin/escrow-disputes/:id", authenticateToken, requireAdmin, asyn
         targetId: String(disputeResolution.id),
         details: `Escrow nizosi (to'lov ID: ${disputeResolution.paymentId}) hal qilindi: ${resolution}.`
       }
-    }).catch((e: any) => logger.error({ err: e }, "Audit log error"));
+    }).catch((e: unknown) => logger.error({ err: e }, "Audit log error"));
 
     res.json({ success: true });
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error({ err }, "Resolve escrow dispute error");
     res.status(500).json({ error: "Nizoni hal qilishda xatolik yuz berdi." });
   }
@@ -278,7 +275,7 @@ router.get("/admin/escrow-refunds", authenticateToken, requireAdmin, async (req:
       orderBy: { createdAt: "desc" }
     });
     res.json(payments);
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error({ err }, "Get pending escrow refunds error");
     res.status(500).json({ error: "Qaytarish talab qilinadigan to'lovlarni olishda xatolik." });
   }
@@ -324,10 +321,10 @@ router.post("/admin/escrow-refunds/:paymentId/complete", authenticateToken, requ
         targetId: paymentId,
         details: `To'lov (ID: ${paymentId}) bo'yicha pul qaytarish CoinGate'da bajarildi deb belgilandi.`
       }
-    }).catch((e: any) => logger.error({ err: e }, "Audit log error"));
+    }).catch((e: unknown) => logger.error({ err: e }, "Audit log error"));
 
     res.json({ success: true, message: "Pul qaytarish yakunlandi deb belgilandi." });
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error({ err }, "Complete escrow refund error");
     res.status(500).json({ error: "Pul qaytarishni yakunlashda xatolik." });
   }

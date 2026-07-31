@@ -146,7 +146,8 @@ router.get("/users/:id/reviews", async (req: Request, res: Response) => {
           }
         }
       },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
+      take: 50
     });
 
     const user = await prisma.user.findUnique({
