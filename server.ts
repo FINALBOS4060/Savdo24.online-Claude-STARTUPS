@@ -740,6 +740,9 @@ export function formatStartup(dbStartup: any) {
     };
     // Hide deliveryUrl from general viewing. It should only be accessible to the verified buyer on payment status check.
     delete formatted.deliveryUrl;
+    delete formatted.contactEmail;
+    delete formatted.contactPhone;
+    delete formatted.contactTelegram;
     return formatted;
   } catch (err) {
     console.error("Error formatting startup:", err);
@@ -1589,6 +1592,9 @@ app.get("/api/startups/:id", async (req: Request, res: Response) => {
     const formatted = formatStartup(startupRecord);
     if (isOwner || isAdmin) {
       formatted.deliveryUrl = startupRecord.deliveryUrl || '';
+      formatted.contactEmail = startupRecord.contactEmail || '';
+      formatted.contactPhone = startupRecord.contactPhone || '';
+      formatted.contactTelegram = startupRecord.contactTelegram || '';
     }
 
     res.json(formatted);

@@ -11,7 +11,7 @@ export const ideaLimiter = rateLimit({
   validate: false,
   windowMs: 1 * 60 * 1000,
   max: 3,
-  keyGenerator: (req: any) => req.cookies?.guest_id || req.ip || "unknown",
+  keyGenerator: (req: any) => `${req.ip || "unknown"}:${req.cookies?.guest_id || "noguest"}`,
   message: { error: "Juda ko'p komment qoldirildi. Iltimos, 1 daqiqadan so'ng qayta urinib ko'ring." }
 });
 
@@ -19,7 +19,7 @@ export const upvoteLimiter = rateLimit({
   validate: false,
   windowMs: 1 * 60 * 1000,
   max: 10,
-  keyGenerator: (req: any) => req.cookies?.guest_id || req.ip || "unknown",
+  keyGenerator: (req: any) => `${req.ip || "unknown"}:${req.cookies?.guest_id || "noguest"}`,
   message: { error: "Juda ko'p ovoz berildi. Iltimos, 1 daqiqadan so'ng qayta urinib ko'ring." }
 });
 

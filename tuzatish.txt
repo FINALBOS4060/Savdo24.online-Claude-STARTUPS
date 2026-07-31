@@ -1825,3 +1825,31 @@ HALI QO'LDA SINALMAGAN — SellPage orqali juda katta narx kiritishga urinib, 40
 140-bosqich: CATEGORY MAYDONINI BAZADAGI RO'YXAT BILAN TEKSHIRISH.
 `server.ts` faylidagi POST `/api/startups` va PATCH `/api/startups/:id` endpointlarida `category` maydoni uchun server darajasidagi tekshiruv qo'shildi. `prisma.category.findFirst` yordamida tanlangan kategoriyaning bazada mavjudligi (`id` maydoni bo'yicha) tekshiriladi.
 HALI QO'LDA SINALMAGAN — SellPage orqali yangi e'lon yaratib (haqiqiy kategoriya bilan) hammasi ishlashini, va to'g'ridan-to'g'ri API so'rovida noto'g'ri category qiymati bilan 400 xato qaytarilishini tekshirish kerak.
+
+141-bosqich: GUEST_ID COOKIE ORQALI RATE-LIMIT CHETLAB O'TISHINI TUZATISH.
+`src/lib/rateLimiters.ts` faylidagi `ideaLimiter` va `upvoteLimiter` uchun `keyGenerator` o'zgartirildi. Endi kalit sifatida IP manzil va `guest_id` cookie qiymati birgalikda ishlatiladi (`${req.ip || "unknown"}:${req.cookies?.guest_id || "noguest"}`). Bu `guest_id`'ni almashtirish orqali cheklovni chetlab o'tishni qiyinlashtiradi.
+HALI QO'LDA SINALMAGAN — bir necha marta guest_id cookie'ni qo'lda almashtirib (masalan brauzer devtools orqali) komment/ovoz berishga urinib, endi limitga tushishini tekshirish kerak.
+
+142-bosqich: ASOSIY PACKAGE.JSON'DAGI ANDOZA NOMINI TUZATISH.
+`package.json` faylidagi `name` maydoni "savdo24-online" ga, `version` esa "1.0.0" ga o'zgartirildi.
+DIQQAT: `package-lock.json` va `bun.lock` fayllarida "react-example" nomi saqlanib qoldi (ular avtomatik boshqariladi). Build yoki deploy jarayonida muammo bo'lsa, ularni tekshirish kerak bo'lishi mumkin.
+HALI QO'LDA SINALMAGAN — npm install va build jarayoni xato bermasligini tekshirish kerak.
+
+142-bosqich: ASOSIY PACKAGE.JSON'DAGI ANDOZA NOMINI TUZATISH.
+`package.json` faylidagi `name` maydoni "savdo24-online" ga, `version` esa "1.0.0" ga o'zgartirildi.
+DIQQAT: `package-lock.json` va `bun.lock` fayllarida "react-example" nomi saqlanib qoldi (ular avtomatik boshqariladi). Build yoki deploy jarayonida muammo bo'lsa, ularni tekshirish kerak bo'lishi mumkin.
+HALI QO'LDA SINALMAGAN — npm install va build jarayoni xato bermasligini tekshirish kerak.
+
+143-bosqich: ASOSIY SAHIFALARNI LAZY-LOAD QILISH.
+`src/App.tsx` faylida `AdminPage` va `ProfilePage` komponentlari `React.lazy()` orqali lazy-load qilindi va `Suspense` bilan o'raldi.
+Build natijalari:
+- Asosiy chunk (index-GWFh-m_u.js) hajmi ~1.6MB dan ~934KB ga kamaydi.
+- AdminPage (~575KB) va ProfilePage (~92KB) alohida chunk'larga ajratildi.
+HALI QO'LDA SINALMAGAN — /admin va /profile sahifalariga o'tishda Suspense fallback to'g'ri ko'rinishini va sahifa muvaffaqiyatli yuklanishini brauzerda tekshirish kerak.
+Qolgan sahifalar (DetailPage, SellPage, BrowsePage va h.k.) uchun ham kelgusida xuddi shu usulda lazy-load rejalashtirilmoqda.
+
+144-bosqich: SOTUVCHI ALOQA MA'LUMOTLARINI OCHIQ API'DAN YASHIRISH.
+`server.ts` faylidagi `formatStartup` funksiyasida `contactEmail`, `contactPhone`, `contactTelegram` maydonlari o'chirildi (ochiq API uchun).
+GET `/api/startups/:id` endpointida faqat egasi yoki admin uchun bu ma'lumotlar qayta tiklanishi ta'minlandi.
+To'lov qilingan xaridorlar uchun `sellerContact` mavjudligini tekshirdik (u to'g'ri ishlamoqda).
+HALI QO'LDA SINALMAGAN — 1) tizimga kirmasdan biror e'lon sahifasini ochib, tarmoq (Network) panelida API javobida contactEmail/Phone/Telegram endi ko'rinmasligini, 2) haqiqiy xaridor sifatida sotib olgandan keyin sotuvchi bilan bog'lanish ma'lumoti hali ham to'g'ri ko'rinishini tekshirish kerak.

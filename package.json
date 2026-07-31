@@ -1,7 +1,7 @@
 {
-  "name": "react-example",
+  "name": "savdo24-online",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "npx prisma generate --schema=prisma/schema.sqlite.prisma && npx prisma generate --schema=prisma/schema.prisma && tsx server.ts",

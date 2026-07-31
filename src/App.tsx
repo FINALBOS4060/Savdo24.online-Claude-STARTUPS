@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { Startup, UserProfileData, ProfileTab, Category, Notification } from './types';
@@ -6,11 +6,9 @@ import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import MobileNav from './components/MobileNav';
 import BrowsePage from './components/BrowsePage';
-import ProfilePage from './components/ProfilePage';
 import DetailPage from './components/DetailPage';
 import CheckoutPage from './components/CheckoutPage';
 import SellPage from './components/SellPage';
-import AdminPage from './components/AdminPage';
 import IdeasRatingPage from './components/IdeasRatingPage';
 import SupportPage from './components/SupportPage';
 import MessagesPage from './components/MessagesPage';
@@ -22,6 +20,9 @@ import ResetPasswordPage from './components/ResetPasswordPage';
 import Footer from './components/Footer';
 import { apiFetch as fetch } from './lib/api';
 import { io } from 'socket.io-client';
+
+const AdminPage = lazy(() => import('./components/AdminPage'));
+const ProfilePage = lazy(() => import('./components/ProfilePage'));
 
 export default function App() {
   const navigate = useNavigate();
@@ -599,58 +600,60 @@ export default function App() {
               } />
 
               <Route path="/profile" element={
-                <motion.div
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -15 }}
-                  transition={{ duration: 0.25, ease: 'easeInOut' }}
-                  className="space-y-6"
-                >
-                  {!isAuthenticated && (
-                    <div className="bg-[#f0b90b]/10 border border-[#f0b90b]/30 rounded-2xl p-6 text-left flex flex-col md:flex-row items-center justify-between gap-4">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-[#f0b90b]/20 flex items-center justify-center text-[#f0b90b]">
-                          <span className="material-symbols-outlined">warning</span>
+                <Suspense fallback={<div className="text-white p-8 text-center">Yuklanmoqda...</div>}>
+                  <motion.div
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -15 }}
+                    transition={{ duration: 0.25, ease: 'easeInOut' }}
+                    className="space-y-6"
+                  >
+                    {!isAuthenticated && (
+                      <div className="bg-[#f0b90b]/10 border border-[#f0b90b]/30 rounded-2xl p-6 text-left flex flex-col md:flex-row items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-full bg-[#f0b90b]/20 flex items-center justify-center text-[#f0b90b]">
+                            <span className="material-symbols-outlined">warning</span>
+                          </div>
+                          <div>
+                            <h4 className="text-white font-extrabold text-base">Siz tizimga kirmagansiz</h4>
+                            <p className="text-xs text-on-primary-container">Profilni ko'rish, xatcho'plarni saqlash va o'z startaplaringizni joylashtirish uchun tizimga kiring.</p>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="text-white font-extrabold text-base">Siz tizimga kirmagansiz</h4>
-                          <p className="text-xs text-on-primary-container">Profilni ko'rish, xatcho'plarni saqlash va o'z startaplaringizni joylashtirish uchun tizimga kiring.</p>
-                        </div>
+                        <button
+                          onClick={() => { setAuthTab('login'); setAuthModalOpen(true); }}
+                          className="px-6 py-2.5 bg-[#f0b90b] text-black font-extrabold text-xs rounded-xl hover:brightness-110 transition-all active:scale-95"
+                        >
+                          Kirish / Ro'yxatdan o'tish
+                        </button>
                       </div>
-                      <button
-                        onClick={() => { setAuthTab('login'); setAuthModalOpen(true); }}
-                        className="px-6 py-2.5 bg-[#f0b90b] text-black font-extrabold text-xs rounded-xl hover:brightness-110 transition-all active:scale-95"
-                      >
-                        Kirish / Ro'yxatdan o'tish
-                      </button>
-                    </div>
-                  )}
+                    )}
 
-                  <ProfilePage
-                    startups={startups}
-                    setView={setView}
-                    setSelectedStartupId={setSelectedStartupId}
-                    user={user}
-                    setUser={setUser}
-                    bookmarkedIds={bookmarkedIds}
-                    onActionToast={showToast}
-                    activeTab={profileTab}
-                    setActiveTab={setProfileTab}
-                    categories={categories}
-                  />
+                    <ProfilePage
+                      startups={startups}
+                      setView={setView}
+                      setSelectedStartupId={setSelectedStartupId}
+                      user={user}
+                      setUser={setUser}
+                      bookmarkedIds={bookmarkedIds}
+                      onActionToast={showToast}
+                      activeTab={profileTab}
+                      setActiveTab={setProfileTab}
+                      categories={categories}
+                    />
 
-                  {isAuthenticated && (
-                    <div className="text-left pt-4">
-                      <button
-                        onClick={handleLogout}
-                        className="px-6 py-3 border border-red-500/30 text-red-400 hover:bg-red-500/10 rounded-xl font-bold text-xs transition-all active:scale-95 flex items-center gap-2"
-                      >
-                        <span className="material-symbols-outlined text-sm">logout</span>
-                        Tizimdan chiqish
-                      </button>
-                    </div>
-                  )}
-                </motion.div>
+                    {isAuthenticated && (
+                      <div className="text-left pt-4">
+                        <button
+                          onClick={handleLogout}
+                          className="px-6 py-3 border border-red-500/30 text-red-400 hover:bg-red-500/10 rounded-xl font-bold text-xs transition-all active:scale-95 flex items-center gap-2"
+                        >
+                          <span className="material-symbols-outlined text-sm">logout</span>
+                          Tizimdan chiqish
+                        </button>
+                      </div>
+                    )}
+                  </motion.div>
+                </Suspense>
               } />
 
               <Route path="/startup/:id" element={
@@ -730,22 +733,24 @@ export default function App() {
               } />
 
               <Route path="/admin" element={
-                <motion.div
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -15 }}
-                  transition={{ duration: 0.25, ease: 'easeInOut' }}
-                >
-                  <AdminPage
-                    user={user}
-                    startups={startups}
-                    fetchStartups={fetchStartups}
-                    onActionToast={showToast}
-                    setView={setView}
-                    categories={categories}
-                    fetchCategories={fetchCategories}
-                  />
-                </motion.div>
+                <Suspense fallback={<div className="text-white p-8 text-center">Yuklanmoqda...</div>}>
+                  <motion.div
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -15 }}
+                    transition={{ duration: 0.25, ease: 'easeInOut' }}
+                  >
+                    <AdminPage
+                      user={user}
+                      startups={startups}
+                      fetchStartups={fetchStartups}
+                      onActionToast={showToast}
+                      setView={setView}
+                      categories={categories}
+                      fetchCategories={fetchCategories}
+                    />
+                  </motion.div>
+                </Suspense>
               } />
 
               <Route path="/ideas-rating" element={
