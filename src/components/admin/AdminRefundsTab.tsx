@@ -5,7 +5,7 @@ interface AdminRefundsTabProps {
   isLoadingEscrowRefunds: boolean;
   fetchEscrowRefunds: () => void;
   handleCompleteRefund: (paymentId: string) => void;
-  token: string | null;
+  token?: string | null;
 }
 
 export const AdminRefundsTab: React.FC<AdminRefundsTabProps> = ({

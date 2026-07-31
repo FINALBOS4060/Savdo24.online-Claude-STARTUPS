@@ -6,6 +6,16 @@ import { apiFetch as fetch } from '../lib/api';
 import { AdminB2BTab } from './admin/AdminB2BTab';
 import { AdminUsersTab } from './admin/AdminUsersTab';
 import { AdminCategoriesTab } from './admin/AdminCategoriesTab';
+import { AdminDashboardTab } from './admin/AdminDashboardTab';
+import { AdminAnalyticsTab } from './admin/AdminAnalyticsTab';
+import { AdminListingsTab } from './admin/AdminListingsTab';
+import { AdminDisputesTab } from './admin/AdminDisputesTab';
+import { AdminReportsTab } from './admin/AdminReportsTab';
+import { AdminSponsorsTab } from './admin/AdminSponsorsTab';
+import { AdminAuditTab } from './admin/AdminAuditTab';
+import { AdminSupportTab } from './admin/AdminSupportTab';
+import { AdminRefundsTab } from './admin/AdminRefundsTab';
+import { AdminSettingsTab } from './admin/AdminSettingsTab';
 
 interface AdminPageProps {
   user: UserProfileData;
@@ -763,96 +773,8 @@ export default function AdminPage({
       )}
 
       {/* Platform Statistics */}
-      {activeTab === 'dashboard' && stats && (
-        <div className="space-y-8 animate-fade-in">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="p-6 bg-[#0e1726]/80 border border-white/5 rounded-2xl space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-on-primary-container uppercase">Foydalanuvchilar</span>
-                <span className="material-symbols-outlined text-blue-400">group</span>
-              </div>
-              <div className="text-2xl font-black font-mono text-white">{stats.totalUsers}</div>
-              <p className="text-[10px] text-[#8892b0]">Jami ro'yxatdan o'tganlar</p>
-            </div>
-
-            <div className="p-6 bg-[#0e1726]/80 border border-white/5 rounded-2xl space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-on-primary-container uppercase">Faol e'lonlar</span>
-                <span className="material-symbols-outlined text-green-400">rocket_launch</span>
-              </div>
-              <div className="text-2xl font-black font-mono text-white">{stats.totalActiveStartups}</div>
-              <p className="text-[10px] text-[#8892b0]">Hozirda sotuvdagilar</p>
-            </div>
-
-            <div className="p-6 bg-[#0e1726]/80 border border-white/5 rounded-2xl space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-on-primary-container uppercase">Yakunlangan savdolar</span>
-                <span className="material-symbols-outlined text-[#f3ba2f]">handshake</span>
-              </div>
-              <div className="text-2xl font-black font-mono text-white">{stats.totalCompletedSales}</div>
-              <p className="text-[10px] text-green-500 font-bold">Muvaffaqiyatli bitimlar</p>
-            </div>
-
-            <div className="p-6 bg-[#0e1726]/80 border border-white/5 rounded-2xl space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-on-primary-container uppercase">Platforma daromadi</span>
-                <span className="material-symbols-outlined text-emerald-400">toll</span>
-              </div>
-              <div className="text-2xl font-black font-mono text-[#f3ba2f]">${stats.totalCommission.toLocaleString()}</div>
-              <p className="text-[10px] text-emerald-500 font-bold">Joriy oy: +${stats.monthlyCommission.toLocaleString()}</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Oxirgi Nizolar */}
-            <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 shadow-2xl">
-              <h3 className="text-lg font-bold text-white mb-6 flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-red-400">gavel</span>
-                  Oxirgi 5 ta nizo
-                </span>
-                <button onClick={() => setActiveTab('disputes')} className="text-xs text-[#f0b90b] hover:underline bg-transparent border-none cursor-pointer font-bold">Barchasini ko'rish</button>
-              </h3>
-              <div className="space-y-4">
-                {stats.lastDisputes?.length > 0 ? stats.lastDisputes.map((d: any) => (
-                  <div key={d.id} className="bg-[#0b1426] p-4 rounded-xl border border-white/5 flex justify-between items-center">
-                    <div>
-                      <p className="text-sm font-bold text-white">{d.reason}</p>
-                      <p className="text-[10px] text-on-primary-container">{d.buyer} • {new Date(d.date).toLocaleDateString()}</p>
-                    </div>
-                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${d.status === 'open' ? 'bg-red-500/10 text-red-400' : 'bg-green-500/10 text-green-400'}`}>
-                      {d.status === 'open' ? 'Ochiq' : 'Yopilgan'}
-                    </span>
-                  </div>
-                )) : <p className="text-xs text-on-primary-container italic py-4">Nizolar mavjud emas</p>}
-              </div>
-            </div>
-
-            {/* Oxirgi Shikoyatlar */}
-            <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 shadow-2xl">
-              <h3 className="text-lg font-bold text-white mb-6 flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-yellow-500">flag</span>
-                  Oxirgi 5 ta shikoyat
-                </span>
-                <button onClick={() => setActiveTab('reports')} className="text-xs text-[#f0b90b] hover:underline bg-transparent border-none cursor-pointer font-bold">Barchasini ko'rish</button>
-              </h3>
-              <div className="space-y-4">
-                {stats.lastReports?.length > 0 ? stats.lastReports.map((r: any) => (
-                  <div key={r.id} className="bg-[#0b1426] p-4 rounded-xl border border-white/5 flex justify-between items-center">
-                    <div>
-                      <p className="text-sm font-bold text-white">{r.reason}</p>
-                      <p className="text-[10px] text-on-primary-container">{r.targetType} • {new Date(r.date).toLocaleDateString()}</p>
-                    </div>
-                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${r.status === 'pending' ? 'bg-yellow-500/10 text-yellow-500' : 'bg-green-500/10 text-green-400'}`}>
-                      {r.status === 'pending' ? 'Kutilmoqda' : 'Ko\'rildi'}
-                    </span>
-                  </div>
-                )) : <p className="text-xs text-on-primary-container italic py-4">Shikoyatlar mavjud emas</p>}
-              </div>
-            </div>
-          </div>
-        </div>
+      {activeTab === 'dashboard' && (
+        <AdminDashboardTab stats={stats} setActiveTab={setActiveTab} />
       )}
 
       {/* Users Tab */}
@@ -1025,1047 +947,129 @@ export default function AdminPage({
       )}
 
       {activeTab === 'analytics' && (
-        <div className="space-y-8 animate-fade-in">
-          <div className="flex justify-between items-center bg-[#0e1726]/80 p-4 rounded-2xl border border-white/5">
-            <h2 className="text-xl font-black text-white">Platforma Analitikasi</h2>
-            <div className="flex gap-2">
-              {(['day', 'week', 'month'] as const).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setAnalyticsPeriod(p)}
-                  className={`px-4 py-1.5 text-xs font-bold rounded-full transition-all border-none cursor-pointer ${
-                    analyticsPeriod === p ? 'bg-[#f0b90b] text-black' : 'bg-white/5 text-[#8892b0] hover:bg-white/10'
-                  }`}
-                >
-                  {p === 'day' ? 'Bugun' : p === 'week' ? 'Haftalik' : 'Oylik'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {isLoadingAnalytics ? (
-            <div className="flex justify-center py-20">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-[#f0b90b]"></div>
-            </div>
-          ) : analytics ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Revenue Chart */}
-              <div className="bg-[#0e1726]/80 p-6 rounded-3xl border border-white/5 shadow-2xl">
-                <h3 className="text-sm font-bold text-on-primary-container mb-6 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-emerald-400">payments</span>
-                  Daromad Grafigi ($)
-                </h3>
-                <div className="h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={analytics.dailyRevenue.map((d: any) => ({
-                      date: new Date(d.createdAt).toLocaleDateString(),
-                      amount: d._sum.platformFeeAmount || 0
-                    }))}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                      <XAxis dataKey="date" stroke="#8892b0" fontSize={10} tickLine={false} axisLine={false} />
-                      <YAxis stroke="#8892b0" fontSize={10} tickLine={false} axisLine={false} />
-                      <Tooltip 
-                        contentStyle={{ backgroundColor: '#0b1426', border: '1px solid #ffffff10', borderRadius: '12px' }}
-                        itemStyle={{ color: '#10b981', fontWeight: 'bold' }}
-                      />
-                      <Line type="monotone" dataKey="amount" stroke="#10b981" strokeWidth={3} dot={{ fill: '#10b981', r: 4 }} activeDot={{ r: 6 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Categories Pie Chart */}
-              <div className="bg-[#0e1726]/80 p-6 rounded-3xl border border-white/5 shadow-2xl">
-                <h3 className="text-sm font-bold text-on-primary-container mb-6 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#f3ba2f]">category</span>
-                  Kategoriyalar Bo'yicha Startaplar
-                </h3>
-                <div className="h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={analytics.topCategories.map((c: any) => ({ name: c.category, value: c._count }))}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {analytics.topCategories.map((entry: any, index: number) => (
-                          <Cell key={`cell-${index}`} fill={['#10b981', '#3b82f6', '#f3ba2f', '#ef4444', '#8b5cf6'][index % 5]} />
-                        ))}
-                      </Pie>
-                      <Tooltip 
-                        contentStyle={{ backgroundColor: '#0b1426', border: '1px solid #ffffff10', borderRadius: '12px' }}
-                      />
-                      <Legend verticalAlign="bottom" height={36} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* General Stats summary in Analytics */}
-              <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-primary-container/40 p-6 rounded-2xl border border-white/5">
-                  <p className="text-[10px] text-on-primary-container uppercase font-black mb-1">Jami Loyihalar</p>
-                  <p className="text-2xl font-mono font-black text-white">{analytics.totalListings}</p>
-                </div>
-                <div className="bg-primary-container/40 p-6 rounded-2xl border border-white/5">
-                  <p className="text-[10px] text-on-primary-container uppercase font-black mb-1">Yangi Foydalanuvchilar</p>
-                  <p className="text-2xl font-mono font-black text-white">{analytics.newUsers}</p>
-                </div>
-                <div className="bg-primary-container/40 p-6 rounded-2xl border border-white/5">
-                  <p className="text-[10px] text-on-primary-container uppercase font-black mb-1">Muvaffaqiyatli Savdolar</p>
-                  <p className="text-2xl font-mono font-black text-white">{analytics.totalSales}</p>
-                </div>
-                <div className="bg-primary-container/40 p-6 rounded-2xl border border-white/5">
-                  <p className="text-[10px] text-on-primary-container uppercase font-black mb-1">Jami Daromad</p>
-                  <p className="text-2xl font-mono font-black text-[#f3ba2f]">${analytics.totalRevenue.toLocaleString()}</p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="p-20 text-center text-[#8892b0] italic">Analitika ma'lumotlari mavjud emas.</div>
-          )}
-        </div>
+        <AdminAnalyticsTab
+          analyticsPeriod={analyticsPeriod}
+          setAnalyticsPeriod={setAnalyticsPeriod}
+          isLoadingAnalytics={isLoadingAnalytics}
+          analytics={analytics}
+        />
       )}
 
       {activeTab === 'listings' && (
-        <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
-
-          {/* Kutilayotgan / Barcha e'lonlar almashtirgichi */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-5">
-            <div className="flex gap-2">
-              <button
-                onClick={() => setListingsView('pending')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                  listingsView === 'pending'
-                    ? 'bg-secondary-container text-on-secondary-fixed'
-                    : 'bg-white/5 border border-white/10 text-white hover:bg-white/10'
-                }`}
-              >
-                Kutilayotganlar ({pendingStartups.length})
-              </button>
-              <button
-                onClick={() => setListingsView('all')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                  listingsView === 'all'
-                    ? 'bg-secondary-container text-on-secondary-fixed'
-                    : 'bg-white/5 border border-white/10 text-white hover:bg-white/10'
-                }`}
-              >
-                Barcha e'lonlar ({totalAllListings})
-              </button>
-            </div>
-            {listingsView === 'all' && (
-              <input
-                type="text"
-                value={listingsSearch}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setListingsSearch(val);
-                  if (listingsSearchDebounceRef.current) clearTimeout(listingsSearchDebounceRef.current);
-                  listingsSearchDebounceRef.current = setTimeout(() => {
-                    fetchAllListingsAdmin(1, val);
-                  }, 500);
-                }}
-                placeholder="Nomi yoki ID bo'yicha qidirish..."
-                className="w-full sm:w-64 bg-[#0b1426] border border-white/10 rounded-xl px-4 py-2 text-xs text-white outline-none focus:border-secondary-container"
-              />
-            )}
-          </div>
-
-          {listingsView === 'pending' ? (
-            pendingStartups.length === 0 ? (
-              <div className="py-12 text-center text-on-primary-container space-y-2">
-                <span className="material-symbols-outlined text-4xl opacity-40">assignment_turned_in</span>
-                <p className="text-sm font-bold">Kutilayotgan yangi arizalar mavjud emas</p>
-                <p className="text-xs">Barcha yuborilgan loyihalar ko'rib chiqilgan.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {pendingStartups.map((startup) => (
-                  <div
-                    key={startup.id}
-                    className="bg-[#0b1426] border border-white/5 hover:border-white/10 rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 transition-all"
-                  >
-                    <div className="flex items-center gap-4 flex-1">
-                      <img
-                        src={startup.image}
-                        alt={`${startup.name} - kutilayotgan loyiha muqovasi`}
-                        className="w-16 h-16 rounded-xl object-cover border border-white/5 flex-shrink-0"
-                        referrerPolicy="no-referrer"
-                        loading="lazy"
-                        width={64}
-                        height={64}
-                      />
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-white font-extrabold text-base">{startup.name}</h3>
-                          <span className="bg-yellow-500/10 text-yellow-500 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md border border-yellow-500/20">
-                            {startup.category}
-                          </span>
-                        </div>
-                        <p className="text-xs text-[#f3ba2f] font-mono font-bold">
-                          Sotish narxi: ${startup.price ? startup.price.toLocaleString() : "0"} • Turi: {startup.listingType}
-                        </p>
-                        <p className="text-xs text-on-primary-container leading-relaxed line-clamp-1">
-                          {startup.slogan}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2.5 w-full md:w-auto">
-                      <button
-                        disabled={isUpdating !== null}
-                        onClick={() => handleStatusChange(startup.id, 'active')}
-                        className="flex-1 md:flex-none px-4 py-2.5 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-[#12161c] font-extrabold text-xs rounded-xl transition-all flex items-center justify-center gap-1 active:scale-95 shadow-lg shadow-green-500/10 cursor-pointer"
-                      >
-                        <span className="material-symbols-outlined text-sm font-bold">check_circle</span>
-                        Tasdiqlash
-                      </button>
-                      <button
-                        disabled={isUpdating !== null}
-                        onClick={() => handleStatusChange(startup.id, 'rejected')}
-                        className="flex-1 md:flex-none px-4 py-2.5 bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 disabled:opacity-50 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1 active:scale-95 cursor-pointer"
-                      >
-                        <span className="material-symbols-outlined text-sm">cancel</span>
-                        Rad etish
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )
-          ) : isLoadingAllListings ? (
-            <div className="py-12 text-center text-on-primary-container">
-              <span className="material-symbols-outlined text-4xl opacity-40 animate-spin">progress_activity</span>
-            </div>
-          ) : (
-            (() => {
-              const filtered = allListings;
-              return filtered.length === 0 ? (
-                <div className="py-12 text-center text-on-primary-container space-y-2">
-                  <span className="material-symbols-outlined text-4xl opacity-40">search_off</span>
-                  <p className="text-sm font-bold">Hech qanday e'lon topilmadi</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {filtered.map((startup) => (
-                    <div
-                      key={startup.id}
-                      className="bg-[#0b1426] border border-white/5 hover:border-white/10 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-all"
-                    >
-                      <div className="flex items-center gap-4 flex-1 min-w-0">
-                        <img
-                          src={startup.image}
-                          alt={`${startup.name} - loyiha muqovasi`}
-                          className="w-12 h-12 rounded-xl object-cover border border-white/5 flex-shrink-0"
-                          referrerPolicy="no-referrer"
-                          loading="lazy"
-                          width={48}
-                          height={48}
-                        />
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="text-white font-extrabold text-sm truncate">{startup.name}</h3>
-                            <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-md border ${
-                              startup.status === 'active'
-                                ? 'bg-green-500/10 text-green-400 border-green-500/20'
-                                : startup.status === 'pending'
-                                ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
-                                : 'bg-red-500/10 text-red-400 border-red-500/20'
-                            }`}>
-                              {startup.status}
-                            </span>
-                          </div>
-                          <p className="text-[10px] text-on-primary-container font-mono truncate">ID: {startup.id}</p>
-                        </div>
-                      </div>
-
-                      <button
-                        disabled={isDeletingStartupId !== null}
-                        onClick={() => handleDeleteStartup(startup.id, startup.name)}
-                        className="w-full md:w-auto px-4 py-2 bg-red-600/20 text-red-400 border border-red-500/30 hover:bg-red-500 hover:text-white disabled:opacity-50 font-black text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
-                      >
-                        <span className="material-symbols-outlined text-sm">delete_forever</span>
-                        {isDeletingStartupId === startup.id ? "O'chirilmoqda..." : "Butunlay o'chirish"}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              );
-            })()
-          )}
-          {listingsView === 'all' && !isLoadingAllListings &&
-            renderPagination(allListingsPage, allListingsTotalPages, (page) => fetchAllListingsAdmin(page, listingsSearch))}
-        </div>
-      )}
-
-
-      {activeTab === 'disputes' && (
-        <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4">
-            <span className="material-symbols-outlined text-red-400">gavel</span>
-            Sotib oluvchilar arizalari va Nizolar ({disputes.length})
-          </h2>
-
-          {disputes.length === 0 ? (
-            <div className="py-12 text-center text-on-primary-container space-y-2">
-              <span className="material-symbols-outlined text-4xl opacity-40">gavel</span>
-              <p className="text-sm font-bold">Hech qanday nizo arizalari mavjud emas</p>
-              <p className="text-xs">Platformada barcha xaridlar muammosiz davom etmoqda.</p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {disputes.map((disp) => (
-                <div
-                  key={disp.id}
-                  className="bg-[#0b1426] border border-white/5 hover:border-white/10 rounded-2xl p-5 space-y-4 transition-all"
-                >
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-3">
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-[#8892b0] block">Buyurtma va Loyiha</span>
-                      <span className="text-white font-black text-sm">{disp.payment?.startup?.name || "Noma'lum loyiha"}</span>
-                      <span className="text-xs text-on-primary-container block mt-0.5">ID: {disp.paymentId} • Narxi: ${disp.payment?.startup?.price?.toLocaleString()}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-md border ${
-                        disp.status === 'open'
-                          ? 'bg-red-500/10 text-red-400 border-red-500/20'
-                          : disp.status === 'resolved'
-                          ? 'bg-green-500/10 text-green-400 border-green-500/20'
-                          : 'bg-gray-500/10 text-gray-400 border-gray-500/20'
-                      }`}>
-                        {disp.status === 'open' ? 'Ochiq nizo' : disp.status === 'resolved' ? 'Yopilgan' : 'Rad etilgan'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                    <div className="space-y-1 bg-[#0e1726] p-3.5 rounded-xl border border-white/5">
-                      <span className="text-yellow-500/80 font-bold uppercase text-[9px] tracking-wider block">Nizo ochuvchi xaridor</span>
-                      <p className="text-white font-extrabold">{disp.buyer?.name}</p>
-                      <p className="text-on-primary-container text-[11px]">{disp.buyer?.email}</p>
-                      <p className="text-[#8892b0] text-[10px] mt-1.5">{new Date(disp.createdAt).toLocaleString("uz-UZ")}</p>
-                    </div>
-
-                    <div className="space-y-1 bg-[#0e1726] p-3.5 rounded-xl border border-white/5">
-                      <span className="text-red-400/80 font-bold uppercase text-[9px] tracking-wider block">Muammo va Sababi</span>
-                      <p className="text-white font-extrabold">"{disp.reason}"</p>
-                      <p className="text-on-primary-container text-[11px] leading-relaxed mt-1">"{disp.description}"</p>
-                    </div>
-                  </div>
-
-                  {disp.status === 'open' ? (
-                    <div className="space-y-3 pt-2">
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] uppercase font-bold text-[#8892b0]">Admin qarori / Izohi (adminNote):</label>
-                        <input
-                          type="text"
-                          placeholder="Nizoni yopish yoki rad etish sababini batafsil yozing..."
-                          value={adminNotes[disp.id] || ""}
-                          onChange={(e) => setAdminNotes({ ...adminNotes, [disp.id]: e.target.value })}
-                          className="w-full p-2.5 bg-[#0e1726] border border-white/10 rounded-xl text-white text-xs placeholder-[#8892b0]/50 focus:border-secondary-container focus:outline-none transition-all"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2 justify-end">
-                        <button
-                          disabled={updatingDisputeId !== null}
-                          onClick={() => handleDisputeUpdate(disp.id, 'resolved')}
-                          className="px-4 py-2 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-[#12161c] font-extrabold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95 shadow-md shadow-green-500/10"
-                        >
-                          <span className="material-symbols-outlined text-xs">gavel</span>
-                          Nizoni hal etish (Yopish)
-                        </button>
-                        <button
-                          disabled={updatingDisputeId !== null}
-                          onClick={() => handleDisputeUpdate(disp.id, 'rejected')}
-                          className="px-4 py-2 bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 disabled:opacity-50 font-bold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95"
-                        >
-                          <span className="material-symbols-outlined text-xs">cancel</span>
-                          Rad etish
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    disp.adminNote && (
-                      <div className="p-3 bg-white/5 border border-white/5 rounded-xl text-xs">
-                        <span className="text-[#8892b0] font-bold block uppercase text-[9px]">Admin qarori izohi:</span>
-                        <p className="text-gray-300 italic mt-0.5">"{disp.adminNote}"</p>
-                      </div>
-                    )
-                  )}
-                </div>
-              ))}
-              {renderPagination(disputesPage, disputesTotalPages, fetchDisputes)}
-            </div>
-          )}
-        </div>
+        <AdminListingsTab
+          listingsView={listingsView}
+          setListingsView={setListingsView}
+          listingsSearch={listingsSearch}
+          setListingsSearch={setListingsSearch}
+          listingsSearchDebounceRef={listingsSearchDebounceRef}
+          fetchAllListingsAdmin={fetchAllListingsAdmin}
+          pendingStartups={pendingStartups}
+          isLoadingPending={isLoadingPending}
+          totalAllListings={totalAllListings}
+          isUpdating={isUpdating}
+          handleStatusChange={handleStatusChange}
+          isLoadingAllListings={isLoadingAllListings}
+          allListings={allListings}
+          isDeletingStartupId={isDeletingStartupId}
+          handleDeleteStartup={handleDeleteStartup}
+          allListingsPage={allListingsPage}
+          allListingsTotalPages={allListingsTotalPages}
+          renderPagination={renderPagination}
+        />
       )}
 
       {activeTab === 'disputes' && (
-        <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4">
-            <span className="material-symbols-outlined text-red-400">account_balance</span>
-            Escrow (kafolatlangan to'lov) nizolari ({escrowDisputes.length})
-          </h2>
-
-          {isLoadingEscrowDisputes ? (
-            <div className="py-12 text-center text-on-primary-container text-sm">Yuklanmoqda...</div>
-          ) : escrowDisputes.length === 0 ? (
-            <div className="py-12 text-center text-on-primary-container space-y-2">
-              <span className="material-symbols-outlined text-4xl opacity-40">account_balance</span>
-              <p className="text-sm font-bold">Hech qanday escrow nizosi mavjud emas</p>
-              <p className="text-xs">Barcha kafolatlangan to'lovlar muammosiz davom etmoqda.</p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {escrowDisputes.map((ed) => (
-                <div
-                  key={ed.id}
-                  className="bg-[#0b1426] border border-white/5 hover:border-white/10 rounded-2xl p-5 space-y-4 transition-all"
-                >
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-3">
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-[#8892b0] block">Loyiha</span>
-                      <span className="text-white font-black text-sm">{ed.escrow?.payment?.startup?.name || "Noma'lum loyiha"}</span>
-                      <span className="text-xs text-on-primary-container block mt-0.5">To'lov ID: {ed.escrow?.paymentId} • Narxi: ${ed.escrow?.payment?.startup?.price?.toLocaleString()}</span>
-                    </div>
-                    <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-md border bg-red-500/10 text-red-400 border-red-500/20">
-                      Hal qilinmagan
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                    <div className="space-y-1 bg-[#0e1726] p-3.5 rounded-xl border border-white/5">
-                      <span className="text-yellow-500/80 font-bold uppercase text-[9px] tracking-wider block">Nizo ochuvchi xaridor</span>
-                      <p className="text-white font-extrabold">{ed.escrow?.payment?.user?.name}</p>
-                      <p className="text-on-primary-container text-[11px]">{ed.escrow?.payment?.user?.email}</p>
-                      <p className="text-[#8892b0] text-[10px] mt-1.5">{new Date(ed.createdAt).toLocaleString("uz-UZ")}</p>
-                    </div>
-
-                    <div className="space-y-1 bg-[#0e1726] p-3.5 rounded-xl border border-white/5">
-                      <span className="text-red-400/80 font-bold uppercase text-[9px] tracking-wider block">Nizo sababi</span>
-                      <p className="text-white font-extrabold">"{ed.reason}"</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3 pt-2">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase font-bold text-[#8892b0]">Admin qarori / Izohi (adminNote):</label>
-                      <input
-                        type="text"
-                        placeholder="Qarorni asoslab yozing (masalan: dalillar tekshirildi, xaridorning haqi ...)"
-                        value={escrowAdminNotes[ed.id] || ""}
-                        onChange={(e) => setEscrowAdminNotes({ ...escrowAdminNotes, [ed.id]: e.target.value })}
-                        className="w-full p-2.5 bg-[#0e1726] border border-white/10 rounded-xl text-white text-xs placeholder-[#8892b0]/50 focus:border-secondary-container focus:outline-none transition-all"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2 justify-end">
-                      <button
-                        disabled={updatingEscrowDisputeId !== null}
-                        onClick={() => handleEscrowDisputeUpdate(ed.id, 'released')}
-                        className="px-4 py-2 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-[#12161c] font-extrabold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95 shadow-md shadow-green-500/10"
-                      >
-                        <span className="material-symbols-outlined text-xs">check_circle</span>
-                        Sotuvchiga ozod qilish
-                      </button>
-                      <button
-                        disabled={updatingEscrowDisputeId !== null}
-                        onClick={() => handleEscrowDisputeUpdate(ed.id, 'refunded')}
-                        className="px-4 py-2 bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 disabled:opacity-50 font-bold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95"
-                      >
-                        <span className="material-symbols-outlined text-xs">undo</span>
-                        Xaridorga qaytarish
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <AdminDisputesTab
+          disputes={disputes}
+          escrowDisputes={escrowDisputes}
+          isLoadingEscrowDisputes={isLoadingEscrowDisputes}
+          adminNotes={adminNotes}
+          setAdminNotes={setAdminNotes}
+          updatingDisputeId={updatingDisputeId}
+          handleDisputeUpdate={handleDisputeUpdate}
+          escrowAdminNotes={escrowAdminNotes}
+          setEscrowAdminNotes={setEscrowAdminNotes}
+          updatingEscrowDisputeId={updatingEscrowDisputeId}
+          handleEscrowDisputeUpdate={handleEscrowDisputeUpdate}
+          disputesPage={disputesPage}
+          disputesTotalPages={disputesTotalPages}
+          fetchDisputes={fetchDisputes}
+          renderPagination={renderPagination}
+        />
       )}
 
       {activeTab === 'refunds' && (
-        <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
-          <div className="flex justify-between items-center border-b border-white/5 pb-4">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <span className="material-symbols-outlined text-amber-400">payments</span>
-              Qaytarish talab qilinadigan to'lovlar (Refund Required) ({escrowRefunds.length})
-            </h2>
-            <button
-              onClick={fetchEscrowRefunds}
-              className="px-4 py-2 bg-secondary-container/10 text-secondary-container rounded-xl font-bold text-xs hover:bg-secondary-container/20 transition-all flex items-center gap-2"
-            >
-              <span className="material-symbols-outlined text-sm">refresh</span>
-              Yangilash
-            </button>
-          </div>
-
-          {isLoadingEscrowRefunds ? (
-            <div className="py-12 text-center text-on-primary-container text-sm">Yuklanmoqda...</div>
-          ) : escrowRefunds.length === 0 ? (
-            <div className="py-12 text-center text-on-primary-container space-y-2">
-              <span className="material-symbols-outlined text-4xl opacity-40">task_alt</span>
-              <p className="text-sm font-bold">Kutilayotgan qaytarishlar mavjud emas</p>
-              <p className="text-xs">Barcha moliyaviy amaliyotlar joyida.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {escrowRefunds.map((payment) => (
-                <div key={payment.id} className="bg-[#0b1426] border border-amber-500/30 rounded-2xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded font-bold">Qaytarish kutilmoqda</span>
-                      <span className="text-xs text-on-primary-container font-mono">ID: {payment.id}</span>
-                    </div>
-                    <h4 className="font-bold text-white text-base">{payment.startup?.name || 'Noma\'lum loyiha'}</h4>
-                    <p className="text-sm text-on-primary-container">
-                      Xaridor: <span className="text-white font-medium">{payment.user?.name || payment.user?.email || `User #${payment.userId}`}</span> ({payment.user?.email})
-                    </p>
-                    <div className="flex items-center gap-4 text-xs text-on-primary-container mt-1">
-                      <span>Summa: <strong className="text-white">{payment.amount} {payment.currency}</strong></span>
-                      <span>Sana: {new Date(payment.createdAt).toLocaleString()}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => handleCompleteRefund(payment.id)}
-                      className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-black font-extrabold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-md"
-                    >
-                      <span className="material-symbols-outlined text-xs">done_all</span>
-                      Qaytarish bajarildi (CoinGate)
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <AdminRefundsTab
+          escrowRefunds={escrowRefunds}
+          isLoadingEscrowRefunds={isLoadingEscrowRefunds}
+          fetchEscrowRefunds={fetchEscrowRefunds}
+          handleCompleteRefund={handleCompleteRefund}
+        />
       )}
 
       {activeTab === 'reports' && (
-        <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4">
-            <span className="material-symbols-outlined text-red-500">flag</span>
-            Foydalanuvchilar shikoyatlari (Shikoyatlar) ({reports.length})
-          </h2>
-
-          {reports.length === 0 ? (
-            <div className="py-12 text-center text-on-primary-container space-y-2">
-              <span className="material-symbols-outlined text-4xl opacity-40">flag</span>
-              <p className="text-sm font-bold">Hech qanday shikoyatlar mavjud emas</p>
-              <p className="text-xs">Barcha e'lonlar va kontent toza holatda.</p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {reports.map((report) => {
-                const reportedStartup = report.targetType === 'startup' 
-                  ? startups.find((s) => s.id === report.targetId) 
-                  : null;
-
-                return (
-                  <div
-                    key={report.id}
-                    className="bg-[#0b1426] border border-white/5 hover:border-white/10 rounded-2xl p-5 space-y-4 transition-all"
-                  >
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-3">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">
-                            {report.targetType === 'startup' ? "E'lon" : report.targetType === 'user' ? "Foydalanuvchi" : "Izoh / G'oya"}
-                          </span>
-                          <span className="text-[#8892b0] text-[10px]">ID: {report.targetId}</span>
-                        </div>
-                        <h4 className="text-white font-black text-sm">
-                          {report.targetType === 'startup' 
-                            ? (reportedStartup ? `Loyiha: ${reportedStartup.name}` : `Noma'lum Loyiha (ID: ${report.targetId})`)
-                            : report.targetType === 'user'
-                            ? `Foydalanuvchi (ID: ${report.targetId})`
-                            : `Izoh (ID: ${report.targetId})`
-                          }
-                        </h4>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <span className={`text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-md border ${
-                          report.status === 'pending'
-                            ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
-                            : report.status === 'reviewed'
-                            ? 'bg-green-500/10 text-green-400 border-green-500/20'
-                            : 'bg-gray-500/10 text-gray-400 border-gray-500/20'
-                        }`}>
-                          {report.status === 'pending' ? 'Kutilmoqda' : report.status === 'reviewed' ? 'Ko\'rib chiqildi' : 'Rad etildi'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                      <div className="space-y-1 bg-[#0e1726] p-3.5 rounded-xl border border-white/5">
-                        <span className="text-[#f3ba2f] font-bold uppercase text-[9px] tracking-wider block">Shikoyat sababi</span>
-                        <p className="text-white font-extrabold">"{report.reason}"</p>
-                        <p className="text-[#8892b0] text-[10px] mt-1.5">{new Date(report.createdAt).toLocaleString("uz-UZ")}</p>
-                      </div>
-
-                      <div className="space-y-1 bg-[#0e1726] p-3.5 rounded-xl border border-white/5">
-                        <span className="text-red-400/80 font-bold uppercase text-[9px] tracking-wider block">Tavsif / Izoh</span>
-                        <p className="text-on-primary-container text-[11px] leading-relaxed italic">
-                          {report.description ? `"${report.description}"` : "Izoh qoldirilmagan"}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-2">
-                      <div className="flex items-center gap-2">
-                        {report.status === 'pending' && (
-                          <>
-                            <button
-                              onClick={() => handleReportStatusChange(report.id, 'reviewed')}
-                              disabled={updatingReportId === report.id || isDeletingReportedItem === report.id}
-                              className="px-3 py-2 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-[#12161c] font-bold text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
-                            >
-                              <span className="material-symbols-outlined text-xs">check</span>
-                              Tasdiqlash (Ko'rib chiqildi)
-                            </button>
-                            <button
-                              onClick={() => handleReportStatusChange(report.id, 'dismissed')}
-                              disabled={updatingReportId === report.id || isDeletingReportedItem === report.id}
-                              className="px-3 py-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 disabled:opacity-50 font-bold text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
-                            >
-                              <span className="material-symbols-outlined text-xs">close</span>
-                              Inkor etish (Rad etish)
-                            </button>
-                          </>
-                        )}
-                      </div>
-
-                      {report.targetType === 'user' ? (
-                        <button
-                          onClick={() => {
-                            setActiveTab('users');
-                            setUsersSearch(report.targetId);
-                          }}
-                          className="px-3 py-2 bg-white/5 text-white border border-white/10 hover:bg-white/10 font-black text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
-                        >
-                          <span className="material-symbols-outlined text-xs">person_search</span>
-                          Foydalanuvchini ko'rish
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleDeleteReportedItem(report.id, report.targetType, report.targetId)}
-                          disabled={updatingReportId === report.id || isDeletingReportedItem === report.id}
-                          className="px-3 py-2 bg-red-600/20 text-red-400 border border-red-500/30 hover:bg-red-500 hover:text-white disabled:opacity-50 font-black text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
-                        >
-                          <span className="material-symbols-outlined text-xs">delete</span>
-                          {isDeletingReportedItem === report.id ? "O'chirilmoqda..." : (report.targetType === 'startup' ? "E'lonni o'chirish" : "Izohni o'chirish")}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-              {renderPagination(reportsPage, reportsTotalPages, fetchReports)}
-            </div>
-          )}
-        </div>
+        <AdminReportsTab
+          reports={reports}
+          startups={startups}
+          handleReportStatusChange={handleReportStatusChange}
+          updatingReportId={updatingReportId}
+          isDeletingReportedItem={isDeletingReportedItem}
+          handleDeleteReportedItem={handleDeleteReportedItem}
+          setActiveTab={setActiveTab}
+          setUsersSearch={setUsersSearch}
+          reportsPage={reportsPage}
+          reportsTotalPages={reportsTotalPages}
+          fetchReports={fetchReports}
+          renderPagination={renderPagination}
+        />
       )}
 
       {activeTab === 'sponsors' && (
-        <div className="space-y-6">
-          <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4">
-              <span className="material-symbols-outlined text-[#f0b90b]">campaign</span>
-              Yangi sponsor kanal qo'shish
-            </h2>
-            <form onSubmit={handleAddSponsor} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-[#8892b0] uppercase">Kanal ID</label>
-                <input
-                  required
-                  type="text"
-                  placeholder="-100..."
-                  value={newSponsor.channelId}
-                  onChange={e => setNewSponsor({...newSponsor, channelId: e.target.value})}
-                  className="w-full p-2.5 bg-[#0e1726] border border-white/10 rounded-xl text-white text-xs focus:border-[#f0b90b] outline-none"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-[#8892b0] uppercase">Kanal Username</label>
-                <input
-                  required
-                  type="text"
-                  placeholder="savdo24_uz"
-                  value={newSponsor.channelUsername}
-                  onChange={e => setNewSponsor({...newSponsor, channelUsername: e.target.value})}
-                  className="w-full p-2.5 bg-[#0e1726] border border-white/10 rounded-xl text-white text-xs focus:border-[#f0b90b] outline-none"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-[#8892b0] uppercase">Ko'rinadigan nom</label>
-                <input
-                  required
-                  type="text"
-                  placeholder="Savdo24 Rasmiy"
-                  value={newSponsor.displayName}
-                  onChange={e => setNewSponsor({...newSponsor, displayName: e.target.value})}
-                  className="w-full p-2.5 bg-[#0e1726] border border-white/10 rounded-xl text-white text-xs focus:border-[#f0b90b] outline-none"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-[#8892b0] uppercase">Reklamaberuvchi kontakti</label>
-                <input
-                  type="text"
-                  placeholder="@user_admin"
-                  value={newSponsor.advertiserContact}
-                  onChange={e => setNewSponsor({...newSponsor, advertiserContact: e.target.value})}
-                  className="w-full p-2.5 bg-[#0e1726] border border-white/10 rounded-xl text-white text-xs focus:border-[#f0b90b] outline-none"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-[#8892b0] uppercase">Narxi (oyiga $)</label>
-                <input
-                  type="number"
-                  placeholder="10"
-                  value={newSponsor.pricePerMonth}
-                  onChange={e => setNewSponsor({...newSponsor, pricePerMonth: e.target.value})}
-                  className="w-full p-2.5 bg-[#0e1726] border border-white/10 rounded-xl text-white text-xs focus:border-[#f0b90b] outline-none"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-[#8892b0] uppercase">Boshlanish sanasi</label>
-                <input
-                  type="date"
-                  value={newSponsor.startDate}
-                  onChange={e => setNewSponsor({...newSponsor, startDate: e.target.value})}
-                  className="w-full p-2.5 bg-[#0e1726] border border-white/10 rounded-xl text-white text-xs focus:border-[#f0b90b] outline-none"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-[#8892b0] uppercase">Tugash sanasi</label>
-                <input
-                  type="date"
-                  value={newSponsor.endDate}
-                  onChange={e => setNewSponsor({...newSponsor, endDate: e.target.value})}
-                  className="w-full p-2.5 bg-[#0e1726] border border-white/10 rounded-xl text-white text-xs focus:border-[#f0b90b] outline-none"
-                />
-              </div>
-              <div className="flex gap-2 items-end">
-                <button
-                  type="submit"
-                  disabled={isAddingSponsor}
-                  className="w-full px-6 py-2.5 bg-[#f0b90b] hover:bg-[#d4a009] disabled:opacity-50 text-[#12161c] font-black text-xs rounded-xl transition-all h-[42px] cursor-pointer"
-                >
-                  {isAddingSponsor ? 'Qo\'shilmoqda...' : 'Qo\'shish'}
-                </button>
-              </div>
-            </form>
-          </div>
-
-          <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4 mb-6">
-              <span className="material-symbols-outlined text-[#f0b90b]">list</span>
-              Mavjud sponsor kanallar ({sponsorChannels.length})
-            </h2>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-white/5 text-xs text-left">
-                <thead>
-                  <tr className="text-[#8892b0] font-bold uppercase tracking-wider text-[10px]">
-                    <th className="py-3 px-4">Kanal</th>
-                    <th className="py-3 px-4">Username</th>
-                    <th className="py-3 px-4">Holat</th>
-                    <th className="py-3 px-4">Kontakt</th>
-                    <th className="py-3 px-4">Amallar</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5 text-gray-300">
-                  {sponsorChannels.map((chan) => (
-                    <tr key={chan.id} className="hover:bg-white/5 transition-colors">
-                      <td className="py-3.5 px-4 font-bold text-white">{chan.displayName}</td>
-                      <td className="py-3.5 px-4 text-[#8892b0]">@{chan.channelUsername}</td>
-                      <td className="py-3.5 px-4">
-                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${chan.isActive ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
-                          {chan.isActive ? 'Faol' : 'Nofaol'}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4">{chan.advertiserContact || '-'}</td>
-                      <td className="py-3.5 px-4 flex items-center gap-2">
-                        <button
-                          onClick={() => handleSponsorAction(chan.id, 'toggle', chan.isActive)}
-                          className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
-                          title={chan.isActive ? 'Nofaol qilish' : 'Faollashtirish'}
-                        >
-                          <span className="material-symbols-outlined text-sm">{chan.isActive ? 'visibility_off' : 'visibility'}</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            if(window.confirm("Haqiqatan ham o'chirmoqchimisiz?")) handleSponsorAction(chan.id, 'delete');
-                          }}
-                          className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors cursor-pointer"
-                          title="O'chirish"
-                        >
-                          <span className="material-symbols-outlined text-sm">delete</span>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {sponsorChannels.length === 0 && !isLoadingSponsors && (
-                    <tr>
-                      <td colSpan={5} className="py-8 text-center text-[#8892b0]">Kanallar topilmadi</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+        <AdminSponsorsTab
+          newSponsor={newSponsor}
+          setNewSponsor={setNewSponsor}
+          handleAddSponsor={handleAddSponsor}
+          isAddingSponsor={isAddingSponsor}
+          sponsorChannels={sponsorChannels}
+          isLoadingSponsors={isLoadingSponsors}
+          handleSponsorAction={handleSponsorAction}
+        />
       )}
 
-      {/* Audit Logs tab render */}
       {activeTab === 'audit' && (
-        <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4">
-            <span className="material-symbols-outlined text-[#f0b90b]">history</span>
-            Tizim faoliyat tarixi ({auditLogs.length})
-          </h2>
-
-          {isLoadingAudit ? (
-            <div className="py-12 text-center text-on-primary-container">
-              <span className="animate-spin inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full mb-2"></span>
-              <p className="text-sm font-bold">Yuklanmoqda...</p>
-            </div>
-          ) : auditLogs.length === 0 ? (
-            <div className="py-12 text-center text-on-primary-container space-y-2">
-              <span className="material-symbols-outlined text-4xl opacity-40">history</span>
-              <p className="text-sm font-bold">Faoliyat tarixi bo'sh</p>
-              <p className="text-xs">Hozircha adminlar tomonidan hech qanday amal bajarilmagan.</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-white/5 text-xs text-left">
-                <thead>
-                  <tr className="text-[#8892b0] font-bold uppercase tracking-wider text-[10px]">
-                    <th className="py-3 px-4">Sana</th>
-                    <th className="py-3 px-4">Admin</th>
-                    <th className="py-3 px-4">Amal</th>
-                    <th className="py-3 px-4">Nishon ID</th>
-                    <th className="py-3 px-4">Batafsil</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5 text-gray-300">
-                  {auditLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-white/5 transition-colors">
-                      <td className="py-3.5 px-4 font-mono text-[11px] whitespace-nowrap">
-                        {new Date(log.createdAt).toLocaleString("uz-UZ")}
-                      </td>
-                      <td className="py-3.5 px-4 font-bold text-white">
-                        {log.admin?.name || `Admin (ID: ${log.adminId})`}
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border ${
-                          log.action.toUpperCase().includes('APPROVE') || log.action.toUpperCase().includes('RESOLVE')
-                            ? 'bg-green-500/10 text-green-400 border-green-500/20'
-                            : log.action.toUpperCase().includes('REJECT') || log.action.toUpperCase().includes('DELETE')
-                            ? 'bg-red-500/10 text-red-400 border-red-500/20'
-                            : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                        }`}>
-                          {log.action}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 font-mono text-slate-400">{log.targetId || '-'}</td>
-                      <td className="py-3.5 px-4 italic max-w-xs truncate" title={log.details}>
-                        {log.details || '-'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {renderPagination(auditLogsPage, auditLogsTotalPages, fetchAuditLogs)}
-            </div>
-          )}
-        </div>
+        <AdminAuditTab
+          auditLogs={auditLogs}
+          isLoadingAudit={isLoadingAudit}
+          auditLogsPage={auditLogsPage}
+          auditLogsTotalPages={auditLogsTotalPages}
+          fetchAuditLogs={fetchAuditLogs}
+          renderPagination={renderPagination}
+        />
       )}
 
-      {/* Settings tab render */}
-      
       {activeTab === 'support' && (
-        <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4">
-            <span className="material-symbols-outlined text-[#f0b90b]">support_agent</span>
-            Murojaatlar ({supportTickets.length})
-          </h2>
-          {isLoadingSupport ? (
-            <div className="py-12 text-center text-on-primary-container">
-              <span className="animate-spin inline-block w-8 h-8 border-4 border-[#f0b90b] border-t-transparent rounded-full mb-2"></span>
-              <p className="text-sm font-bold">Yuklanmoqda...</p>
-            </div>
-          ) : supportTickets.length === 0 ? (
-            <div className="py-12 text-center text-on-primary-container space-y-2">
-              <span className="material-symbols-outlined text-4xl opacity-40">done_all</span>
-              <p className="text-sm font-bold">Yangi murojaatlar yo'q</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {supportTickets.map(ticket => (
-                <div key={ticket.id} className="bg-[#12161c] border border-white/5 rounded-xl p-4 flex flex-col md:flex-row gap-4 items-start md:items-center">
-                  <div className="flex-grow space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-white font-bold text-sm">{ticket.subject}</span>
-                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${
-                        ticket.status === 'pending' ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' :
-                        ticket.status === 'reviewing' ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20' :
-                        'bg-green-500/10 text-green-500 border border-green-500/20'
-                      }`}>
-                        {ticket.status}
-                      </span>
-                    </div>
-                    <p className="text-xs text-[#8892b0]">Mijoz: {ticket.email} | Sana: {new Date(ticket.createdAt).toLocaleString()}</p>
-                    <p className="text-sm text-on-primary-container mt-2 bg-white/5 p-3 rounded-lg border border-white/5">{ticket.message}</p>
-                  </div>
-                  <div className="flex flex-col gap-2 shrink-0 w-full md:w-auto mt-4 md:mt-0">
-                    {ticket.status === 'pending' && (
-                      <button
-                        disabled={updatingTicketId === ticket.id}
-                        onClick={() => {
-                          setUpdatingTicketId(ticket.id);
-                          fetch(`/api/admin/support-tickets/${ticket.id}/status`, {
-                            method: 'PATCH',
-                            headers: {
-                              'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({ status: 'reviewing' })
-                          }).then(async (res) => {
-                            if (res.ok) {
-                              setSupportTickets(supportTickets.map(t => t.id === ticket.id ? { ...t, status: 'reviewing' } : t));
-                              onActionToast('Holat o\'zgartirildi');
-                            } else {
-                              const err = await res.json().catch(() => ({}));
-                              onActionToast(err.error || 'Holatni o\'zgartirib bo\'lmadi.');
-                            }
-                          }).catch(() => onActionToast('Tarmoq xatosi yuz berdi.'))
-                            .finally(() => setUpdatingTicketId(null));
-                        }}
-                        className="px-4 py-2 bg-blue-500/20 text-blue-400 border border-blue-500/40 rounded-xl font-bold text-xs hover:bg-blue-500/30 transition-all disabled:opacity-50"
-                      >
-                        Ko'rib chiqilmoqda
-                      </button>
-                    )}
-                    {(ticket.status === 'pending' || ticket.status === 'reviewing') && (
-                      <button
-                        disabled={updatingTicketId === ticket.id}
-                        onClick={() => {
-                          setUpdatingTicketId(ticket.id);
-                          fetch(`/api/admin/support-tickets/${ticket.id}/status`, {
-                            method: 'PATCH',
-                            headers: {
-                              'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({ status: 'resolved' })
-                          }).then(async (res) => {
-                            if (res.ok) {
-                              setSupportTickets(supportTickets.map(t => t.id === ticket.id ? { ...t, status: 'resolved' } : t));
-                              onActionToast('Holat o\'zgartirildi');
-                            } else {
-                              const err = await res.json().catch(() => ({}));
-                              onActionToast(err.error || 'Holatni o\'zgartirib bo\'lmadi.');
-                            }
-                          }).catch(() => onActionToast('Tarmoq xatosi yuz berdi.'))
-                            .finally(() => setUpdatingTicketId(null));
-                        }}
-                        className="px-4 py-2 bg-green-500/20 text-green-400 border border-green-500/40 rounded-xl font-bold text-xs hover:bg-green-500/30 transition-all disabled:opacity-50"
-                      >
-                        Hal qilindi
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <AdminSupportTab
+          supportTickets={supportTickets}
+          isLoadingSupport={isLoadingSupport}
+          updatingTicketId={updatingTicketId}
+          setUpdatingTicketId={setUpdatingTicketId}
+          setSupportTickets={setSupportTickets}
+          onActionToast={onActionToast}
+        />
       )}
 
       {activeTab === 'settings' && (
-        <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-8">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4">
-            <span className="material-symbols-outlined text-[#f0b90b]">settings</span>
-            Tizim konfiguratsiyasi
-          </h2>
-
-          {isLoadingSettings ? (
-            <div className="py-12 text-center text-on-primary-container">
-              <span className="animate-spin inline-block w-8 h-8 border-4 border-[#f0b90b] border-t-transparent rounded-full mb-2"></span>
-              <p className="text-sm font-bold">Yuklanmoqda...</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {settings.map((s) => (
-                <div key={s.key} className="bg-[#0b1426] border border-white/5 rounded-2xl p-5 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-bold text-[#8892b0] uppercase tracking-wider">{s.key.replace(/_/g, ' ')}</label>
-                    {s.hasValue && (
-                      <span className="text-[9px] bg-green-500/10 text-green-400 px-1.5 py-0.5 rounded border border-green-500/20 uppercase font-black">Sozlangan</span>
-                    )}
-                  </div>
-                  {!s.hasValue && s.key === 'COINGATE_API_TOKEN' && (
-                    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex items-start gap-2 text-red-400">
-                      <span className="material-symbols-outlined text-sm shrink-0">warning</span>
-                      <p className="text-[10px] leading-tight">DIQQAT: CoinGate API tokeni sozlanmagan — to'lov webhooklari mustaqil tasdiqlanmaydi.</p>
-                    </div>
-                  )}
-                  <div className="relative group">
-                    <input
-                      type={s.isSecret ? (visibleSecrets[s.key] ? "text" : "password") : "text"}
-                      value={settingsValues[s.key] || ''}
-                      onChange={(e) => setSettingsValues(prev => ({ ...prev, [s.key]: e.target.value }))}
-                      placeholder={s.hasValue && s.isSecret ? "••••••••••••" : "Qiymat kiritilmagan"}
-                      className="w-full p-3 bg-[#0e1726] border border-white/10 rounded-xl text-white text-xs pr-10 focus:border-[#f0b90b] outline-none transition-all font-mono"
-                    />
-                    {s.isSecret && (
-                      <button
-                        type="button"
-                        onClick={() => setVisibleSecrets(prev => ({ ...prev, [s.key]: !prev[s.key] }))}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8892b0] hover:text-white transition-colors cursor-pointer"
-                      >
-                        <span className="material-symbols-outlined text-sm">
-                          {visibleSecrets[s.key] ? 'visibility_off' : 'visibility'}
-                        </span>
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <p className="text-[10px] text-[#8892b0] italic leading-tight">
-                      Ushbu qiymat serverda shifrlangan holda saqlanadi.
-                    </p>
-                    <button
-                      onClick={() => handleSaveSetting(s.key)}
-                      disabled={savingKey === s.key}
-                      className={`px-4 py-2 rounded-lg font-bold text-[10px] transition-all flex items-center gap-1 active:scale-95 cursor-pointer ${
-                        settingsStatus[s.key] === 'success' 
-                          ? 'bg-green-500 text-[#12161c]' 
-                          : settingsStatus[s.key] === 'error'
-                          ? 'bg-red-500 text-white'
-                          : 'bg-[#f0b90b] hover:bg-[#d4a009] text-[#12161c]'
-                      }`}
-                    >
-                      {savingKey === s.key ? (
-                        <span className="animate-spin w-3 h-3 border-2 border-current border-t-transparent rounded-full"></span>
-                      ) : (
-                        <span className="material-symbols-outlined text-xs">
-                          {settingsStatus[s.key] === 'success' ? 'check' : settingsStatus[s.key] === 'error' ? 'priority_high' : 'save'}
-                        </span>
-                      )}
-                      {settingsStatus[s.key] === 'success' ? 'Saqlandi' : settingsStatus[s.key] === 'error' ? 'Xato' : 'Saqlash'}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <AdminSettingsTab
+          settings={settings}
+          isLoadingSettings={isLoadingSettings}
+          settingsValues={settingsValues}
+          setSettingsValues={setSettingsValues}
+          visibleSecrets={visibleSecrets}
+          setVisibleSecrets={setVisibleSecrets}
+          savingKey={savingKey}
+          settingsStatus={settingsStatus}
+          handleSaveSetting={handleSaveSetting}
+        />
       )}
 
       {activeTab === 'b2b' && (

@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Startup, UserProfileData, ProfileTab, Category } from '../types';
 import { apiFetch as fetch } from '../lib/api';
+import { ProfileReferralsTab } from './profile/ProfileReferralsTab';
+import { ProfileB2BTab } from './profile/ProfileB2BTab';
+import { ProfileStartupsTab } from './profile/ProfileStartupsTab';
+import { ProfileVipTab } from './profile/ProfileVipTab';
+import { ProfileSavedTab } from './profile/ProfileSavedTab';
+import { ProfilePurchasesTab } from './profile/ProfilePurchasesTab';
+import { ProfileEarningsTab } from './profile/ProfileEarningsTab';
+import { ProfileReviewsTab } from './profile/ProfileReviewsTab';
+import { ProfileSettingsTab } from './profile/ProfileSettingsTab';
+import { ProfileSecurityTab } from './profile/ProfileSecurityTab';
 
 interface ProfilePageProps {
   startups: Startup[];
@@ -653,382 +663,40 @@ export default function ProfilePage({
 
       {/* Content Area */}
       {activeTab === 'b2b' && (
-        <section className="space-y-8 animate-fade-in">
-          <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-8 text-center space-y-6">
-            <span className="material-symbols-outlined text-6xl text-blue-400">corporate_fare</span>
-            <h3 className="text-2xl font-black text-white">Savdo24 B2B — Kompaniyalar uchun maxsus imkoniyatlar</h3>
-            <p className="text-on-primary-container max-w-2xl mx-auto text-sm leading-relaxed">
-              B2B hisob orqali siz ulgurji xaridlar uchun <b>20% gacha chegirma</b>, korporativ hisob-faktura va 
-              shaxsiy menejer xizmatlaridan foydalanishingiz mumkin.
-            </p>
-
-            {b2bAccount ? (
-              <div className="bg-[#0b1426] border border-outline-variant/20 rounded-2xl p-6 text-left max-w-xl mx-auto space-y-4">
-                <div className="flex justify-between border-b border-white/5 pb-2">
-                  <span className="text-on-primary-container text-xs font-bold uppercase">Kompaniya:</span>
-                  <span className="text-white font-bold">{b2bAccount.companyName}</span>
-                </div>
-                <div className="flex justify-between border-b border-white/5 pb-2">
-                  <span className="text-on-primary-container text-xs font-bold uppercase">Holati:</span>
-                  <span className={`text-xs font-black uppercase ${b2bAccount.verified ? 'text-emerald-400' : 'text-yellow-400'}`}>
-                    {b2bAccount.verified ? 'Tasdiqlangan' : 'Tekshirilmoqda'}
-                  </span>
-                </div>
-                <div className="flex justify-between border-b border-white/5 pb-2">
-                  <span className="text-on-primary-container text-xs font-bold uppercase">Ulgurji chegirma:</span>
-                  <span className="text-blue-400 font-bold">{b2bAccount.discount}%</span>
-                </div>
-              </div>
-            ) : (
-              <form 
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  if (isSubmittingB2B) return;
-                  setIsSubmittingB2B(true);
-                  const formData = new FormData(e.currentTarget);
-                  try {
-                    const res = await fetch('/api/b2b/onboard', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        companyName: formData.get('companyName'),
-                        taxId: formData.get('taxId')
-                      })
-                    });
-                    if (res.ok) {
-                      const data = await res.json();
-                      setB2BAccount(data);
-                      onActionToast("B2B so'rovingiz qabul qilindi!");
-                    } else {
-                      const err = await res.json().catch(() => ({}));
-                      onActionToast(err.error || "B2B so'rovini yuborishda xatolik yuz berdi.");
-                    }
-                  } catch (err) {
-                    console.error("B2B onboard error:", err);
-                    onActionToast("Tarmoq xatosi yuz berdi.");
-                  } finally {
-                    setIsSubmittingB2B(false);
-                  }
-                }}
-                className="max-w-md mx-auto space-y-4 bg-[#0b1426] p-8 rounded-2xl border border-outline-variant/20"
-              >
-                <div className="space-y-2 text-left">
-                  <label className="text-xs font-bold text-on-primary-container uppercase">Kompaniya nomi</label>
-                  <input name="companyName" required className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-400" placeholder="MCHJ ..." />
-                </div>
-                <div className="space-y-2 text-left">
-                  <label className="text-xs font-bold text-on-primary-container uppercase">STIR (INN) / Soliq ID</label>
-                  <input name="taxId" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-400" placeholder="123456789" />
-                </div>
-                <button
-                  type="submit"
-                  disabled={isSubmittingB2B}
-                  className="w-full py-4 bg-blue-500 text-black font-black rounded-xl hover:bg-blue-400 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSubmittingB2B ? 'Yuborilmoqda...' : "B2B a'zolik so'rovini yuborish"}
-                </button>
-              </form>
-            )}
-          </div>
-        </section>
+        <ProfileB2BTab
+          b2bAccount={b2bAccount}
+          setB2BAccount={setB2BAccount}
+          onActionToast={onActionToast}
+          isSubmittingB2B={isSubmittingB2B}
+          setIsSubmittingB2B={setIsSubmittingB2B}
+        />
       )}
+
       {activeTab === 'referral' && (
-        <section className="space-y-8 animate-fade-in">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 text-center">
-              <span className="material-symbols-outlined text-3xl text-emerald-400 mb-2">military_tech</span>
-              <p className="text-xs text-on-primary-container uppercase font-bold">Darajangiz</p>
-              <p className="text-xl font-black text-white">{referralStats.tier?.badge || 'Yangi'}</p>
-              <p className="text-[10px] text-emerald-400 font-bold">Commission: {referralStats.tier?.commission}%</p>
-            </div>
-            <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 text-center">
-              <span className="material-symbols-outlined text-3xl text-emerald-400 mb-2">group</span>
-              <p className="text-xs text-on-primary-container uppercase font-bold">Referallar</p>
-              <p className="text-3xl font-black text-white">{referralStats.referralCount}</p>
-            </div>
-            <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 text-center">
-              <span className="material-symbols-outlined text-3xl text-emerald-400 mb-2">monetization_on</span>
-              <p className="text-xs text-on-primary-container uppercase font-bold">Mukofot</p>
-              <p className="text-3xl font-black text-white">${referralStats.totalEarned.toLocaleString()}</p>
-            </div>
-            <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 text-center">
-              <span className="material-symbols-outlined text-3xl text-emerald-400 mb-2">share</span>
-              <p className="text-xs text-on-primary-container uppercase font-bold">Referal kod</p>
-              <div className="flex items-center justify-center gap-2 mt-2">
-                <code className="bg-white/5 px-3 py-1 rounded text-emerald-400 font-mono font-bold">
-                  {referralStats.referrals[0]?.code || '...'}
-                </code>
-                <button 
-                  onClick={() => {
-                    navigator.clipboard.writeText(referralStats.referrals[0]?.code || '');
-                    onActionToast('Referal kod nusxalandi!');
-                  }}
-                  className="text-white hover:text-emerald-400"
-                >
-                  <span className="material-symbols-outlined text-sm">content_copy</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-8 text-center space-y-6">
-            <h3 className="text-xl font-black text-white">Do'stlaringizni taklif qiling va daromad oling!</h3>
-            <p className="text-on-primary-container max-w-xl mx-auto text-sm leading-relaxed">
-              Sizning referral kodingiz orqali xarid qilgan foydalanuvchilar <b>{referralStats.tier?.discount || 5}% chegirma</b> oladi, 
-              siz esa xarid summasidan <b>{referralStats.tier?.commission || 5}% mukofot</b> olasiz.
-            </p>
-            
-            {!referralStats.referrals.length && (
-              <button 
-                onClick={async () => {
-                  const res = await fetch('/api/referrals/generate', { method: 'POST' });
-                  if (res.ok) {
-                    const data = await res.json();
-                    setReferralStats(prev => ({ ...prev, referrals: [{ code: data.code, isActive: true }] }));
-                    onActionToast('Referal kod yaratildi!');
-                  } else {
-                    const err = await res.json().catch(() => ({}));
-                    onActionToast(err.error || "Referal kod yaratishda xatolik yuz berdi.");
-                  }
-                }}
-                className="px-8 py-4 bg-emerald-500 text-black font-black rounded-xl hover:bg-emerald-400 transition-all shadow-lg shadow-emerald-500/20"
-              >
-                Referal kod yaratish
-              </button>
-            )}
-
-            {referralStats.referrals.length > 0 && (
-              <div className="space-y-4">
-                <p className="text-xs text-on-primary-container">Referal havolangiz:</p>
-                <div className="flex max-w-lg mx-auto bg-[#0b1426] rounded-xl overflow-hidden border border-outline-variant/20">
-                  <input 
-                    readOnly 
-                    value={`${window.location.origin}/browse?ref=${referralStats.referrals[0].code}`}
-                    className="flex-1 bg-transparent px-4 py-3 text-xs text-on-primary-container outline-none"
-                  />
-                  <button 
-                    onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}/browse?ref=${referralStats.referrals[0].code}`);
-                      onActionToast('Havola nusxalandi!');
-                    }}
-                    className="bg-emerald-500 text-black px-6 font-bold text-xs"
-                  >
-                    Nusxalash
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
+        <ProfileReferralsTab
+          user={user}
+          referralStats={referralStats}
+          onActionToast={onActionToast}
+        />
       )}
       {activeTab === 'startups' && (
-        <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {myStartups.map((startup) => {
-            // Pick colors and details based on listing status
-            const isActive = startup.status === 'active';
-            const isPending = startup.status === 'pending';
-            const isSold = startup.soldStatus === 'sotildi';
-
-            const statusClass = isActive && !isSold
-              ? 'status-chip-active'
-              : isPending
-              ? 'status-chip-pending'
-              : 'status-chip-sold';
-
-            const statusLabel = isActive && !isSold
-              ? 'Faol'
-              : isPending
-              ? 'Tekshirilmoqda'
-              : 'Sotildi';
-
-            const materialIcon =
-              startup.category === 'Fintech'
-                ? 'terminal'
-                : startup.category === 'Logistics'
-                ? 'eco'
-                : startup.category === 'E-commerce'
-                ? 'sports_esports'
-                : 'rocket_launch';
-
-            return (
-              <div
-                key={startup.id}
-                onClick={() => handleCardClick(startup.id)}
-                className={`glass-card rounded-2xl p-6 hover:shadow-2xl transition-all duration-300 group border border-outline-variant/10 flex flex-col justify-between min-h-[320px] ${
-                  isSold ? 'opacity-70 hover:opacity-100 grayscale hover:grayscale-0' : 'cursor-pointer hover:-translate-y-1'
-                }`}
-              >
-                <div>
-                  <div className="flex justify-between items-start mb-6">
-                    <div className="w-12 h-12 rounded-xl bg-secondary-fixed/10 flex items-center justify-center border border-secondary-fixed/20 text-secondary-container">
-                      <span className="material-symbols-outlined">{materialIcon}</span>
-                    </div>
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${statusClass}`}>
-                      {statusLabel}
-                    </span>
-                  </div>
-
-                  <h3 className="text-xl font-extrabold mb-2 group-hover:text-secondary-container transition-colors text-white flex items-center gap-2">
-                    {startup.name}
-                    {startup.isTop && (
-                      <span className="text-[10px] bg-yellow-400/20 text-yellow-400 px-1.5 py-0.5 rounded font-black flex items-center gap-0.5">
-                        <span className="material-symbols-outlined text-[10px]">vertical_align_top</span>
-                        TOP
-                      </span>
-                    )}
-                  </h3>
-                  
-                  <p className="text-xs text-on-primary-container line-clamp-3 leading-relaxed mb-6">
-                    {startup.description}
-                  </p>
-                </div>
-
-                <div>
-                  <div className="grid grid-cols-2 gap-4 mb-6">
-                    <div className="bg-white/5 p-3 rounded-xl border border-white/5">
-                      <p className="text-[9px] uppercase tracking-wider text-on-tertiary-container font-extrabold mb-1">
-                        Sotish narxi
-                      </p>
-                      <p className="font-mono text-xs font-bold text-white">${startup.price ? startup.price.toLocaleString() : "0"}</p>
-                    </div>
-                    <div className="bg-white/5 p-3 rounded-xl border border-white/5">
-                      <p className="text-[9px] uppercase tracking-wider text-on-tertiary-container font-extrabold mb-1">
-                        E'lon turi
-                      </p>
-                      <p className="font-mono text-xs font-bold text-white leading-tight">{startup.listingType || "To'liq loyiha (manba kodi bilan)"}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-4 border-t border-white/5 gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setView('edit-startup', startup.id);
-                      }}
-                      className="flex-1 py-2 bg-blue-400/10 border border-blue-400/30 hover:bg-blue-400/20 text-blue-400 rounded-lg font-bold text-[10px] transition-all flex items-center justify-center gap-1.5"
-                    >
-                      Tahrirlash
-                    </button>
-                    {isActive ? (
-                      <>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setTopModal({ isOpen: true, startupId: startup.id, startupName: startup.name });
-                          }}
-                          className="flex-1 py-2 bg-yellow-400/10 border border-yellow-400/30 hover:bg-yellow-400/20 text-yellow-400 rounded-lg font-bold text-[10px] transition-all flex items-center justify-center gap-1.5"
-                        >
-                          <span className="material-symbols-outlined text-xs">vertical_align_top</span>
-                          TOP qilish
-                        </button>
-                      </>
-                    ) : isPending ? (
-                      <>
-                        <span className="text-xs text-on-tertiary-container italic">Tekshirilmoqda...</span>
-                        <span className="text-xs font-bold text-on-primary-container">Taxminan 24 soat</span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-xs font-bold text-secondary-container">Muvaffaqiyatli chiqish</span>
-                        <span className="material-symbols-outlined text-on-primary-container text-sm leading-none">
-                          arrow_forward
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Dotted Launcher card */}
-          <div
-            onClick={() => setView('sell')}
-            className="border-2 border-dashed border-outline-variant/30 rounded-2xl flex flex-col items-center justify-center p-8 hover:bg-white/5 hover:border-secondary-container/50 transition-all group cursor-pointer min-h-[320px] text-center"
-          >
-            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:bg-secondary-container/10 transition-all">
-              <span className="material-symbols-outlined text-secondary-container text-3xl group-hover:rotate-90 transition-transform duration-300">
-                add
-              </span>
-            </div>
-            <h4 className="text-lg font-bold text-white mb-2 group-hover:text-secondary-container transition-colors">
-              Yangi e'lon
-            </h4>
-            <p className="text-xs text-on-primary-container max-w-[200px] leading-relaxed">
-              Loyihangizni 5000 dan ortiq tasdiqlangan xaridorlarga taqdim eting.
-            </p>
-          </div>
-        </section>
+        <ProfileStartupsTab
+          myStartups={myStartups}
+          handleCardClick={handleCardClick}
+          setView={setView}
+          setTopModal={setTopModal}
+        />
       )}
 
       {activeTab === 'vip' && (
-        <section className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="text-center space-y-4">
-            <div className="w-20 h-20 bg-yellow-400/10 border border-yellow-400/20 rounded-3xl mx-auto flex items-center justify-center text-yellow-400">
-              <span className="material-symbols-outlined text-4xl">workspace_premium</span>
-            </div>
-            <h2 className="text-3xl font-black text-white">VIP A'zolik</h2>
-            <p className="text-on-primary-container">
-              Eksklyuziv imkoniyatlar va chegirmalarga ega bo'ling.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4">
-            <div className="glass-card p-6 rounded-2xl border-yellow-400/20 bg-yellow-400/5 relative overflow-hidden">
-              <div className="relative z-10 space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 rounded-full bg-yellow-400/20 text-yellow-400 flex items-center justify-center">
-                      <span className="material-symbols-outlined text-sm">done</span>
-                    </span>
-                    <p className="text-sm text-white">Ismingiz yonida 👑 VIP belgisi</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 rounded-full bg-yellow-400/20 text-yellow-400 flex items-center justify-center">
-                      <span className="material-symbols-outlined text-sm">done</span>
-                    </span>
-                    <p className="text-sm text-white">Rasmlarni yuklashda 6MB gacha limit (oddiyda 2MB)</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 rounded-full bg-yellow-400/20 text-yellow-400 flex items-center justify-center">
-                      <span className="material-symbols-outlined text-sm">done</span>
-                    </span>
-                    <p className="text-sm text-white">Yangi loyihalarni birinchi bo'lib ko'rish imkoniyati</p>
-                  </div>
-                </div>
-
-                <div className="pt-6 border-t border-white/10 space-y-4">
-                  <div className="flex justify-between items-end">
-                    <div>
-                      <p className="text-[10px] uppercase font-bold text-on-primary-container mb-1">Muddati tanlang (kun)</p>
-                      <input 
-                        type="number" 
-                        value={vipDays} 
-                        onChange={(e) => setVipDays(Math.min(365, Math.max(1, parseInt(e.target.value) || 1)))}
-                        className="w-24 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white font-mono font-bold focus:border-yellow-400/50 outline-none"
-                      />
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[10px] uppercase font-bold text-on-primary-container mb-1">Jami ({vipDiscountPercent}% chegirma bilan)</p>
-                      <p className="text-3xl font-black text-yellow-400">
-                        ${vipEstimatedPrice}
-                      </p>
-                    </div>
-                  </div>
-
-                  <button 
-                    onClick={handleBuyVip}
-                    disabled={isBuyingVip}
-                    className="w-full py-4 bg-yellow-400 text-black font-black rounded-xl hover:brightness-110 transition-all shadow-lg shadow-yellow-400/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isBuyingVip ? 'Yuklanmoqda...' : "👑 VIP bo'lish"}
-                  </button>
-                </div>
-              </div>
-              <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-yellow-400/10 blur-[100px] rounded-full"></div>
-            </div>
-          </div>
-        </section>
+        <ProfileVipTab
+          vipDays={vipDays}
+          setVipDays={setVipDays}
+          vipDiscountPercent={vipDiscountPercent}
+          vipEstimatedPrice={vipEstimatedPrice}
+          handleBuyVip={handleBuyVip}
+          isBuyingVip={isBuyingVip}
+        />
       )}
 
       {/* TOP Boost Modal */}
@@ -1098,535 +766,63 @@ export default function ProfilePage({
       )}
 
       {activeTab === 'saved' && (
-        <section className="space-y-6">
-          {savedStartups.length === 0 ? (
-            <div className="text-center py-16 border border-dashed border-outline-variant/20 rounded-2xl bg-white/5">
-              <span className="material-symbols-outlined text-4xl text-on-primary-container mb-3">bookmark_border</span>
-              <p className="text-on-primary-container font-semibold">Hozircha saqlangan e'lonlar yo'q.</p>
-              <button
-                onClick={() => setView('browse')}
-                className="text-secondary-container font-bold text-sm underline mt-2"
-              >
-                Xatcho'p qo'shish uchun startaplarni ko'rib chiqing
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {savedStartups.map((startup) => (
-                <div
-                  key={startup.id}
-                  className="bg-primary-container border border-outline-variant/20 rounded-2xl overflow-hidden hover:shadow-xl transition-all group flex flex-col justify-between h-[380px]"
-                >
-                  <div className="h-40 relative overflow-hidden bg-white/5">
-                    <img
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      src={startup.image}
-                      alt={`${startup.name} - saqlangan loyiha muqovasi`}
-                      loading="lazy"
-                      width={320}
-                      height={160}
-                    />
-                    <div className="absolute top-4 left-4 bg-primary-container/95 text-white border border-white/10 px-3 py-1 rounded-lg text-xs font-bold uppercase">
-                      {categories.find(c => c.id === startup.category)?.name || startup.category}
-                    </div>
-                  </div>
-
-                  <div className="p-5 flex-grow flex flex-col justify-between">
-                    <div>
-                      <h4
-                        onClick={() => handleCardClick(startup.id)}
-                        className="font-extrabold text-white text-base hover:text-secondary-container transition-colors cursor-pointer"
-                      >
-                        {startup.name}
-                      </h4>
-                      <p className="text-xs text-on-primary-container line-clamp-2 mt-1">
-                        {startup.description}
-                      </p>
-                    </div>
-
-                    <div className="mt-4 pt-4 border-t border-outline-variant/20 flex items-center justify-between">
-                      <div>
-                        <span className="text-[10px] text-on-primary-container uppercase block">Sotish narxi</span>
-                        <span className="text-sm font-bold text-secondary-container font-mono">
-                          ${startup.price ? startup.price.toLocaleString() : "Kelishilgan holda"}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => handleCardClick(startup.id)}
-                        className="px-4 py-2 bg-white/5 hover:bg-secondary-container hover:text-on-secondary-fixed text-white font-bold text-xs rounded-lg transition-colors"
-                      >
-                        Ko'rish
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+        <ProfileSavedTab
+          savedStartups={savedStartups}
+          categories={categories}
+          handleCardClick={handleCardClick}
+          setView={setView}
+        />
       )}
 
       {activeTab === 'purchases' && (
-        <section className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6">
-          <h3 className="text-lg font-bold text-white border-b border-outline-variant/15 pb-4 mb-6 flex items-center gap-2">
-            <span className="material-symbols-outlined text-secondary-container">shopping_cart</span>
-            Mening xaridlarim
-          </h3>
-          {myPurchases.length === 0 ? (
-            <div className="text-center py-10 border border-dashed border-outline-variant/20 rounded-2xl">
-              <span className="material-symbols-outlined text-5xl text-on-primary-container/30 mb-3 block">receipt_long</span>
-              <p className="text-on-primary-container font-medium">Hozircha xaridlar yo'q</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {myPurchases.map(payment => (
-                <div key={payment.id} className="bg-[#0b1426] border border-outline-variant/20 rounded-xl p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:border-outline-variant/40 transition-colors">
-                  <div>
-                    <h4 className="font-bold text-white text-lg">{payment.startup?.name || 'Noma\'lum loyiha'}</h4>
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2 text-sm text-on-primary-container">
-                      <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px]">payments</span>{payment.amount} {payment.currency}</span>
-                      <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px]">calendar_today</span>{new Date(payment.createdAt).toLocaleDateString()}</span>
-                      {payment.status === 'refund_required' && (
-                        <span className="px-2 py-0.5 bg-amber-500/15 text-amber-400 text-xs rounded-md font-bold">Qaytarish jarayonda (Refund in progress)</span>
-                      )}
-                      {payment.status === 'refund_completed' && (
-                        <span className="px-2 py-0.5 bg-emerald-500/15 text-emerald-400 text-xs rounded-md font-bold">Pul qaytarildi (Refunded)</span>
-                      )}
-                    </div>
-                  </div>
-                  {payment.startup && payment.startup.deliveryUrl ? (
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      {/* 15-MUAMMO: eski yozuvlarda deliveryUrl javascript:/data: bo'lishi mumkin edi */}
-                      <a
-                        href={payment.startup.deliveryUrl} target="_blank" rel="noreferrer"
-                        onClick={(e) => {
-                          // Faqat http/https havolalarga ruxsat (javascript:/data: XSS'ga qarshi)
-                          try {
-                            const url = new URL(payment.startup.deliveryUrl!);
-                            if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-                              e.preventDefault();
-                            }
-                          } catch {
-                            e.preventDefault();
-                          }
-                        }}
-                        className="px-4 py-2 bg-secondary-container/10 text-secondary-container hover:bg-secondary-container/20 rounded-lg font-bold text-sm whitespace-nowrap transition-colors border border-secondary-container/20 text-center"
-                      >
-                        Loyihani yuklash
-                      </a>
-                      {escrows.find(e => e.paymentId === payment.id)?.status === 'held' && (
-                        <div className="flex gap-2">
-                          <button
-                            disabled={escrowActionId === payment.id}
-                            onClick={async () => {
-                              // 63-band: avval faqat res.ok tekshirilardi — ochiq nizo
-                              // sababli server 400 qaytarganda (server.ts) tugma hech
-                              // narsa demasdi, xarid go'yo "osilib qolgandek" ko'rinardi.
-                              // Endi xato xabari ham ko'rsatiladi.
-                              // 120-band: tugma so'rov davomida disabled bo'lmasdi,
-                              // tez-tez bosilsa bir nechta release so'rovi ketardi.
-                              if (escrowActionId === payment.id) return;
-                              setEscrowActionId(payment.id);
-                              try {
-                                const res = await fetch('/api/escrow/release', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ paymentId: payment.id })
-                                });
-                                const data = await res.json().catch(() => ({}));
-                                if (res.ok) {
-                                  onActionToast("Mablag' ozod qilindi!");
-                                  setEscrows(prev => prev.map(e => e.paymentId === payment.id ? { ...e, status: 'released' } : e));
-                                } else {
-                                  onActionToast(data.error || "Mablag'ni ozod qilishda xatolik yuz berdi.");
-                                }
-                              } catch (err) {
-                                console.error("Escrow release error:", err);
-                                onActionToast("Tarmoq xatosi yuz berdi.");
-                              } finally {
-                                setEscrowActionId(null);
-                              }
-                            }}
-                            className="px-4 py-2 bg-emerald-500 text-black rounded-lg font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            Tasdiqlash
-                          </button>
-                          <button
-                            disabled={escrowActionId === payment.id}
-                            onClick={() => {
-                              if (escrowActionId === payment.id) return;
-                              const reason = prompt("Nizo sababini yozing:");
-                              if (reason) {
-                                  setEscrowActionId(payment.id);
-                                  fetch('/api/escrow/dispute', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ paymentId: payment.id, reason })
-                                  }).then(async (res) => {
-                                    const data = await res.json();
-                                    onActionToast(data.message || data.error);
-                                    if (res.ok) setEscrows(prev => prev.map(e => e.paymentId === payment.id ? { ...e, status: 'disputed' } : e));
-                                  }).catch((err) => {
-                                    console.error("Escrow dispute error:", err);
-                                    onActionToast("Tarmoq xatosi yuz berdi.");
-                                  }).finally(() => setEscrowActionId(null));
-                              }
-                            }}
-                            className="px-4 py-2 bg-red-500/10 text-red-500 border border-red-500/20 rounded-lg font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            Nizo
-                          </button>
-                        </div>
-                      )}
-                      {escrows.find(e => e.paymentId === payment.id)?.status === 'released' && (
-                        <span className="px-4 py-2 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-lg font-bold text-sm">
-                          Yakunlangan
-                        </span>
-                      )}
-                      {escrows.find(e => e.paymentId === payment.id)?.status === 'disputed' && (
-                        <span className="px-4 py-2 bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 rounded-lg font-bold text-sm">
-                          Nizoda
-                        </span>
-                      )}
-                    </div>
-                  ) : payment.startup ? (
-                    <button
-                      onClick={() => handleCardClick(payment.startup.id)}
-                      className="px-4 py-2 bg-secondary-container/10 text-secondary-container hover:bg-secondary-container/20 rounded-lg font-bold text-sm whitespace-nowrap transition-colors border border-secondary-container/20"
-                    >
-                      Loyihani ko'rish (Aloqa kutilmoqda)
-                    </button>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+        <ProfilePurchasesTab
+          myPurchases={myPurchases}
+          escrows={escrows}
+          setEscrows={setEscrows}
+          escrowActionId={escrowActionId}
+          setEscrowActionId={setEscrowActionId}
+          handleCardClick={handleCardClick}
+          onActionToast={onActionToast}
+        />
       )}
 
       {activeTab === 'earnings' && (
-        <section className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6">
-          <div className="mb-8 text-center md:text-left">
-            <h3 className="text-sm font-bold text-on-primary-container uppercase tracking-wider mb-2">Jami daromad</h3>
-            <p className="text-4xl font-extrabold text-white">${earningsData.totalEarnings.toLocaleString()}</p>
-          </div>
-
-          <h3 className="text-lg font-bold text-white border-b border-outline-variant/15 pb-4 mb-6 flex items-center gap-2">
-            <span className="material-symbols-outlined text-secondary-container">history</span>
-            Yakunlangan savdolar ro'yxati
-          </h3>
-          
-          {earningsData.sales.length === 0 ? (
-            <div className="text-center py-10 border border-dashed border-outline-variant/20 rounded-2xl">
-              <p className="text-on-primary-container font-medium">Hozircha daromadlar yo'q</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-outline-variant/10">
-                    <th className="py-4 px-4 text-xs font-bold text-on-primary-container uppercase">Sana</th>
-                    <th className="py-4 px-4 text-xs font-bold text-on-primary-container uppercase">Loyiha nomi</th>
-                    <th className="py-4 px-4 text-xs font-bold text-on-primary-container uppercase">Savdo summasi</th>
-                    <th className="py-4 px-4 text-xs font-bold text-on-primary-container uppercase">Sof daromad</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {earningsData.sales.map((sale: any) => (
-                    <tr key={sale.id} className="border-b border-outline-variant/5 hover:bg-white/5 transition-colors">
-                      <td className="py-4 px-4 text-sm text-white">{new Date(sale.date).toLocaleDateString()}</td>
-                      <td className="py-4 px-4 text-sm font-bold text-white">{sale.projectName}</td>
-                      <td className="py-4 px-4 text-sm text-on-primary-container">${sale.amount.toLocaleString()}</td>
-                      <td className="py-4 px-4 text-sm font-bold text-emerald-400">+${sale.payout.toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+        <ProfileEarningsTab
+          earningsData={earningsData}
+        />
       )}
 
       {activeTab === 'reviews' && (
-        <section className="space-y-8">
-          <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <span className="material-symbols-outlined text-secondary-container">star</span>
-                Menga yozilgan sharhlar
-              </h3>
-              <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-xl border border-white/5">
-                <span className="text-sm font-bold text-white">O'rtacha reyting:</span>
-                <span className="text-lg font-extrabold text-[#f0b90b]">{reviewsReceivedData.averageRating.toFixed(1)}</span>
-                <div className="flex text-[#f0b90b]">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <span key={star} className="material-symbols-outlined text-sm">
-                      {star <= Math.round(reviewsReceivedData.averageRating) ? 'star' : 'star_outline'}
-                    </span>
-                  ))}
-                </div>
-                <span className="text-xs text-on-primary-container">({reviewsReceivedData.totalReviews} ta)</span>
-              </div>
-            </div>
-
-            {reviewsReceivedData.reviews.length === 0 ? (
-              <div className="text-center py-10 border border-dashed border-outline-variant/20 rounded-2xl">
-                <p className="text-on-primary-container font-medium">Hozircha sharhlar yo'q</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {reviewsReceivedData.reviews.map((review: any) => (
-                  <div key={review.id} className="bg-[#0b1426] border border-outline-variant/10 rounded-xl p-5">
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex items-center gap-3">
-                        <img 
-                          src={review.buyer?.avatarUrl} 
-                          className="w-10 h-10 rounded-full border border-outline-variant/20" 
-                          alt={`${review.buyer?.name || 'Xaridor'} avatari`}
-                          loading="lazy"
-                          width={40}
-                          height={40}
-                        />
-                        <div>
-                          <p className="text-sm font-bold text-white">{review.buyer?.name}</p>
-                          <p className="text-[10px] text-on-primary-container">{new Date(review.createdAt).toLocaleDateString()} • {review.startup?.name}</p>
-                        </div>
-                      </div>
-                      <div className="flex text-[#f0b90b]">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <span key={star} className="material-symbols-outlined text-sm">
-                            {star <= review.rating ? 'star' : 'star_outline'}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <p className="text-sm text-on-primary-container leading-relaxed italic">"{review.comment}"</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6">
-            <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-              <span className="material-symbols-outlined text-secondary-container">rate_review</span>
-              Men yozgan sharhlar
-            </h3>
-
-            {reviewsGiven.length === 0 ? (
-              <div className="text-center py-10 border border-dashed border-outline-variant/20 rounded-2xl">
-                <p className="text-on-primary-container font-medium">Siz hali sharh yozmagansiz</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {reviewsGiven.map((review: any) => (
-                  <div key={review.id} className="bg-[#0b1426] border border-outline-variant/10 rounded-xl p-5">
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <p className="text-sm font-bold text-white">{review.startup?.name}</p>
-                        <p className="text-[10px] text-on-primary-container">{new Date(review.createdAt).toLocaleDateString()}</p>
-                      </div>
-                      <div className="flex text-[#f0b90b]">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <span key={star} className="material-symbols-outlined text-sm">
-                            {star <= review.rating ? 'star' : 'star_outline'}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <p className="text-sm text-on-primary-container leading-relaxed italic">"{review.comment}"</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
+        <ProfileReviewsTab
+          reviewsReceivedData={reviewsReceivedData}
+          reviewsGiven={reviewsGiven}
+        />
       )}
 
       {activeTab === 'settings' && (
-
-        <section className="max-w-xl bg-primary-container border border-outline-variant/20 rounded-2xl p-6">
-          <form onSubmit={handleSaveSettings} className="space-y-6">
-            <h3 className="text-lg font-bold text-white border-b border-outline-variant/15 pb-3 flex items-center gap-2">
-              <span className="material-symbols-outlined text-secondary-container">person</span>
-              Profil sozlamalarini tahrirlash
-            </h3>
-
-            <div className="flex flex-col items-center gap-4 py-4">
-              <div 
-                className="relative group cursor-pointer"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <div className="w-24 h-24 rounded-full border-4 border-secondary-container/20 overflow-hidden bg-[#0b1426] flex items-center justify-center">
-                  {isUploadingAvatar ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="w-6 h-6 border-2 border-secondary-container border-t-transparent rounded-full animate-spin"></div>
-                      <span className="text-[10px] font-bold text-secondary-container">Yuklanmoqda...</span>
-                    </div>
-                  ) : (
-                    <img 
-                      src={editAvatar} 
-                      alt="Profil rasmini yangilash - yangi rasm tanlash" 
-                      className="w-full h-full object-cover group-hover:opacity-50 transition-all" 
-                      loading="lazy"
-                      width={96}
-                      height={96}
-                    />
-                  )}
-                </div>
-                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
-                  <span className="material-symbols-outlined text-white text-3xl">edit</span>
-                </div>
-                {user.isVip && (
-                  <div className="absolute -top-1 -right-1 w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center text-black border-4 border-primary-container shadow-lg">
-                    <span className="material-symbols-outlined text-lg">workspace_premium</span>
-                  </div>
-                )}
-              </div>
-              <p className="text-[10px] font-bold text-on-primary-container uppercase tracking-widest">Profil rasmini o'zgartirish</p>
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleAvatarUpload} 
-                accept="image/*" 
-                className="hidden" 
-              />
-              
-              <div className="mt-4 pt-4 border-t border-outline-variant/10 w-full space-y-3">
-                <p className="text-[10px] font-bold text-on-primary-container text-center uppercase tracking-widest">Yoki tayyor variantni tanlang</p>
-                <div className="flex justify-center gap-3">
-                  {[
-                    '/default-avatar.jpg',
-                    `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=0D8ABC&color=fff`,
-                    `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`,
-                  ].map((url, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setEditAvatar(url)}
-                      className={`w-10 h-10 rounded-full overflow-hidden border-2 transition-all ${
-                        editAvatar === url ? 'border-secondary-container scale-110 shadow-lg' : 'border-transparent opacity-50 hover:opacity-100'
-                      }`}
-                    >
-                      <img src={url} alt="Avatar variant" className="w-full h-full object-cover" />
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-on-primary-container block">To'liq ism</label>
-              <input
-                type="text"
-                className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-lg p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container focus:ring-1 focus:ring-secondary-container transition-all"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-on-primary-container block">Sotuvchi/Xaridor roli</label>
-              <select
-                className="w-full bg-[#0b1426] border border-outline-variant/30 text-white/50 rounded-lg p-3 font-semibold text-sm focus:outline-none appearance-none cursor-not-allowed"
-                value={editRole}
-                disabled
-              >
-                <option value="Xaridor">Xaridor</option>
-                <option value="Sotuvchi">Sotuvchi</option>
-              </select>
-              <p className="text-[10px] text-on-primary-container">Xavfsizlik sababli rolni bu yerdan o'zgartirib bo'lmaydi. Sotuvchi bo'lish uchun shunchaki birinchi e'loningizni joylashtiring.</p>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSavingSettings}
-              className="w-full py-3 bg-secondary-container text-on-secondary-fixed rounded-xl font-bold text-sm shadow-lg shadow-secondary-container/10 hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSavingSettings ? 'Saqlanmoqda...' : 'Sozlamalarni saqlash'}
-            </button>
-          </form>
-
-          <div className="mt-10 pt-6 border-t border-outline-variant/15 space-y-4">
-            <h4 className="text-sm font-bold text-white flex items-center gap-2">
-              <span className="material-symbols-outlined text-secondary-container text-lg">robot_2</span>
-              Telegram botni ulash
-            </h4>
-            <p className="text-xs text-on-primary-container leading-relaxed">
-              Botni ulash orqali siz mahsulotlarni bevosita Telegram orqali sotib olishingiz va to'lovdan so'ng darhol yetkazish havolasini olishingiz mumkin.
-            </p>
-            
-            {linkCode ? (
-              <div className="bg-[#0b1426] border border-secondary-container/30 rounded-xl p-4 text-center space-y-2 animate-pulse-subtle">
-                <p className="text-[10px] uppercase font-bold text-on-primary-container">Sizning ulanish kodingiz:</p>
-                <p className="text-2xl font-mono font-bold text-secondary-container tracking-widest">{linkCode}</p>
-                <p className="text-[10px] text-on-primary-container">
-                  Botga o'ting va ushbu buyruqni yuboring: <br/>
-                  <code className="bg-white/5 px-1 py-0.5 rounded">/bogla {linkCode}</code>
-                </p>
-              </div>
-            ) : (
-              <button
-                onClick={generateLinkCode}
-                className="w-full py-3 bg-white/5 border border-white/10 hover:bg-white/10 text-white rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2"
-              >
-                <span className="material-symbols-outlined text-sm">link</span>
-                Ulanish kodi olish
-              </button>
-            )}
-          </div>
-        </section>
+        <ProfileSettingsTab
+          handleSaveSettings={handleSaveSettings}
+          fileInputRef={fileInputRef}
+          isUploadingAvatar={isUploadingAvatar}
+          editAvatar={editAvatar}
+          setEditAvatar={setEditAvatar}
+          handleAvatarUpload={handleAvatarUpload}
+          user={user}
+          editName={editName}
+          setEditName={setEditName}
+          editRole={editRole}
+          isSavingSettings={isSavingSettings}
+          linkCode={linkCode}
+          generateLinkCode={generateLinkCode}
+        />
       )}
 
       {activeTab === 'security' && (
-        <section className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <span className="material-symbols-outlined text-secondary-container">shield</span>
-              Faol sessiyalar
-            </h3>
-            {sessions.length > 1 && (
-              <button
-                onClick={revokeAllSessions}
-                className="px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 rounded-xl font-bold text-xs transition-all"
-              >
-                Barcha sessiyalarni yakunlash
-              </button>
-            )}
-          </div>
-
-          <div className="space-y-4">
-            {sessions.length === 0 ? (
-              <p className="text-center py-8 text-on-primary-container text-sm italic">Sessiyalar topilmadi.</p>
-            ) : (
-              sessions.map(session => (
-                <div key={session.id} className="bg-[#0b1426] border border-outline-variant/10 rounded-xl p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-secondary-container">
-                      <span className="material-symbols-outlined text-2xl">
-                        {session.userAgent?.toLowerCase().includes('mobile') ? 'smartphone' : 'desktop_windows'}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-white">
-                        {session.userAgent || "Noma'lum qurilma"}
-                      </p>
-                      <p className="text-[10px] text-on-primary-container mt-0.5">
-                        IP: {session.ip} • Oxirgi faollik: {new Date(session.updatedAt).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => revokeSession(session.id)}
-                    className="px-4 py-2 text-red-400 hover:bg-red-500/10 border border-red-500/20 rounded-lg font-bold text-[11px] transition-colors"
-                  >
-                    Sessiyani yakunlash
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-        </section>
+        <ProfileSecurityTab
+          sessions={sessions}
+          revokeAllSessions={revokeAllSessions}
+          revokeSession={revokeSession}
+        />
       )}
     </div>
   );
