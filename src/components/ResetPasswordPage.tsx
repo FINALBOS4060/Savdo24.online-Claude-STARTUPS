@@ -78,7 +78,7 @@ export default function ResetPasswordPage({ onNavigate }: ResetPasswordPageProps
   };
 
   return (
-    <div className="min-h-screen bg-[#080d14] flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans" id="reset-password-page">
+    <div className="min-h-screen bg-background flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans" id="reset-password-page">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
           <div className="bg-emerald-500/10 text-emerald-400 p-3 rounded-2xl border border-emerald-500/20">
@@ -88,13 +88,13 @@ export default function ResetPasswordPage({ onNavigate }: ResetPasswordPageProps
         <h2 className="mt-6 text-center text-3xl font-medium tracking-tight text-white">
           Yangi parolni o'rnatish
         </h2>
-        <p className="mt-2 text-center text-sm text-[#8892b0]">
+        <p className="mt-2 text-center text-sm text-on-primary-container">
           Iltimos, hisobingiz uchun yangi xavfsiz parol kiriting.
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-[#0d131a] py-8 px-4 border border-[#1d2733] shadow-xl rounded-2xl sm:px-10">
+        <div className="bg-surface-container py-8 px-4 border border-outline/20 shadow-xl rounded-2xl sm:px-10">
           {error && (
             <div className="mb-4 bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl flex items-start gap-3 text-sm">
               <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
@@ -108,7 +108,7 @@ export default function ResetPasswordPage({ onNavigate }: ResetPasswordPageProps
                 <CheckCircle className="h-6 w-6" />
               </div>
               <p className="text-emerald-400 font-medium mb-2">Muvaffaqiyatli!</p>
-              <p className="text-sm text-[#8892b0] mb-6">
+              <p className="text-sm text-on-primary-container mb-6">
                 {success}
               </p>
               <button
@@ -133,7 +133,7 @@ export default function ResetPasswordPage({ onNavigate }: ResetPasswordPageProps
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
                     disabled={loading}
-                    className="mt-1.5 block w-full px-4 py-3 bg-[#131b26] border border-[#222e3d] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm transition-colors duration-200 disabled:opacity-60"
+                    className="mt-1.5 block w-full px-4 py-3 bg-surface-container-low border border-outline/20 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm transition-colors duration-200 disabled:opacity-60"
                     placeholder="Email orqali yuborilgan tokenni kiriting"
                   />
                 </div>
@@ -143,7 +143,7 @@ export default function ResetPasswordPage({ onNavigate }: ResetPasswordPageProps
                 <label htmlFor="password" className="block text-sm font-medium text-slate-300">
                   Yangi parol
                 </label>
-                <div className="mt-1.5 relative rounded-md shadow-sm">
+                <div className="mt-1.5 relative rounded-lg shadow-sm">
                   <input
                     id="password"
                     name="password"
@@ -152,7 +152,7 @@ export default function ResetPasswordPage({ onNavigate }: ResetPasswordPageProps
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={loading}
-                    className="block w-full px-4 py-3 bg-[#131b26] border border-[#222e3d] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm pr-12 transition-colors duration-200 disabled:opacity-60"
+                    className="block w-full px-4 py-3 bg-surface-container-low border border-outline/20 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm pr-12 transition-colors duration-200 disabled:opacity-60"
                     placeholder="••••••••"
                   />
                   <button
@@ -177,7 +177,7 @@ export default function ResetPasswordPage({ onNavigate }: ResetPasswordPageProps
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   disabled={loading}
-                  className="mt-1.5 block w-full px-4 py-3 bg-[#131b26] border border-[#222e3d] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm transition-colors duration-200 disabled:opacity-60"
+                  className="mt-1.5 block w-full px-4 py-3 bg-surface-container-low border border-outline/20 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm transition-colors duration-200 disabled:opacity-60"
                   placeholder="••••••••"
                 />
               </div>
@@ -205,7 +205,7 @@ export default function ResetPasswordPage({ onNavigate }: ResetPasswordPageProps
                   id="back-to-login-from-reset-btn"
                   type="button"
                   onClick={() => onNavigate('login')}
-                  className="inline-flex items-center gap-2 text-sm text-[#10b981] hover:text-emerald-400 font-medium transition-colors duration-150"
+                  className="inline-flex items-center gap-2 text-sm text-success hover:text-emerald-400 font-medium transition-colors duration-150"
                 >
                   <ArrowLeft className="h-4 w-4" />
                   Ortga qaytish

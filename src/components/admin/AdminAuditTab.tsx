@@ -20,7 +20,7 @@ export const AdminAuditTab: React.FC<AdminAuditTabProps> = ({
   renderPagination,
 }) => {
   return (
-    <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
+    <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
       <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4">
         <span className="material-symbols-outlined text-secondary">history</span>
         Tizim faoliyat tarixi ({auditLogs.length})
@@ -38,7 +38,7 @@ export const AdminAuditTab: React.FC<AdminAuditTabProps> = ({
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-white/5 text-xs text-left">
             <thead>
-              <tr className="text-[#8892b0] font-bold uppercase tracking-wider text-xs">
+              <tr className="text-on-primary-container font-bold uppercase tracking-wider text-xs">
                 <th className="py-3 px-4">Sana</th>
                 <th className="py-3 px-4">Admin</th>
                 <th className="py-3 px-4">Amal</th>

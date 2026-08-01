@@ -63,7 +63,7 @@ export const ProfileSavedTab: React.FC<ProfileSavedTabProps> = ({
 
                 <div className="mt-4 pt-4 border-t border-outline-variant/20 flex items-center justify-between">
                   <div>
-                    <span className="text-[10px] text-on-primary-container uppercase block">Sotish narxi</span>
+                    <span className="text-xs text-on-primary-container uppercase block">Sotish narxi</span>
                     <span className="text-sm font-bold text-secondary-container font-mono">
                       ${startup.price ? startup.price.toLocaleString() : "Kelishilgan holda"}
                     </span>

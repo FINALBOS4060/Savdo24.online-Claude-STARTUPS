@@ -79,7 +79,7 @@ export const AdminListingsTab: React.FC<AdminListingsTabProps> = ({
 
       {listingsView === 'all' && (
         <div className="relative">
-          <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8892b0] text-sm">search</span>
+          <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-primary-container text-sm">search</span>
           <input
             type="text"
             placeholder="E'lon nomi yoki ID bo'yicha qidirish..."
@@ -88,7 +88,7 @@ export const AdminListingsTab: React.FC<AdminListingsTabProps> = ({
               setListingsSearch(e.target.value);
               fetchAllListingsAdmin(1, e.target.value);
             }}
-            className="w-full pl-10 pr-4 py-2.5 bg-surface-container-low border border-white/10 rounded-xl text-white text-xs placeholder-[#8892b0]/60 focus:outline-none focus:ring-2 focus:ring-secondary"
+            className="w-full pl-10 pr-4 py-2.5 bg-surface-container-low border border-white/10 rounded-xl text-white text-xs placeholder-on-primary-container/60 focus:outline-none focus:ring-2 focus:ring-secondary"
           />
         </div>
       )}
@@ -124,7 +124,7 @@ export const AdminListingsTab: React.FC<AdminListingsTabProps> = ({
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <h3 className="text-white font-extrabold text-base">{startup.name}</h3>
-                      <span className="bg-yellow-500/10 text-yellow-500 text-xs font-extrabold uppercase px-2 py-0.5 rounded-md border border-yellow-500/20">
+                      <span className="bg-yellow-500/10 text-yellow-500 text-xs font-extrabold uppercase px-2 py-0.5 rounded-lg border border-yellow-500/20">
                         {startup.category}
                       </span>
                     </div>
@@ -141,7 +141,7 @@ export const AdminListingsTab: React.FC<AdminListingsTabProps> = ({
                   <button
                     disabled={isUpdating !== null}
                     onClick={() => handleStatusChange(startup.id, 'active')}
-                    className="flex-1 md:flex-none px-4 py-2.5 bg-success hover:brightness-110 disabled:opacity-50 text-[#12161c] font-extrabold text-xs rounded-xl transition-all flex items-center justify-center gap-1 active:scale-95 shadow-lg shadow-success/10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-success"
+                    className="flex-1 md:flex-none px-4 py-2.5 bg-success hover:brightness-110 disabled:opacity-50 text-on-secondary font-extrabold text-xs rounded-xl transition-all flex items-center justify-center gap-1 active:scale-95 shadow-lg shadow-success/10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-success"
                   >
                     <span className="material-symbols-outlined text-sm font-bold">check_circle</span>
                     Tasdiqlash
@@ -188,7 +188,7 @@ export const AdminListingsTab: React.FC<AdminListingsTabProps> = ({
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="text-white font-extrabold text-sm truncate">{startup.name}</h3>
-                    <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded-md border ${
+                    <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded-lg border ${
                       startup.status === 'active'
                         ? 'bg-success-container/10 text-success border-success/20'
                         : startup.status === 'pending'

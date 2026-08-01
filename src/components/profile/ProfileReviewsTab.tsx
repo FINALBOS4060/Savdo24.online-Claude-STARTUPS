@@ -23,8 +23,8 @@ export const ProfileReviewsTab: React.FC<ProfileReviewsTabProps> = ({
           </h3>
           <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-xl border border-white/5">
             <span className="text-sm font-bold text-white">O'rtacha reyting:</span>
-            <span className="text-lg font-extrabold text-[#f0b90b]">{reviewsReceivedData.averageRating.toFixed(1)}</span>
-            <div className="flex text-[#f0b90b]">
+            <span className="text-lg font-extrabold text-secondary">{reviewsReceivedData.averageRating.toFixed(1)}</span>
+            <div className="flex text-secondary">
               {[1, 2, 3, 4, 5].map((star) => (
                 <span key={star} className="material-symbols-outlined text-sm">
                   {star <= Math.round(reviewsReceivedData.averageRating) ? 'star' : 'star_outline'}
@@ -42,7 +42,7 @@ export const ProfileReviewsTab: React.FC<ProfileReviewsTabProps> = ({
         ) : (
           <div className="space-y-4">
             {reviewsReceivedData.reviews.map((review: any) => (
-              <div key={review.id} className="bg-[#0b1426] border border-outline-variant/10 rounded-xl p-5">
+              <div key={review.id} className="bg-background border border-outline-variant/10 rounded-xl p-5">
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex items-center gap-3">
                     <img 
@@ -55,10 +55,10 @@ export const ProfileReviewsTab: React.FC<ProfileReviewsTabProps> = ({
                     />
                     <div>
                       <p className="text-sm font-bold text-white">{review.buyer?.name}</p>
-                      <p className="text-[10px] text-on-primary-container">{new Date(review.createdAt).toLocaleDateString()} • {review.startup?.name}</p>
+                      <p className="text-xs text-on-primary-container">{new Date(review.createdAt).toLocaleDateString()} • {review.startup?.name}</p>
                     </div>
                   </div>
-                  <div className="flex text-[#f0b90b]">
+                  <div className="flex text-secondary">
                     {[1, 2, 3, 4, 5].map((star) => (
                       <span key={star} className="material-symbols-outlined text-sm">
                         {star <= review.rating ? 'star' : 'star_outline'}
@@ -86,13 +86,13 @@ export const ProfileReviewsTab: React.FC<ProfileReviewsTabProps> = ({
         ) : (
           <div className="space-y-4">
             {reviewsGiven.map((review: any) => (
-              <div key={review.id} className="bg-[#0b1426] border border-outline-variant/10 rounded-xl p-5">
+              <div key={review.id} className="bg-background border border-outline-variant/10 rounded-xl p-5">
                 <div className="flex justify-between items-start mb-3">
                   <div>
                     <p className="text-sm font-bold text-white">{review.startup?.name}</p>
-                    <p className="text-[10px] text-on-primary-container">{new Date(review.createdAt).toLocaleDateString()}</p>
+                    <p className="text-xs text-on-primary-container">{new Date(review.createdAt).toLocaleDateString()}</p>
                   </div>
-                  <div className="flex text-[#f0b90b]">
+                  <div className="flex text-secondary">
                     {[1, 2, 3, 4, 5].map((star) => (
                       <span key={star} className="material-symbols-outlined text-sm">
                         {star <= review.rating ? 'star' : 'star_outline'}

@@ -22,21 +22,21 @@ export default function TermsPage({ setView }: TermsPageProps) {
 
       <div className="space-y-6 text-sm text-gray-300 leading-relaxed font-medium">
         <section className="space-y-3">
-          <h2 className="text-base font-bold text-white uppercase tracking-wider text-[#f3ba2f]">1. Shartlarning qabul qilinishi</h2>
+          <h2 className="text-base font-bold text-white uppercase tracking-wider text-secondary">1. Shartlarning qabul qilinishi</h2>
           <p>
             Savdo24 platformasiga (keyingi o'rinlarda "Platforma") kirish yoki undan foydalanish orqali siz ushbu Foydalanish shartlariga to'liq rozilik bildirasiz. Agar siz ushbu shartlarga rozi bo'lmasangiz, iltimos, Platforma xizmatlaridan foydalanmang.
           </p>
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-base font-bold text-white uppercase tracking-wider text-[#f3ba2f]">2. Xizmat tavsifi</h2>
+          <h2 className="text-base font-bold text-white uppercase tracking-wider text-secondary">2. Xizmat tavsifi</h2>
           <p>
             Savdo24 — bu raqamli mahsulotlar, startaplar, SaaS loyihalari, API xizmatlar va dasturiy ta'minot kodlarini sotish va sotib olishga mo'ljallangan xavfsiz vositachilik platformasidir. Platforma xaridor va sotuvchilarga o'zaro shartnomalar tuzish, xavfsiz to'lovlarni amalga oshirish hamda loyihalarni topshirish imkonini beradi.
           </p>
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-base font-bold text-white uppercase tracking-wider text-[#f3ba2f]">3. Foydalanuvchilarning majburiyatlari</h2>
+          <h2 className="text-base font-bold text-white uppercase tracking-wider text-secondary">3. Foydalanuvchilarning majburiyatlari</h2>
           <p>
             Platformadan foydalanganda quyidagi qoidalarga qat'iy rioya qilishingiz shart:
           </p>
@@ -48,7 +48,7 @@ export default function TermsPage({ setView }: TermsPageProps) {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-base font-bold text-white uppercase tracking-wider text-[#f3ba2f]">4. Taqiqlangan kontent va harakatlar</h2>
+          <h2 className="text-base font-bold text-white uppercase tracking-wider text-secondary">4. Taqiqlangan kontent va harakatlar</h2>
           <p>
             Platformada quyidagi kontent turlarini sotish yoki joylashtirish qat'iyan man etiladi:
           </p>
@@ -61,14 +61,14 @@ export default function TermsPage({ setView }: TermsPageProps) {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-base font-bold text-white uppercase tracking-wider text-[#f3ba2f]">5. Bitimlar va vositachilik komissiyasi</h2>
+          <h2 className="text-base font-bold text-white uppercase tracking-wider text-secondary">5. Bitimlar va vositachilik komissiyasi</h2>
           <p>
             Platformada muvaffaqiyatli amalga oshirilgan har bir xarid bitimidan Savdo24 tizimi 5% miqdorida vositachilik komissiyasi ushlab qoladi. To'lovlar xavfsiz kripto to'lov tizimi (CoinGate) orqali amalga oshiriladi va loyiha xaridorga to'liq topshirilgunga qadar platforma depozitida saqlanadi.
           </p>
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-base font-bold text-white uppercase tracking-wider text-[#f3ba2f]">6. Shartlarning o'zgartirilishi</h2>
+          <h2 className="text-base font-bold text-white uppercase tracking-wider text-secondary">6. Shartlarning o'zgartirilishi</h2>
           <p>
             Savdo24 ushbu Foydalanish shartlarini istalgan vaqtda bir tomonlama o'zgartirish huquqini o'zida saqlab qoladi. Shartlar o'zgargandan so'ng xizmatlardan foydalanishda davom etishingiz yangilangan qoidalarni qabul qilganingizni anglatadi.
           </p>

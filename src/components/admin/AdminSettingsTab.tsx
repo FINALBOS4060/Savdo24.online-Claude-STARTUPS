@@ -30,7 +30,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({
           <span className="material-symbols-outlined text-secondary">settings</span>
           Tizim sozlamalari
         </h2>
-        <p className="text-xs text-[#8892b0] mt-1">
+        <p className="text-xs text-on-primary-container mt-1">
           Telegram bot, to'lov xizmatlari va API kalitlarini boshqarish.
         </p>
       </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { ChevronLeft, ChevronRight, Users, Search, X, Crown, UserCog, CheckCircle, AlertTriangle, KeyRound, Trash2, History, Ban } from 'lucide-react';
 import { apiFetch as fetch } from '../../lib/api';
 import { LoadingState } from '../LoadingState';
 import { formatDate, formatDateTime } from '../../lib/formatDate';
@@ -202,7 +203,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
           className="p-2 bg-white/5 hover:bg-white/10 disabled:opacity-40 text-white rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-secondary-container"
           aria-label="Oldingi sahifa"
         >
-          <span className="material-symbols-outlined text-sm block">chevron_left</span>
+          <ChevronLeft className="w-4 h-4 block" />
         </button>
         <span className="text-xs text-on-primary-container font-medium px-2">
           {currentPage} / {totalPages}
@@ -213,7 +214,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
           className="p-2 bg-white/5 hover:bg-white/10 disabled:opacity-40 text-white rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-secondary-container"
           aria-label="Keyingi sahifa"
         >
-          <span className="material-symbols-outlined text-sm block">chevron_right</span>
+          <ChevronRight className="w-4 h-4 block" />
         </button>
       </div>
     );
@@ -221,14 +222,14 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
 
   return (
     <>
-      <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
+      <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-white/5 pb-6">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <span className="material-symbols-outlined text-secondary">group</span>
+            <Users className="w-5 h-5 text-secondary" />
             Foydalanuvchilar ({totalAdminUsers})
           </h2>
           <div className="relative w-full md:w-64">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-primary-container text-sm">search</span>
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-on-primary-container w-4 h-4" />
             <input
               type="text"
               placeholder="Qidirish (ism, email)..."
@@ -323,19 +324,19 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
       {/* Admin User Detail Modal */}
       {selectedUserDetail && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="glass-card w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 md:p-10 rounded-3xl border border-white/5 shadow-2xl relative custom-scrollbar">
+          <div className="glass-card w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 md:p-10 rounded-2xl border border-white/5 shadow-2xl relative custom-scrollbar">
             <button 
               onClick={() => setSelectedUserDetail(null)}
               className="absolute top-6 right-6 w-12 h-12 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-all text-white border border-white/10 focus:outline-none focus:ring-2 focus:ring-secondary-container"
               aria-label="Yopish"
             >
-              <span className="material-symbols-outlined">close</span>
+              <X className="w-5 h-5" />
             </button>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Profile Card */}
               <div className="lg:col-span-1 space-y-6">
-                <div className="bg-surface-container-low border border-white/5 rounded-3xl p-6 text-center space-y-4">
+                <div className="bg-surface-container-low border border-white/5 rounded-2xl p-6 text-center space-y-4">
                   <div className="relative inline-block">
                     <img 
                       src={selectedUserDetail.user.avatarUrl || '/default-avatar.jpg'} 
@@ -346,8 +347,8 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                       height={96}
                     />
                     {selectedUserDetail.user.isVip && (
-                      <div className="absolute -top-1 -right-1 w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center text-black border-4 border-[#0b1426]">
-                        <span className="material-symbols-outlined text-lg">workspace_premium</span>
+                      <div className="absolute -top-1 -right-1 w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center text-black border-4 border-background">
+                        <Crown className="w-4 h-4 fill-current" />
                       </div>
                     )}
                   </div>
@@ -405,9 +406,9 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
               {/* Action Tabs & Logs */}
               <div className="lg:col-span-2 space-y-8">
                 {/* VIP Status Settings */}
-                <div className="bg-[#0b1426] border border-white/5 rounded-3xl p-6 md:p-8 space-y-4">
+                <div className="bg-background border border-white/5 rounded-2xl p-6 md:p-8 space-y-4">
                   <h4 className="text-sm font-black text-white flex items-center gap-2">
-                    <span className="material-symbols-outlined text-yellow-400">workspace_premium</span>
+                    <Crown className="w-4 h-4 text-yellow-400 fill-yellow-400" />
                     VIP A'zolik Sozlamalari
                   </h4>
                   <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pt-2">
@@ -450,9 +451,9 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                 {/* Role and Danger Zone */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Rol o'zgartirish */}
-                  <div className="bg-[#0b1426] border border-white/5 rounded-3xl p-6 md:p-8 space-y-4">
+                  <div className="bg-background border border-white/5 rounded-2xl p-6 md:p-8 space-y-4">
                     <h4 className="text-sm font-black text-white flex items-center gap-2">
-                      <span className="material-symbols-outlined text-blue-400">manage_accounts</span>
+                      <UserCog className="w-4 h-4 text-blue-400" />
                       Tizimdagi Roli
                     </h4>
                     <div className="flex flex-col gap-2 pt-2">
@@ -469,7 +470,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                         >
                           <span>{role}</span>
                           {selectedUserDetail.user.role === role && (
-                            <span className="material-symbols-outlined text-sm">check_circle</span>
+                            <CheckCircle className="w-4 h-4 text-blue-400" />
                           )}
                         </button>
                       ))}
@@ -477,9 +478,9 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                   </div>
 
                   {/* Xavfli hudud */}
-                  <div className="bg-[#0b1426] border border-red-500/10 rounded-3xl p-6 md:p-8 space-y-4">
+                  <div className="bg-background border border-red-500/10 rounded-2xl p-6 md:p-8 space-y-4">
                     <h4 className="text-sm font-black text-red-400 flex items-center gap-2">
-                      <span className="material-symbols-outlined">warning</span>
+                      <AlertTriangle className="w-4 h-4 text-red-400" />
                       Xavfli Hudud
                     </h4>
                     <div className="space-y-3 pt-2">
@@ -488,7 +489,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                         disabled={isUpdatingUser}
                         className="w-full px-4 py-2.5 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 border border-yellow-500/20 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                       >
-                        <span className="material-symbols-outlined text-sm">lock_reset</span>
+                        <KeyRound className="w-4 h-4" />
                         Parolni tiklash havolasi
                       </button>
                       
@@ -501,9 +502,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                             : 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20'
                         }`}
                       >
-                        <span className="material-symbols-outlined text-sm">
-                          {selectedUserDetail.user.isBanned ? "check_circle" : "block"}
-                        </span>
+                        {selectedUserDetail.user.isBanned ? <CheckCircle className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
                         {selectedUserDetail.user.isBanned ? "Blokdan ochish" : "Foydalanuvchini bloklash"}
                       </button>
 
@@ -535,7 +534,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                           disabled={isUpdatingUser}
                           className="w-full px-4 py-2.5 bg-red-600/10 hover:bg-red-600/20 text-red-500 border border-red-600/20 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-red-500"
                         >
-                          <span className="material-symbols-outlined text-sm">delete_forever</span>
+                          <Trash2 className="w-4 h-4" />
                           Hisobni butunlay o'chirish
                         </button>
                       )}
@@ -546,10 +545,10 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                 {/* Audit Logs */}
                 <div className="space-y-4">
                   <h4 className="text-sm font-black text-white flex items-center gap-2">
-                    <span className="material-symbols-outlined text-secondary-container">history</span>
+                    <History className="w-4 h-4 text-secondary-container" />
                     Oxirgi AuditLog yozuvlari
                   </h4>
-                  <div className="bg-[#0b1426] border border-white/5 rounded-2xl overflow-hidden">
+                  <div className="bg-background border border-white/5 rounded-2xl overflow-hidden">
                     {selectedUserDetail.auditLogs.length === 0 ? (
                       <p className="p-8 text-center text-on-primary-container text-xs italic">Audit yozuvlari topilmadi.</p>
                     ) : (
@@ -561,7 +560,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                               <span className="text-xs text-on-primary-container font-mono">{formatDateTime(log.createdAt)}</span>
                             </div>
                             <p className="text-xs text-white font-medium leading-relaxed mb-1">{log.details}</p>
-                            <p className="text-xs text-[#8892b0]">Admin: <span className="text-white font-bold">{log.admin?.name || "Tizim"}</span></p>
+                            <p className="text-xs text-on-primary-container">Admin: <span className="text-white font-bold">{log.admin?.name || "Tizim"}</span></p>
                           </div>
                         ))}
                       </div>

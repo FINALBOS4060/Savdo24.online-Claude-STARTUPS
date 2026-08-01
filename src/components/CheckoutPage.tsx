@@ -339,9 +339,9 @@ export default function CheckoutPage({
   return (
     <div className="max-w-2xl mx-auto animate-fade-in text-left">
       {paymentStep === 'checkout' && (
-        <div className={`bg-[#0b1426] border ${gateway === 'stripe' ? 'border-[#6366f1]/30' : 'border-[#10b981]/30'} rounded-3xl overflow-hidden shadow-2xl`}>
+        <div className={`bg-background border ${gateway === 'stripe' ? 'border-indigo-600/30' : 'border-success/30'} rounded-2xl overflow-hidden shadow-2xl`}>
           {/* Header */}
-          <div className={gateway === 'stripe' ? "bg-gradient-to-r from-[#6366f1] to-[#4f46e5] px-8 py-5 flex items-center justify-between text-white" : "bg-gradient-to-r from-[#10b981] to-[#059669] px-8 py-5 flex items-center justify-between text-white"}>
+          <div className={gateway === 'stripe' ? "bg-gradient-to-r from-indigo-600 to-indigo-700 px-8 py-5 flex items-center justify-between text-white" : "bg-gradient-to-r from-success to-emerald-700 px-8 py-5 flex items-center justify-between text-white"}>
             <div className="flex items-center gap-3">
               <span className="material-symbols-outlined text-3xl select-none font-bold">
                 {gateway === 'stripe' ? 'credit_card' : 'lock'}
@@ -351,15 +351,15 @@ export default function CheckoutPage({
               </span>
             </div>
             <div className="text-right">
-              <p className="text-[10px] font-extrabold uppercase tracking-widest opacity-70">Sotuvchi</p>
+              <p className="text-xs font-extrabold uppercase tracking-widest opacity-70">Sotuvchi</p>
               <p className="text-xs font-bold uppercase">Savdo24</p>
             </div>
           </div>
 
           <div className="p-8 space-y-8">
             {/* Redirect Banner */}
-            <div className={gateway === 'stripe' ? "bg-[#6366f1]/10 border border-[#6366f1]/20 rounded-2xl p-6 text-center space-y-4" : "bg-[#10b981]/10 border border-[#10b981]/20 rounded-2xl p-6 text-center space-y-4"}>
-              <div className={gateway === 'stripe' ? "flex items-center justify-center gap-2 text-[#818cf8]" : "flex items-center justify-center gap-2 text-[#10b981]"}>
+            <div className={gateway === 'stripe' ? "bg-indigo-600/10 border border-indigo-600/20 rounded-2xl p-6 text-center space-y-4" : "bg-success/10 border border-success/20 rounded-2xl p-6 text-center space-y-4"}>
+              <div className={gateway === 'stripe' ? "flex items-center justify-center gap-2 text-indigo-400" : "flex items-center justify-center gap-2 text-success"}>
                 <span className="material-symbols-outlined animate-spin">sync</span>
                 <span className="font-bold text-sm">
                   {gateway === 'stripe' ? "Stripe to'lov tizimiga yo'naltirilmoqda..." : "CoinGate to'lov tizimiga yo'naltirilmoqda..."}
@@ -374,7 +374,7 @@ export default function CheckoutPage({
               <div className="flex justify-center gap-3 pt-2">
                 <button
                   onClick={handleCoinGateRedirect}
-                  className={gateway === 'stripe' ? "px-6 py-3 bg-[#6366f1] hover:bg-[#4f46e5] active:scale-95 text-white font-black text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-[#6366f1]/10" : "px-6 py-3 bg-[#10b981] hover:bg-[#059669] active:scale-95 text-white font-black text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-[#10b981]/10"}
+                  className={gateway === 'stripe' ? "px-6 py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-black text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/10" : "px-6 py-3 bg-success hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-success/10"}
                 >
                   <span className="material-symbols-outlined text-sm font-bold">open_in_new</span>
                   To'lov sahifasiga o'tish
@@ -395,7 +395,7 @@ export default function CheckoutPage({
               <div className="col-span-2 pt-4 border-t border-white/5 flex justify-between items-center">
                 <div>
                   <p className="text-xs text-on-primary-container font-extrabold uppercase tracking-wider mb-1">To'lanadigan summa</p>
-                  <p className={gateway === 'stripe' ? "text-2xl font-black text-[#818cf8] font-mono" : "text-2xl font-black text-[#10b981] font-mono"}>
+                  <p className={gateway === 'stripe' ? "text-2xl font-black text-indigo-400 font-mono" : "text-2xl font-black text-success font-mono"}>
                     ${(discountData ? amount * (1 - discountData.discountPercent / 100) : amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {gateway === 'stripe' ? 'USD' : 'USDT'}
                   </p>
                   {discountData && (
@@ -406,7 +406,7 @@ export default function CheckoutPage({
                     </p>
                   )}
                 </div>
-                <div className={`text-right rounded-xl px-3 py-1.5 font-mono text-xs font-bold flex items-center gap-1.5 border ${isExpired ? 'bg-red-500/10 text-red-400 border-red-500/20' : (gateway === 'stripe' ? 'bg-[#6366f1]/10 text-[#818cf8] border-[#6366f1]/20' : 'bg-[#10b981]/10 text-[#10b981] border-[#10b981]/20')}`}>
+                <div className={`text-right rounded-xl px-3 py-1.5 font-mono text-xs font-bold flex items-center gap-1.5 border ${isExpired ? 'bg-red-500/10 text-red-400 border-red-500/20' : (gateway === 'stripe' ? 'bg-indigo-600/10 text-indigo-400 border-indigo-600/20' : 'bg-success/10 text-success border-success/20')}`}>
                   <span className="material-symbols-outlined text-sm">schedule</span>
                   {isExpired ? "Vaqt tugadi" : formatTime(timeLeft)}
                 </div>
@@ -419,7 +419,7 @@ export default function CheckoutPage({
                     type="text"
                     value={referralCode}
                     onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-                    className={`flex-1 bg-surface-container-low border border-white/10 rounded-xl px-4 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface ${gateway === 'stripe' ? 'focus:border-[#6366f1]' : 'focus:border-[#10b981]'}`}
+                    className={`flex-1 bg-surface-container-low border border-white/10 rounded-xl px-4 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface ${gateway === 'stripe' ? 'focus:border-indigo-600' : 'focus:border-success'}`}
                     placeholder="KODNI KIRITING"
                   />
                   <button 
@@ -456,8 +456,8 @@ export default function CheckoutPage({
                   onClick={handleVerifyPayment}
                   disabled={isChecking || isExpired}
                   className={gateway === 'stripe'
-                    ? "px-6 py-3 border border-[#6366f1]/30 hover:bg-[#6366f1]/5 active:scale-95 text-[#818cf8] font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                    : "px-6 py-3 border border-[#10b981]/30 hover:bg-[#10b981]/5 active:scale-95 text-[#10b981] font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"}
+                    ? "px-6 py-3 border border-indigo-600/30 hover:bg-indigo-600/5 active:scale-95 text-indigo-400 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                    : "px-6 py-3 border border-success/30 hover:bg-success/5 active:scale-95 text-success font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"}
                 >
                   <span className={`material-symbols-outlined text-sm ${isChecking ? 'animate-spin' : ''}`}>
                     {isChecking ? 'sync' : 'verified_user'}
@@ -472,12 +472,12 @@ export default function CheckoutPage({
 
       {/* Payment Processing Step */}
       {paymentStep === 'processing' && (
-        <div className="bg-[#0b1426] border border-outline-variant/30 rounded-3xl p-12 text-center space-y-8 shadow-2xl min-h-[400px] flex flex-col justify-center items-center">
+        <div className="bg-background border border-outline-variant/30 rounded-2xl p-12 text-center space-y-8 shadow-2xl min-h-[400px] flex flex-col justify-center items-center">
           <div className="relative w-24 h-24">
-            <div className={`absolute inset-0 border-4 ${gateway === 'stripe' ? 'border-[#6366f1]/20' : 'border-[#10b981]/20'} rounded-full`}></div>
-            <div className={`absolute inset-0 border-4 ${gateway === 'stripe' ? 'border-[#6366f1]' : 'border-[#10b981]'} border-t-transparent rounded-full animate-spin`}></div>
+            <div className={`absolute inset-0 border-4 ${gateway === 'stripe' ? 'border-indigo-600/20' : 'border-success/20'} rounded-full`}></div>
+            <div className={`absolute inset-0 border-4 ${gateway === 'stripe' ? 'border-indigo-600' : 'border-success'} border-t-transparent rounded-full animate-spin`}></div>
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className={`material-symbols-outlined text-3xl ${gateway === 'stripe' ? 'text-[#818cf8]' : 'text-[#10b981]'} animate-pulse`}>
+              <span className={`material-symbols-outlined text-3xl ${gateway === 'stripe' ? 'text-indigo-400' : 'text-success'} animate-pulse`}>
                 {gateway === 'stripe' ? 'credit_card' : 'lock'}
               </span>
             </div>
@@ -495,7 +495,7 @@ export default function CheckoutPage({
 
       {/* Payment Success Receipt */}
       {paymentStep === 'success' && (
-        <div className="bg-[#0b1426] border border-green-500/30 rounded-3xl p-8 shadow-2xl space-y-8 animate-scale-up">
+        <div className="bg-background border border-green-500/30 rounded-2xl p-8 shadow-2xl space-y-8 animate-scale-up">
           <div className="flex flex-col items-center text-center space-y-4">
             <div className="w-16 h-16 bg-green-500/10 text-green-400 border border-green-500/30 rounded-full flex items-center justify-center shadow-lg">
               <span className="material-symbols-outlined text-3xl font-bold">check_circle</span>
@@ -544,7 +544,7 @@ export default function CheckoutPage({
                         onActionToast("Havola xato.");
                       }
                     }}
-                    className="w-full flex items-center justify-center gap-2 py-3 bg-[#10b981]/10 border border-[#10b981]/30 text-[#10b981] rounded-xl font-bold hover:bg-[#10b981]/20 transition-all text-sm"
+                    className="w-full flex items-center justify-center gap-2 py-3 bg-success/10 border border-success/30 text-success rounded-xl font-bold hover:bg-success/20 transition-all text-sm"
                   >
                     Loyihani yuklab olish (Sotuvchi havolasi)
                     <span className="material-symbols-outlined text-sm">open_in_new</span>
@@ -554,7 +554,7 @@ export default function CheckoutPage({
                       href={`https://t.me/Savdo24Bot?start=${encodeURIComponent(deliveryData.telegramToken)}`} 
                       target="_blank" 
                       rel="noreferrer" 
-                      className="w-full flex items-center justify-center gap-2 py-3 bg-[#229ED9]/10 border border-[#229ED9]/30 text-[#229ED9] rounded-xl font-bold hover:bg-[#229ED9]/20 transition-all text-sm"
+                      className="w-full flex items-center justify-center gap-2 py-3 bg-sky-400/10 border border-sky-400/30 text-sky-400 rounded-xl font-bold hover:bg-sky-400/20 transition-all text-sm"
                     >
                       📥 Telegram bot orqali yuklab olish
                       <span className="material-symbols-outlined text-sm">send</span>
@@ -563,10 +563,10 @@ export default function CheckoutPage({
                 </div>
               ) : (
                 // Hide seller contact - use encrypted/masked display
-                <div className="bg-[#10b981]/10 border border-[#10b981]/30 rounded-xl p-4 flex flex-col items-center text-center">
-                  <span className="material-symbols-outlined text-[#10b981] text-2xl mb-2">hourglass_top</span>
+                <div className="bg-success/10 border border-success/30 rounded-xl p-4 flex flex-col items-center text-center">
+                  <span className="material-symbols-outlined text-success text-2xl mb-2">hourglass_top</span>
                   <p className="text-white text-sm font-bold mb-1">Sotuvchi 24 soat ichida siz bilan bog'lanadi</p>
-                  <p className="text-[#10b981] text-xs">
+                  <p className="text-success text-xs">
                     Aloqa ma'lumotlari maxfiy: {deliveryData.sellerContact ? '✓ Qabul qilindi' : '⏳ Kutilmoqda'}
                   </p>
                 </div>
@@ -582,8 +582,8 @@ export default function CheckoutPage({
           </div>
 
           {/* Manba kodiga kirish / Loyihani olish */}
-          <div className="bg-secondary-container/10 border border-[#10b981]/20 rounded-2xl p-5 space-y-4 text-left">
-            <h4 className="text-[#10b981] font-bold text-sm flex items-center gap-2">
+          <div className="bg-secondary-container/10 border border-success/20 rounded-2xl p-5 space-y-4 text-left">
+            <h4 className="text-success font-bold text-sm flex items-center gap-2">
               <span className="material-symbols-outlined">download_done</span>
               Loyihani qabul qilib olish
             </h4>
@@ -598,13 +598,13 @@ export default function CheckoutPage({
                     href={deliveryData.deliveryUrl || startup?.deliveryUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="w-full py-3 px-4 bg-[#24292e] hover:bg-white/10 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 border border-white/10"
+                    className="w-full py-3 px-4 bg-slate-800 hover:bg-white/10 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 border border-white/10"
                   >
                     <span className="material-symbols-outlined text-sm">code</span>
                     Loyiha omboriga / Havolasiga o'tish
                   </a>
                 ) : (
-                  <div className="bg-[#10b981]/10 border border-[#10b981]/30 rounded-xl p-4 text-center text-xs text-white">
+                  <div className="bg-success/10 border border-success/30 rounded-xl p-4 text-center text-xs text-white">
                     Sotuvchi ushbu loyiha uchun yetkazib berish havolasini kiritmagan. Iltimos, pastdagi aloqa ma'lumotlari orqali sotuvchi bilan bog'laning.
                   </div>
                 )}
@@ -612,7 +612,7 @@ export default function CheckoutPage({
             </div>
 
             <div className="pt-3 border-t border-white/5 flex flex-col gap-2">
-              <p className="text-[11px] text-on-primary-container">
+              <p className="text-xs text-on-primary-container">
                 Muammo yuzaga kelsa yoki qo'shimcha savollar bo'lsa, to'g'ridan-to'g'ri sotuvchi bilan bog'lanishingiz mumkin:
               </p>
               <div className="flex flex-wrap gap-2 text-xs text-white">
@@ -621,7 +621,7 @@ export default function CheckoutPage({
                     href={`https://t.me/${startup.contactTelegram.replace('@', '')}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#229ED9]/10 text-[#229ED9] hover:bg-[#229ED9]/20 rounded-xl transition-all font-bold"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-400/10 text-sky-400 hover:bg-sky-400/20 rounded-xl transition-all font-bold"
                   >
                     <span className="material-symbols-outlined text-xs">send</span>
                     Telegram: {startup.contactTelegram}

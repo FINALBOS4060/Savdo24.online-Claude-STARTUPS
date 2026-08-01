@@ -42,7 +42,7 @@ export const DetailIdeasSection: React.FC<DetailIdeasSectionProps> = ({
             Startap rivojlanishi uchun g'oyalar yuboring yoki eng yaxshilariga ovoz bering.
           </p>
         </div>
-        <span className="bg-yellow-500/10 text-secondary text-xs font-extrabold uppercase px-2.5 py-1 rounded-md border border-yellow-500/20 text-center self-start sm:self-auto">
+        <span className="bg-yellow-500/10 text-secondary text-xs font-extrabold uppercase px-2.5 py-1 rounded-lg border border-yellow-500/20 text-center self-start sm:self-auto">
           {ideas.length} ta g'oya
         </span>
       </div>

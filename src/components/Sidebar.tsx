@@ -1,3 +1,4 @@
+import { LayoutDashboard, List, Trophy, Settings, HelpCircle, ShieldCheck, CheckCircle } from 'lucide-react';
 import { UserProfileData, ProfileTab } from '../types';
 
 interface SidebarProps {
@@ -17,17 +18,17 @@ export default function Sidebar({
   setProfileTab,
   profileTab,
 }: SidebarProps) {
-  const menuItems: Array<{ id: string; label: string; icon: string; view?: string; toast?: string }> = [
-    { id: 'profile', label: 'Boshqaruv paneli', icon: 'dashboard', view: 'profile' },
-    { id: 'browse', label: 'Faol e\'lonlar', icon: 'list_alt', view: 'browse' },
-    { id: 'ideas-rating', label: '🏆 G\'oyalar reytingi', icon: 'emoji_events', view: 'ideas-rating' },
-    { id: 'settings', label: 'Sozlamalar', icon: 'settings' },
-    { id: 'support', label: 'Qo\'llab-quvvatlash', icon: 'help', view: 'support' },
+  const menuItems: Array<{ id: string; label: string; icon: React.ComponentType<{ className?: string }>; view?: string; toast?: string }> = [
+    { id: 'profile', label: 'Boshqaruv paneli', icon: LayoutDashboard, view: 'profile' },
+    { id: 'browse', label: 'Faol e\'lonlar', icon: List, view: 'browse' },
+    { id: 'ideas-rating', label: 'G\'oyalar reytingi', icon: Trophy, view: 'ideas-rating' },
+    { id: 'settings', label: 'Sozlamalar', icon: Settings },
+    { id: 'support', label: 'Qo\'llab-quvvatlash', icon: HelpCircle, view: 'support' },
   ];
 
   const isAdmin = user && user.role === 'Admin';
   if (isAdmin) {
-    menuItems.splice(1, 0, { id: 'admin', label: 'Admin paneli', icon: 'admin_panel_settings', view: 'admin' });
+    menuItems.splice(1, 0, { id: 'admin', label: 'Admin paneli', icon: ShieldCheck, view: 'admin' });
   }
 
   return (
@@ -46,7 +47,7 @@ export default function Sidebar({
         <h3 className="font-bold text-sm text-on-surface dark:text-white">{user.name}</h3>
         {user.name !== 'Mehmon' && user.emailVerified && (
           <p className="text-xs text-secondary-fixed-dim font-medium flex items-center gap-1 mt-0.5">
-            <span className="material-symbols-outlined text-xs text-secondary-container">verified</span>
+            <CheckCircle className="w-3.5 h-3.5 text-secondary-container" />
             Tasdiqlangan foydalanuvchi
           </p>
         )}
@@ -54,6 +55,7 @@ export default function Sidebar({
 
       <nav className="space-y-1 flex-grow">
         {menuItems.map((item) => {
+          const IconComponent = item.icon;
           const isActive = item.id === 'settings'
             ? (currentView === 'profile' && profileTab === 'settings')
             : (item.view ? (currentView === item.view && (item.view !== 'profile' || profileTab !== 'settings')) : false);
@@ -80,7 +82,7 @@ export default function Sidebar({
                   : 'text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-white/5'
               }`}
             >
-              <span className="material-symbols-outlined text-lg">{item.icon}</span>
+              <IconComponent className="w-4 h-4" />
               <span>{item.label}</span>
             </button>
           );

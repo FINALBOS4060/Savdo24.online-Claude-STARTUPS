@@ -62,7 +62,7 @@ export const AdminB2BTab: React.FC<AdminB2BTabProps> = ({ onActionToast }) => {
   return (
     <div className="space-y-8">
       {/* Pending B2B Requests */}
-      <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
+      <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
         <div className="flex justify-between items-center border-b border-white/5 pb-4">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <span className="material-symbols-outlined text-secondary">business_center</span>
@@ -133,7 +133,7 @@ export const AdminB2BTab: React.FC<AdminB2BTabProps> = ({ onActionToast }) => {
       </div>
 
       {/* Verified B2B Accounts */}
-      <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
+      <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
         <div className="flex justify-between items-center border-b border-white/5 pb-4">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <span className="material-symbols-outlined text-success">verified</span>

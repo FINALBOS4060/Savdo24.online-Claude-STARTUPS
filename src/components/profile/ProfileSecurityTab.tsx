@@ -33,7 +33,7 @@ export const ProfileSecurityTab: React.FC<ProfileSecurityTabProps> = ({
           <p className="text-center py-8 text-on-primary-container text-sm italic">Sessiyalar topilmadi.</p>
         ) : (
           sessions.map(session => (
-            <div key={session.id} className="bg-[#0b1426] border border-outline-variant/10 rounded-xl p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div key={session.id} className="bg-background border border-outline-variant/10 rounded-xl p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-secondary-container">
                   <span className="material-symbols-outlined text-2xl">
@@ -44,14 +44,14 @@ export const ProfileSecurityTab: React.FC<ProfileSecurityTabProps> = ({
                   <p className="text-sm font-bold text-white">
                     {session.userAgent || "Noma'lum qurilma"}
                   </p>
-                  <p className="text-[10px] text-on-primary-container mt-0.5">
+                  <p className="text-xs text-on-primary-container mt-0.5">
                     IP: {session.ip} • Oxirgi faollik: {new Date(session.updatedAt).toLocaleString()}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => revokeSession(session.id)}
-                className="px-4 py-2 text-red-400 hover:bg-red-500/10 border border-red-500/20 rounded-lg font-bold text-[11px] transition-colors cursor-pointer"
+                className="px-4 py-2 text-red-400 hover:bg-red-500/10 border border-red-500/20 rounded-lg font-bold text-xs transition-colors cursor-pointer"
               >
                 Sessiyani yakunlash
               </button>

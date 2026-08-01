@@ -44,7 +44,7 @@ export default function MobileNav({
               <div className="w-10 h-10 bg-secondary-container rounded-full flex items-center justify-center -mt-6 border-4 border-primary-container text-on-secondary-fixed">
                 <span className="material-symbols-outlined text-xl">add</span>
               </div>
-              <span className="text-[10px] mt-0.5">E'lon</span>
+              <span className="text-xs mt-0.5">E'lon</span>
             </button>
           );
         }
@@ -83,7 +83,7 @@ export default function MobileNav({
             >
               {tab.icon}
             </span>
-            <span className="text-[10px] mt-0.5">{tab.label}</span>
+            <span className="text-xs mt-0.5">{tab.label}</span>
           </button>
         );
       })}

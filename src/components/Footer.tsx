@@ -63,7 +63,7 @@ export default function Footer({ setView }: FooterProps) {
       </div>
 
       <div className="max-w-7xl mx-auto mt-12 pt-8 border-t border-outline-variant/10 text-center">
-        <p className="text-[10px] text-on-primary-container/60">
+        <p className="text-xs text-on-primary-container/60">
           © {currentYear} Savdo24. Barcha huquqlar himoyalangan.
         </p>
       </div>

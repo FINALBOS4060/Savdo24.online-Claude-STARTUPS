@@ -56,7 +56,7 @@ export const AdminRefundsTab: React.FC<AdminRefundsTabProps> = ({
   return (
     <div className="space-y-8">
       {/* Escrow Refunds Section */}
-      <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
+      <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
         <div className="flex justify-between items-center border-b border-white/5 pb-4">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <span className="material-symbols-outlined text-amber-400">payments</span>
@@ -82,7 +82,7 @@ export const AdminRefundsTab: React.FC<AdminRefundsTabProps> = ({
         ) : (
           <div className="space-y-4">
             {escrowRefunds.map((payment) => (
-              <div key={payment.id} className="bg-[#0b1426] border border-amber-500/30 rounded-2xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div key={payment.id} className="bg-background border border-amber-500/30 rounded-2xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded font-bold">Qaytarish kutilmoqda</span>
@@ -114,7 +114,7 @@ export const AdminRefundsTab: React.FC<AdminRefundsTabProps> = ({
       </div>
 
       {/* Pending Referral Rewards Section (Item 4 requirement) */}
-      <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
+      <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
         <div className="flex justify-between items-center border-b border-white/5 pb-4">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <span className="material-symbols-outlined text-cyan-400">card_giftcard</span>
@@ -140,7 +140,7 @@ export const AdminRefundsTab: React.FC<AdminRefundsTabProps> = ({
         ) : (
           <div className="space-y-4">
             {pendingRewards.map((reward) => (
-              <div key={reward.id} className="bg-[#0b1426] border border-cyan-500/30 rounded-2xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div key={reward.id} className="bg-background border border-cyan-500/30 rounded-2xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 text-xs rounded font-bold uppercase">{reward.status}</span>

@@ -55,7 +55,7 @@ export const ProfileStartupsTab: React.FC<ProfileStartupsTabProps> = ({
                 <div className="w-12 h-12 rounded-xl bg-secondary-fixed/10 flex items-center justify-center border border-secondary-fixed/20 text-secondary-container">
                   <span className="material-symbols-outlined">{materialIcon}</span>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${statusClass}`}>
+                <span className={`px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider ${statusClass}`}>
                   {statusLabel}
                 </span>
               </div>
@@ -63,8 +63,8 @@ export const ProfileStartupsTab: React.FC<ProfileStartupsTabProps> = ({
               <h3 className="text-xl font-extrabold mb-2 group-hover:text-secondary-container transition-colors text-white flex items-center gap-2">
                 {startup.name}
                 {startup.isTop && (
-                  <span className="text-[10px] bg-yellow-400/20 text-yellow-400 px-1.5 py-0.5 rounded font-black flex items-center gap-0.5">
-                    <span className="material-symbols-outlined text-[10px]">vertical_align_top</span>
+                  <span className="text-xs bg-yellow-400/20 text-yellow-400 px-1.5 py-0.5 rounded font-black flex items-center gap-0.5">
+                    <span className="material-symbols-outlined text-xs">vertical_align_top</span>
                     TOP
                   </span>
                 )}
@@ -78,13 +78,13 @@ export const ProfileStartupsTab: React.FC<ProfileStartupsTabProps> = ({
             <div>
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="bg-white/5 p-3 rounded-xl border border-white/5">
-                  <p className="text-[9px] uppercase tracking-wider text-on-tertiary-container font-extrabold mb-1">
+                  <p className="text-xs uppercase tracking-wider text-on-tertiary-container font-extrabold mb-1">
                     Sotish narxi
                   </p>
                   <p className="font-mono text-xs font-bold text-white">${startup.price ? startup.price.toLocaleString() : "0"}</p>
                 </div>
                 <div className="bg-white/5 p-3 rounded-xl border border-white/5">
-                  <p className="text-[9px] uppercase tracking-wider text-on-tertiary-container font-extrabold mb-1">
+                  <p className="text-xs uppercase tracking-wider text-on-tertiary-container font-extrabold mb-1">
                     E'lon turi
                   </p>
                   <p className="font-mono text-xs font-bold text-white leading-tight">{startup.listingType || "To'liq loyiha (manba kodi bilan)"}</p>
@@ -97,7 +97,7 @@ export const ProfileStartupsTab: React.FC<ProfileStartupsTabProps> = ({
                     e.stopPropagation();
                     setView('edit-startup', startup.id);
                   }}
-                  className="flex-1 py-2 bg-blue-400/10 border border-blue-400/30 hover:bg-blue-400/20 text-blue-400 rounded-lg font-bold text-[10px] transition-all flex items-center justify-center gap-1.5"
+                  className="flex-1 py-2 bg-blue-400/10 border border-blue-400/30 hover:bg-blue-400/20 text-blue-400 rounded-lg font-bold text-xs transition-all flex items-center justify-center gap-1.5"
                 >
                   Tahrirlash
                 </button>
@@ -108,7 +108,7 @@ export const ProfileStartupsTab: React.FC<ProfileStartupsTabProps> = ({
                         e.stopPropagation();
                         setTopModal({ isOpen: true, startupId: startup.id, startupName: startup.name });
                       }}
-                      className="flex-1 py-2 bg-yellow-400/10 border border-yellow-400/30 hover:bg-yellow-400/20 text-yellow-400 rounded-lg font-bold text-[10px] transition-all flex items-center justify-center gap-1.5"
+                      className="flex-1 py-2 bg-yellow-400/10 border border-yellow-400/30 hover:bg-yellow-400/20 text-yellow-400 rounded-lg font-bold text-xs transition-all flex items-center justify-center gap-1.5"
                     >
                       <span className="material-symbols-outlined text-xs">vertical_align_top</span>
                       TOP qilish

@@ -493,7 +493,7 @@ export default function DetailPage({
   if (!startup) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-12 h-12 border-4 border-[#f0b90b]/20 border-t-[#f0b90b] rounded-full animate-spin"></div>
+        <div className="w-12 h-12 border-4 border-secondary/20 border-text-secondary rounded-full animate-spin"></div>
       </div>
     );
   }
@@ -563,14 +563,14 @@ export default function DetailPage({
                 {startup.milestones.map((m, idx) => (
                   <div key={idx} className="flex gap-4 bg-white/5 dark:bg-primary-container/20 border border-outline-variant/10 rounded-xl p-5">
                     <div className="flex flex-col items-center flex-shrink-0">
-                      <span className="w-3 h-3 rounded-full bg-[#f3ba2f] mt-1" />
+                      <span className="w-3 h-3 rounded-full bg-secondary mt-1" />
                       {idx < startup.milestones.length - 1 && (
                         <span className="w-px flex-1 bg-white/10 mt-1" />
                       )}
                     </div>
                     <div className="pb-1">
                       {m.date && (
-                        <span className="text-[10px] text-[#f3ba2f] font-mono font-bold uppercase tracking-wider block mb-1">
+                        <span className="text-xs text-secondary font-mono font-bold uppercase tracking-wider block mb-1">
                           {m.date}
                         </span>
                       )}
@@ -605,12 +605,12 @@ export default function DetailPage({
           {sellerReviewsData && sellerReviewsData.reviews && sellerReviewsData.reviews.length > 0 && (
             <section className="bg-white/5 dark:bg-primary-container/20 border border-outline-variant/10 rounded-2xl p-6 md:p-8 space-y-6">
               <h3 className="text-secondary-container font-extrabold text-xl md:text-2xl flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#f3ba2f]">reviews</span>
+                <span className="material-symbols-outlined text-secondary">reviews</span>
                 Sotuvchi haqida sharhlar ({sellerReviewsData.totalReviews})
               </h3>
               <div className="space-y-4">
                 {sellerReviewsData.reviews.map((rev: any) => (
-                  <div key={rev.id} className="p-4 bg-[#0b1426]/50 border border-white/5 rounded-xl space-y-2">
+                  <div key={rev.id} className="p-4 bg-background/50 border border-white/5 rounded-xl space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
                         <img
@@ -633,7 +633,7 @@ export default function DetailPage({
                           <span
                             key={i}
                             className={`material-symbols-outlined text-xs ${
-                              i < rev.rating ? "text-[#f3ba2f] fill-1" : "text-gray-600"
+                              i < rev.rating ? "text-secondary fill-1" : "text-gray-600"
                             }`}
                           >
                             star

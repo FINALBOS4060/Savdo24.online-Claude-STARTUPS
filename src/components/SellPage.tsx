@@ -303,7 +303,7 @@ export default function SellPage({
 
   return (
     <div className="max-w-3xl mx-auto animate-fade-in text-left">
-      <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-10 shadow-2xl space-y-8">
+      <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-10 shadow-2xl space-y-8">
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold text-white mb-2">
             Yangi g'oya yoki loyihani e'lon qilish
@@ -320,7 +320,7 @@ export default function SellPage({
               <input
                 type="text"
                 required
-                className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
+                className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
                 placeholder="Masalan: Safia Systems"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -330,7 +330,7 @@ export default function SellPage({
             <div className="space-y-2">
               <label className="text-xs font-bold text-on-primary-container block">Kategoriya</label>
               <select
-                className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
+                className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
                 value={category}
                 onChange={(e) => {
                   setCategory(e.target.value);
@@ -347,7 +347,7 @@ export default function SellPage({
           </div>
 
           {/* Dynamic Category Attributes */}
-          <div className="bg-[#0c192d] border border-outline-variant/20 rounded-2xl p-5 space-y-4">
+          <div className="bg-surface-container border border-outline-variant/20 rounded-2xl p-5 space-y-4">
             <h3 className="text-sm font-bold text-secondary-container">
               Kategoriya ma'lumotlari (Ixtiyoriy moslashuvchan ko'rsatkichlar)
             </h3>
@@ -360,7 +360,7 @@ export default function SellPage({
                       <input
                         type="checkbox"
                         id={field.key}
-                        className="w-5 h-5 accent-secondary-container bg-[#0b1426] border border-outline-variant/30 rounded focus:ring-0 cursor-pointer"
+                        className="w-5 h-5 accent-secondary-container bg-background border border-outline-variant/30 rounded focus:ring-0 cursor-pointer"
                         checked={!!dynamicAttributes[field.key]}
                         onChange={(e) => setDynamicAttributes({ ...dynamicAttributes, [field.key]: e.target.checked })}
                       />
@@ -374,7 +374,7 @@ export default function SellPage({
                     <div key={field.key} className="space-y-1">
                       <label className="text-xs font-semibold text-gray-300 block">{field.label}</label>
                       <select
-                        className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-2.5 text-xs focus:outline-none focus:border-secondary-container transition-all"
+                        className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-2.5 text-xs focus:outline-none focus:border-secondary-container transition-all"
                         value={dynamicAttributes[field.key] || ''}
                         onChange={(e) => setDynamicAttributes({ ...dynamicAttributes, [field.key]: e.target.value })}
                       >
@@ -393,7 +393,7 @@ export default function SellPage({
                       <label className="text-xs font-semibold text-gray-300 block">{field.label}</label>
                       <input
                         type={field.type}
-                        className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-2.5 text-xs focus:outline-none focus:border-secondary-container transition-all"
+                        className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-2.5 text-xs focus:outline-none focus:border-secondary-container transition-all"
                         placeholder={field.placeholder}
                         value={dynamicAttributes[field.key] || ''}
                         onChange={(e) => setDynamicAttributes({
@@ -415,7 +415,7 @@ export default function SellPage({
             <input
               type="text"
               required
-              className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
+              className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
               placeholder="Masalan: Logistika uchun sun'iy intellekt va marshrutlash boshqaruvi"
               value={slogan}
               onChange={(e) => setSlogan(e.target.value)}
@@ -427,7 +427,7 @@ export default function SellPage({
             <textarea
               required
               rows={5}
-              className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all resize-none leading-relaxed"
+              className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all resize-none leading-relaxed"
               placeholder="Texnologiyangiz, bozor talabi, biznes modelingiz va kelajakdagi rejalaringiz haqida batafsil ma'lumot bering..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -477,9 +477,9 @@ export default function SellPage({
                       onActionToast("AI tavsiya xizmatida xatolik yuz berdi.");
                     }
                   }}
-                  className="text-[10px] bg-secondary-container/10 text-secondary-container px-2 py-1 rounded border border-secondary-container/20 font-bold hover:bg-secondary-container/20 transition-all flex items-center gap-1"
+                  className="text-xs bg-secondary-container/10 text-secondary-container px-2 py-1 rounded border border-secondary-container/20 font-bold hover:bg-secondary-container/20 transition-all flex items-center gap-1"
                 >
-                  <span className="material-symbols-outlined text-[12px]">auto_awesome</span>
+                  <span className="material-symbols-outlined text-xs">auto_awesome</span>
                   AI Narx Taklifi
                 </button>
               </div>
@@ -488,7 +488,7 @@ export default function SellPage({
                 required
                 min="1"
                 step="0.01"
-                className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
+                className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
                 placeholder="Masalan: 250 (faqat raqam kiriting)"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
@@ -498,7 +498,7 @@ export default function SellPage({
             <div className="space-y-2">
               <label className="text-xs font-bold text-on-primary-container block">Nima sotiladi?</label>
               <select
-                className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
+                className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
                 value={listingType}
                 onChange={(e) => setListingType(e.target.value)}
               >
@@ -511,12 +511,12 @@ export default function SellPage({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Texnologiyalar chip style block */}
-            <div className="col-span-1 md:col-span-2 space-y-3 bg-[#0b1426] border border-outline-variant/10 rounded-2xl p-5">
+            <div className="col-span-1 md:col-span-2 space-y-3 bg-background border border-outline-variant/10 rounded-2xl p-5">
               <div>
                 <label className="text-xs font-bold text-on-primary-container block mb-1">
                   Texnologiyalar (Chip-style tanlov)
                 </label>
-                <p className="text-[10px] text-on-primary-container leading-relaxed">
+                <p className="text-xs text-on-primary-container leading-relaxed">
                   Loyihangizda ishlatilgan asosiy texnologiyalarni tanlang yoki o'zingiznikini qo'shing.
                 </p>
               </div>
@@ -540,12 +540,12 @@ export default function SellPage({
                       }}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
                         isSelected
-                          ? 'bg-[#f3ba2f] text-[#12161c] border-[#f3ba2f]'
+                          ? 'bg-secondary text-on-secondary border-secondary'
                           : 'bg-white/5 text-white/70 border-white/5 hover:bg-white/10'
                       }`}
                     >
                       {tech}
-                      {isSelected && <span className="ml-1 text-[10px]">✓</span>}
+                      {isSelected && <span className="ml-1 text-xs">✓</span>}
                     </button>
                   );
                 })}
@@ -578,7 +578,7 @@ export default function SellPage({
                       setCustomTechInput('');
                     }
                   }}
-                  className="px-4 bg-secondary-container text-[#12161c] hover:brightness-110 font-bold text-xs rounded-xl active:scale-95 transition-all"
+                  className="px-4 bg-secondary-container text-on-secondary hover:brightness-110 font-bold text-xs rounded-xl active:scale-95 transition-all"
                 >
                   Qo'shish
                 </button>
@@ -586,17 +586,17 @@ export default function SellPage({
 
               {selectedTechs.length > 0 && (
                 <div className="pt-2 border-t border-white/5 flex flex-wrap gap-2 items-center">
-                  <span className="text-[10px] text-on-primary-container font-extrabold uppercase mr-1">Tanlanganlar:</span>
+                  <span className="text-xs text-on-primary-container font-extrabold uppercase mr-1">Tanlanganlar:</span>
                   {selectedTechs.map((tech) => (
                     <span
                       key={tech}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#f3ba2f]/10 border border-[#f3ba2f]/30 rounded-lg text-xs font-bold text-[#f3ba2f]"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-secondary/10 border border-secondary/30 rounded-lg text-xs font-bold text-secondary"
                     >
                       {tech}
                       <button
                         type="button"
                         onClick={() => setSelectedTechs(selectedTechs.filter(t => t !== tech))}
-                        className="text-[10px] hover:text-red-400 font-bold ml-1 text-[#f3ba2f]"
+                        className="text-xs hover:text-red-400 font-bold ml-1 text-secondary"
                       >
                         ✕
                       </button>
@@ -612,12 +612,12 @@ export default function SellPage({
                 <span className="material-symbols-outlined text-sm">lock</span>
                 Yetkazib berish havolasi (Maxfiy)
               </label>
-              <p className="text-[11px] text-on-primary-container mb-2">
+              <p className="text-xs text-on-primary-container mb-2">
                 Ushbu havola (GitHub repo, Google Drive va hokazo) FAQAT xaridorga to'lov muvaffaqiyatli o'tgandan keyin ko'rsatiladi.
               </p>
               <input
                 type="url"
-                className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
+                className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
                 placeholder="Masalan: https://github.com/loyiha/manba-kodi yoki Google Drive linki"
                 value={deliveryUrl}
                 onChange={(e) => {
@@ -639,7 +639,7 @@ export default function SellPage({
               <label className="text-xs font-bold text-on-primary-container block">Demo havola (ixtiyoriy)</label>
               <input
                 type="url"
-                className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
+                className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
                 placeholder="Masalan: https://demo.loyiha.uz"
                 value={demoUrl}
                 onChange={(e) => setDemoUrl(e.target.value)}
@@ -650,7 +650,7 @@ export default function SellPage({
               <label className="text-xs font-bold text-on-primary-container block">GitHub repozitoriyasi (ixtiyoriy, ommaviy ko'rinadi)</label>
               <input
                 type="url"
-                className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
+                className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
                 placeholder="Masalan: https://github.com/foydalanuvchi/repo"
                 value={githubUrl}
                 onChange={(e) => setGithubUrl(e.target.value)}
@@ -685,7 +685,7 @@ export default function SellPage({
             {milestones.length > 0 && (
               <div className="space-y-3">
                 {milestones.map((m, idx) => (
-                  <div key={idx} className="bg-[#0b1426] border border-outline-variant/30 rounded-xl p-4 space-y-2">
+                  <div key={idx} className="bg-background border border-outline-variant/30 rounded-xl p-4 space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <input
                         type="text"
@@ -742,7 +742,7 @@ export default function SellPage({
               className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[160px] ${
                 dragActive
                   ? 'border-secondary-container bg-secondary-container/5'
-                  : 'border-outline-variant/30 bg-[#0b1426] hover:border-secondary-container/50'
+                  : 'border-outline-variant/30 bg-background hover:border-secondary-container/50'
               }`}
               onDragEnter={handleDrag}
               onDragOver={handleDrag}
@@ -777,7 +777,7 @@ export default function SellPage({
                     height={128}
                   />
                   <div className="flex gap-2 items-center">
-                    <p className="text-[10px] text-green-400 font-bold flex items-center gap-1">
+                    <p className="text-xs text-green-400 font-bold flex items-center gap-1">
                       <span className="material-symbols-outlined text-xs">check_circle</span>
                       Muvaffaqiyatli yuklandi
                     </p>
@@ -788,7 +788,7 @@ export default function SellPage({
                         setImageUrl('');
                         setImageFile(null);
                       }}
-                      className="text-[10px] bg-red-500/20 text-red-400 hover:bg-red-500/30 px-2.5 py-1 rounded-lg font-bold"
+                      className="text-xs bg-red-500/20 text-red-400 hover:bg-red-500/30 px-2.5 py-1 rounded-lg font-bold"
                     >
                       O'chirish
                     </button>
@@ -802,7 +802,7 @@ export default function SellPage({
                   <p className="text-xs font-bold text-white mb-1">
                     Faylni tortib olib tashlang yoki ko'rib chiqish uchun bosing
                   </p>
-                  <p className="text-[10px] text-on-primary-container">
+                  <p className="text-xs text-on-primary-container">
                     PNG, JPG yoki SVG formatlarini qo'llab-quvvatlaydi (oddiy: 2MB, VIP: 6MB gacha)
                   </p>
                 </>
@@ -811,7 +811,7 @@ export default function SellPage({
 
             <div className="relative flex py-2 items-center">
               <div className="flex-grow border-t border-outline-variant/10"></div>
-              <span className="flex-shrink mx-4 text-[10px] font-extrabold uppercase tracking-widest text-on-primary-container">
+              <span className="flex-shrink mx-4 text-xs font-extrabold uppercase tracking-widest text-on-primary-container">
                 — YOKI RASM URL MANZILINI JOYLASHTIRING —
               </span>
               <div className="flex-grow border-t border-outline-variant/10"></div>
@@ -819,7 +819,7 @@ export default function SellPage({
 
             <input
               type="url"
-              className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
+              className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
               placeholder="Rasmning onlayn URL havolasini kiriting..."
               value={imageUrl}
               onChange={(e) => {
@@ -840,7 +840,7 @@ export default function SellPage({
                 <label className="text-xs font-bold text-on-primary-container block">Elektron pochta manzili</label>
                 <input
                   type="email"
-                  className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
+                  className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
                   placeholder="contact@safia.uz"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -851,7 +851,7 @@ export default function SellPage({
                 <label className="text-xs font-bold text-on-primary-container block">Telefon raqami</label>
                 <input
                   type="tel"
-                  className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
+                  className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
                   placeholder="+998 90 123 45 67"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
@@ -862,7 +862,7 @@ export default function SellPage({
                 <label className="text-xs font-bold text-on-primary-container block">Telegram foydalanuvchi nomi</label>
                 <input
                   type="text"
-                  className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
+                  className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
                   placeholder="safia_founder"
                   value={telegram}
                   onChange={(e) => setTelegram(e.target.value)}

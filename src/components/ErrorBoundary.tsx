@@ -42,8 +42,8 @@ export default class ErrorBoundary extends React.Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-[#0b1426] text-white flex items-center justify-center p-4">
-          <div className="max-w-md text-center p-8 bg-white/5 border border-white/10 rounded-3xl shadow-2xl">
+        <div className="min-h-screen bg-background text-white flex items-center justify-center p-4">
+          <div className="max-w-md text-center p-8 bg-white/5 border border-white/10 rounded-2xl shadow-2xl">
             <span className="material-symbols-outlined text-red-500 text-6xl mb-4 select-none">error</span>
             <h2 className="text-2xl font-bold mb-4">Oops! Xatolik yuz berdi</h2>
             <p className="text-gray-400 mb-6 text-sm">
@@ -51,7 +51,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
             </p>
             <button
               onClick={() => window.location.reload()}
-              className="px-6 py-3 bg-[#f0b90b] text-black font-bold rounded-xl hover:brightness-110 transition-all text-xs"
+              className="px-6 py-3 bg-secondary text-black font-bold rounded-xl hover:brightness-110 transition-all text-xs"
             >
               Sahifani yangilash
             </button>

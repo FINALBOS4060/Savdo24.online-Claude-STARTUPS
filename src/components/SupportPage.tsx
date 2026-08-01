@@ -114,7 +114,7 @@ export default function SupportPage({ setView, onActionToast }: { setView: (view
                   <span className="material-symbols-outlined">mail</span>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-on-primary-container font-extrabold">Elektron pochta</p>
+                  <p className="text-xs uppercase tracking-wider text-on-primary-container font-extrabold">Elektron pochta</p>
                   <p className="text-sm font-bold text-white group-hover:text-secondary-container transition-colors">support@savdo24.online</p>
                 </div>
               </a>
@@ -129,7 +129,7 @@ export default function SupportPage({ setView, onActionToast }: { setView: (view
                   <span className="material-symbols-outlined">send</span>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-on-primary-container font-extrabold">Telegram aloqa</p>
+                  <p className="text-xs uppercase tracking-wider text-on-primary-container font-extrabold">Telegram aloqa</p>
                   <p className="text-sm font-bold text-white group-hover:text-secondary-container transition-colors">@savdo24_support</p>
                 </div>
               </a>
@@ -158,36 +158,36 @@ export default function SupportPage({ setView, onActionToast }: { setView: (view
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold text-on-primary-container uppercase">Sizning pochtangiz</label>
+                  <label className="text-xs font-extrabold text-on-primary-container uppercase">Sizning pochtangiz</label>
                   <input
                     type="email"
                     required
                     placeholder="example@mail.com"
-                    className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-3 text-sm focus:outline-none focus:border-secondary-container focus:ring-1 focus:ring-secondary-container transition-all"
+                    className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 text-sm focus:outline-none focus:border-secondary-container focus:ring-1 focus:ring-secondary-container transition-all"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold text-on-primary-container uppercase">Mavzu</label>
+                  <label className="text-xs font-extrabold text-on-primary-container uppercase">Mavzu</label>
                   <input
                     type="text"
                     required
                     placeholder="Murojaat mavzusi"
-                    className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-3 text-sm focus:outline-none focus:border-secondary-container focus:ring-1 focus:ring-secondary-container transition-all"
+                    className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 text-sm focus:outline-none focus:border-secondary-container focus:ring-1 focus:ring-secondary-container transition-all"
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold text-on-primary-container uppercase">Xabar matni</label>
+                  <label className="text-xs font-extrabold text-on-primary-container uppercase">Xabar matni</label>
                   <textarea
                     required
                     rows={4}
                     placeholder="Savolingizni batafsil tushuntiring..."
-                    className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-3 text-sm focus:outline-none focus:border-secondary-container focus:ring-1 focus:ring-secondary-container transition-all resize-none"
+                    className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 text-sm focus:outline-none focus:border-secondary-container focus:ring-1 focus:ring-secondary-container transition-all resize-none"
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                   />

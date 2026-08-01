@@ -17,7 +17,7 @@ export const DetailTechnicalSpecs: React.FC<DetailTechnicalSpecsProps> = ({
       {Object.keys(parsedAttrs).length > 0 && (
         <section className="bg-white/5 dark:bg-primary-container/20 border border-outline-variant/10 rounded-2xl p-6 md:p-8 space-y-6">
           <h3 className="text-secondary-container font-extrabold text-xl md:text-2xl flex items-center gap-2">
-            <span className="material-symbols-outlined text-[#f3ba2f]">settings_suggest</span>
+            <span className="material-symbols-outlined text-secondary">settings_suggest</span>
             Texnik xususiyatlar
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -48,15 +48,15 @@ export const DetailTechnicalSpecs: React.FC<DetailTechnicalSpecsProps> = ({
               return (
                 <div
                   key={key}
-                  className="flex items-center gap-4 p-4 bg-[#0b1426]/50 border border-white/5 rounded-xl hover:border-secondary-container/20 transition-all"
+                  className="flex items-center gap-4 p-4 bg-background/50 border border-white/5 rounded-xl hover:border-secondary-container/20 transition-all"
                 >
                   <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-[#f3ba2f] text-xl">
+                    <span className="material-symbols-outlined text-secondary text-xl">
                       {icon}
                     </span>
                   </div>
                   <div className="min-w-0 flex-1">
-                    <span className="text-[10px] text-on-primary-container uppercase font-extrabold tracking-wider block">
+                    <span className="text-xs text-on-primary-container uppercase font-extrabold tracking-wider block">
                       {label}
                     </span>
                     {key === 'pitchDeckUrl' && value && value !== "Ko'rsatilmagan" ? (
@@ -64,7 +64,7 @@ export const DetailTechnicalSpecs: React.FC<DetailTechnicalSpecsProps> = ({
                         href={String(value)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[#f3ba2f] hover:underline text-xs md:text-sm font-semibold truncate block"
+                        className="text-secondary hover:underline text-xs md:text-sm font-semibold truncate block"
                       >
                         Taqdimot hujjati (Pitch deck) ↗
                       </a>

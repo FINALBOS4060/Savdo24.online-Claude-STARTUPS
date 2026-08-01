@@ -44,11 +44,11 @@ export const ProfileSettingsTab: React.FC<ProfileSettingsTabProps> = ({
             className="relative group cursor-pointer"
             onClick={() => fileInputRef.current?.click()}
           >
-            <div className="w-24 h-24 rounded-full border-4 border-secondary-container/20 overflow-hidden bg-[#0b1426] flex items-center justify-center">
+            <div className="w-24 h-24 rounded-full border-4 border-secondary-container/20 overflow-hidden bg-background flex items-center justify-center">
               {isUploadingAvatar ? (
                 <div className="flex flex-col items-center gap-2">
                   <div className="w-6 h-6 border-2 border-secondary-container border-t-transparent rounded-full animate-spin"></div>
-                  <span className="text-[10px] font-bold text-secondary-container">Yuklanmoqda...</span>
+                  <span className="text-xs font-bold text-secondary-container">Yuklanmoqda...</span>
                 </div>
               ) : (
                 <img 
@@ -70,7 +70,7 @@ export const ProfileSettingsTab: React.FC<ProfileSettingsTabProps> = ({
               </div>
             )}
           </div>
-          <p className="text-[10px] font-bold text-on-primary-container uppercase tracking-widest">Profil rasmini o'zgartirish</p>
+          <p className="text-xs font-bold text-on-primary-container uppercase tracking-widest">Profil rasmini o'zgartirish</p>
           <input 
             type="file" 
             ref={fileInputRef} 
@@ -80,7 +80,7 @@ export const ProfileSettingsTab: React.FC<ProfileSettingsTabProps> = ({
           />
           
           <div className="mt-4 pt-4 border-t border-outline-variant/10 w-full space-y-3">
-            <p className="text-[10px] font-bold text-on-primary-container text-center uppercase tracking-widest">Yoki tayyor variantni tanlang</p>
+            <p className="text-xs font-bold text-on-primary-container text-center uppercase tracking-widest">Yoki tayyor variantni tanlang</p>
             <div className="flex justify-center gap-3">
               {[
                 '/default-avatar.jpg',
@@ -106,7 +106,7 @@ export const ProfileSettingsTab: React.FC<ProfileSettingsTabProps> = ({
           <label className="text-xs font-bold text-on-primary-container block">To'liq ism</label>
           <input
             type="text"
-            className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-lg p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container focus:ring-1 focus:ring-secondary-container transition-all"
+            className="w-full bg-background border border-outline-variant/30 text-white rounded-lg p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container focus:ring-1 focus:ring-secondary-container transition-all"
             value={editName}
             onChange={(e) => setEditName(e.target.value)}
           />
@@ -115,14 +115,14 @@ export const ProfileSettingsTab: React.FC<ProfileSettingsTabProps> = ({
         <div className="space-y-2">
           <label className="text-xs font-bold text-on-primary-container block">Sotuvchi/Xaridor roli</label>
           <select
-            className="w-full bg-[#0b1426] border border-outline-variant/30 text-white/50 rounded-lg p-3 font-semibold text-sm focus:outline-none appearance-none cursor-not-allowed"
+            className="w-full bg-background border border-outline-variant/30 text-white/50 rounded-lg p-3 font-semibold text-sm focus:outline-none appearance-none cursor-not-allowed"
             value={editRole}
             disabled
           >
             <option value="Xaridor">Xaridor</option>
             <option value="Sotuvchi">Sotuvchi</option>
           </select>
-          <p className="text-[10px] text-on-primary-container">Xavfsizlik sababli rolni bu yerdan o'zgartirib bo'lmaydi. Sotuvchi bo'lish uchun shunchaki birinchi e'loningizni joylashtiring.</p>
+          <p className="text-xs text-on-primary-container">Xavfsizlik sababli rolni bu yerdan o'zgartirib bo'lmaydi. Sotuvchi bo'lish uchun shunchaki birinchi e'loningizni joylashtiring.</p>
         </div>
 
         <button
@@ -144,10 +144,10 @@ export const ProfileSettingsTab: React.FC<ProfileSettingsTabProps> = ({
         </p>
         
         {linkCode ? (
-          <div className="bg-[#0b1426] border border-secondary-container/30 rounded-xl p-4 text-center space-y-2 animate-pulse-subtle">
-            <p className="text-[10px] uppercase font-bold text-on-primary-container">Sizning ulanish kodingiz:</p>
+          <div className="bg-background border border-secondary-container/30 rounded-xl p-4 text-center space-y-2 animate-pulse-subtle">
+            <p className="text-xs uppercase font-bold text-on-primary-container">Sizning ulanish kodingiz:</p>
             <p className="text-2xl font-mono font-bold text-secondary-container tracking-widest">{linkCode}</p>
-            <p className="text-[10px] text-on-primary-container">
+            <p className="text-xs text-on-primary-container">
               Botga o'ting va ushbu buyruqni yuboring: <br/>
               <code className="bg-white/5 px-1 py-0.5 rounded">/bogla {linkCode}</code>
             </p>

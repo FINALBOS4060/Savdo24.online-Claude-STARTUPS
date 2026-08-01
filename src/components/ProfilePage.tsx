@@ -469,14 +469,14 @@ export default function ProfilePage({
 
       {/* Profile Header Section */}
       <header className="relative mb-10 bg-primary-container border border-outline-variant/20 rounded-2xl overflow-hidden pb-6">
-        <div className="h-48 w-full bg-gradient-to-br from-[#131b2e] to-[#0b1426] relative overflow-hidden flex items-center justify-center">
+        <div className="h-48 w-full bg-gradient-to-br from-surface-container to-background relative overflow-hidden flex items-center justify-center">
           {user.coverUrl ? (
             <img src={user.coverUrl} alt="Cover" className="absolute inset-0 w-full h-full object-cover" loading="eager" fetchPriority="high" />
           ) : (
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0b1426] to-transparent"></div>
+            <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent"></div>
           )}
           {/* Subtle network connection pattern overlay */}
-          <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#fdc338_1px,transparent_1px)] [background-size:16px_16px]"></div>
+          <div className="absolute inset-0 opacity-10 bg-[radial-gradient(var(--color-secondary)_1px,transparent_1px)] [background-size:16px_16px]"></div>
           
           <input 
             type="file" 
@@ -501,7 +501,7 @@ export default function ProfilePage({
 
         <div className="flex flex-col md:flex-row items-center md:items-end -mt-16 md:-mt-12 px-6 gap-6 relative z-10">
           <div className="relative">
-            <div className="w-32 h-32 md:w-40 md:h-40 rounded-full border-4 border-primary-container overflow-hidden shadow-2xl bg-[#0b1426]">
+            <div className="w-32 h-32 md:w-40 md:h-40 rounded-full border-4 border-primary-container overflow-hidden shadow-2xl bg-background">
               <img
                 className="w-full h-full object-cover"
                 src={user.avatarUrl}
@@ -511,7 +511,7 @@ export default function ProfilePage({
                 height={160}
               />
             </div>
-            <div className="absolute bottom-2 right-2 w-8 h-8 bg-secondary-container rounded-full flex items-center justify-center border-4 border-[#0b1426] shadow-lg">
+            <div className="absolute bottom-2 right-2 w-8 h-8 bg-secondary-container rounded-full flex items-center justify-center border-4 border-background shadow-lg">
               <span className="material-symbols-outlined text-on-secondary-fixed text-sm font-bold">verified</span>
             </div>
           </div>

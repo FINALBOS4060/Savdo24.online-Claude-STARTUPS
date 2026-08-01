@@ -45,7 +45,7 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
   };
 
   return (
-    <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
+    <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
       <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4">
         <span className="material-symbols-outlined text-secondary">support_agent</span>
         Murojaatlar ({supportTickets.length})
@@ -65,7 +65,7 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
               <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-white/5 pb-3">
                 <div>
                   <h4 className="text-white font-bold text-sm">{ticket.subject || ticket.title || "Murojaat"}</h4>
-                  <p className="text-xs text-[#8892b0]">
+                  <p className="text-xs text-on-primary-container">
                     Foydalanuvchi: <span className="text-white font-semibold">{ticket.user?.name || ticket.user?.email || ticket.userId}</span> • {formatDateTime(ticket.createdAt)}
                   </p>
                 </div>
@@ -84,7 +84,7 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
                     placeholder="Javobingizni yozing..."
                     value={replies[ticket.id] || ''}
                     onChange={(e) => setReplies({ ...replies, [ticket.id]: e.target.value })}
-                    className="w-full p-3 bg-surface-container border border-white/10 rounded-xl text-xs text-white placeholder-[#8892b0]/50 focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/50"
+                    className="w-full p-3 bg-surface-container border border-white/10 rounded-xl text-xs text-white placeholder-on-primary-container/50 focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/50"
                   />
                   <div className="flex justify-end">
                     <button

@@ -32,7 +32,7 @@ export const AdminReportsTab: React.FC<AdminReportsTabProps> = ({
   renderPagination,
 }) => {
   return (
-    <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
+    <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
       <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4">
         <span className="material-symbols-outlined text-red-500">flag</span>
         Foydalanuvchilar shikoyatlari (Shikoyatlar) ({reports.length})
@@ -62,7 +62,7 @@ export const AdminReportsTab: React.FC<AdminReportsTabProps> = ({
                       <span className="text-xs uppercase font-extrabold px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">
                         {report.targetType === 'startup' ? "E'lon" : report.targetType === 'user' ? "Foydalanuvchi" : "Izoh / G'oya"}
                       </span>
-                      <span className="text-[#8892b0] text-xs">ID: {report.targetId}</span>
+                      <span className="text-on-primary-container text-xs">ID: {report.targetId}</span>
                     </div>
                     <h4 className="text-white font-black text-sm">
                       {report.targetType === 'startup' 
@@ -75,7 +75,7 @@ export const AdminReportsTab: React.FC<AdminReportsTabProps> = ({
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <span className={`text-xs font-extrabold uppercase px-2.5 py-1 rounded-md border ${
+                    <span className={`text-xs font-extrabold uppercase px-2.5 py-1 rounded-lg border ${
                       report.status === 'pending'
                         ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
                         : report.status === 'reviewed'
@@ -91,7 +91,7 @@ export const AdminReportsTab: React.FC<AdminReportsTabProps> = ({
                   <div className="space-y-1 bg-surface-container p-3.5 rounded-xl border border-white/5">
                     <span className="text-secondary font-bold uppercase text-xs tracking-wider block">Shikoyat sababi</span>
                     <p className="text-white font-extrabold">"{report.reason}"</p>
-                    <p className="text-[#8892b0] text-xs mt-1.5">{formatDateTime(report.createdAt)}</p>
+                    <p className="text-on-primary-container text-xs mt-1.5">{formatDateTime(report.createdAt)}</p>
                   </div>
 
                   <div className="space-y-1 bg-surface-container p-3.5 rounded-xl border border-white/5">
@@ -109,7 +109,7 @@ export const AdminReportsTab: React.FC<AdminReportsTabProps> = ({
                         <button
                           onClick={() => handleReportStatusChange(report.id, 'reviewed')}
                           disabled={updatingReportId === report.id || isDeletingReportedItem === report.id}
-                          className="px-3 py-2 bg-success hover:brightness-110 disabled:opacity-50 text-[#12161c] font-bold text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-success"
+                          className="px-3 py-2 bg-success hover:brightness-110 disabled:opacity-50 text-on-secondary font-bold text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-success"
                         >
                           <span className="material-symbols-outlined text-xs">check</span>
                           Tasdiqlash (Ko'rib chiqildi)

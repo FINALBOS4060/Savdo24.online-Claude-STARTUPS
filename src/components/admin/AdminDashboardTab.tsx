@@ -18,7 +18,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ stats, set
             <span className="material-symbols-outlined text-blue-400">group</span>
           </div>
           <div className="text-2xl font-black font-mono text-white">{stats.totalUsers}</div>
-          <p className="text-xs text-[#8892b0]">Jami ro'yxatdan o'tganlar</p>
+          <p className="text-xs text-on-primary-container">Jami ro'yxatdan o'tganlar</p>
         </div>
 
         <div className="p-6 bg-surface-container-low border border-white/5 rounded-2xl space-y-2">
@@ -27,7 +27,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ stats, set
             <span className="material-symbols-outlined text-success">rocket_launch</span>
           </div>
           <div className="text-2xl font-black font-mono text-white">{stats.totalActiveStartups}</div>
-          <p className="text-xs text-[#8892b0]">Hozirda sotuvdagilar</p>
+          <p className="text-xs text-on-primary-container">Hozirda sotuvdagilar</p>
         </div>
 
         <div className="p-6 bg-surface-container-low border border-white/5 rounded-2xl space-y-2">
@@ -51,7 +51,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ stats, set
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Oxirgi Nizolar */}
-        <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 shadow-2xl">
+        <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 shadow-2xl">
           <h3 className="text-lg font-bold text-white mb-6 flex items-center justify-between">
             <span className="flex items-center gap-2">
               <span className="material-symbols-outlined text-red-400">gavel</span>
@@ -81,7 +81,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ stats, set
         </div>
 
         {/* Oxirgi Shikoyatlar */}
-        <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 shadow-2xl">
+        <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 shadow-2xl">
           <h3 className="text-lg font-bold text-white mb-6 flex items-center justify-between">
             <span className="flex items-center gap-2">
               <span className="material-symbols-outlined text-secondary">flag</span>

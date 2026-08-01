@@ -33,17 +33,17 @@ export const ProfilePurchasesTab: React.FC<ProfilePurchasesTabProps> = ({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {myPurchases.map(payment => (
-            <div key={payment.id} className="bg-[#0b1426] border border-outline-variant/20 rounded-xl p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:border-outline-variant/40 transition-colors">
+            <div key={payment.id} className="bg-background border border-outline-variant/20 rounded-xl p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:border-outline-variant/40 transition-colors">
               <div>
                 <h4 className="font-bold text-white text-lg">{payment.startup?.name || 'Noma\'lum loyiha'}</h4>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2 text-sm text-on-primary-container">
-                  <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px]">payments</span>{payment.amount} {payment.currency}</span>
-                  <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px]">calendar_today</span>{new Date(payment.createdAt).toLocaleDateString()}</span>
+                  <span className="flex items-center gap-1"><span className="material-symbols-outlined text-base">payments</span>{payment.amount} {payment.currency}</span>
+                  <span className="flex items-center gap-1"><span className="material-symbols-outlined text-base">calendar_today</span>{new Date(payment.createdAt).toLocaleDateString()}</span>
                   {payment.status === 'refund_required' && (
-                    <span className="px-2 py-0.5 bg-amber-500/15 text-amber-400 text-xs rounded-md font-bold">Qaytarish jarayonda (Refund in progress)</span>
+                    <span className="px-2 py-0.5 bg-amber-500/15 text-amber-400 text-xs rounded-lg font-bold">Qaytarish jarayonda (Refund in progress)</span>
                   )}
                   {payment.status === 'refund_completed' && (
-                    <span className="px-2 py-0.5 bg-emerald-500/15 text-emerald-400 text-xs rounded-md font-bold">Pul qaytarildi (Refunded)</span>
+                    <span className="px-2 py-0.5 bg-emerald-500/15 text-emerald-400 text-xs rounded-lg font-bold">Pul qaytarildi (Refunded)</span>
                   )}
                 </div>
               </div>

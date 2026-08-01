@@ -231,12 +231,12 @@ export default function IdeasRatingPage({
                       </p>
                       
                       <div className="flex items-center gap-2.5 text-xs text-on-primary-container flex-wrap">
-                        <span className="font-extrabold text-secondary flex items-center gap-1 bg-secondary/10 px-2 py-0.5 rounded-md border border-secondary/10">
+                        <span className="font-extrabold text-secondary flex items-center gap-1 bg-secondary/10 px-2 py-0.5 rounded-lg border border-secondary/10">
                           <span className="material-symbols-outlined text-xs">person</span>
                           {idea.authorName}
                         </span>
                         <span>•</span>
-                        <span className="bg-white/5 px-2 py-0.5 rounded-md text-xs border border-white/5">
+                        <span className="bg-white/5 px-2 py-0.5 rounded-lg text-xs border border-white/5">
                           {formatDate(idea.createdAt, {
                             month: 'short',
                             day: 'numeric',
@@ -248,12 +248,12 @@ export default function IdeasRatingPage({
                             <span>•</span>
                             <button
                               onClick={() => handleStartupClick(idea.startupId)}
-                              className="text-secondary font-extrabold hover:underline text-left flex items-center gap-1 bg-secondary/5 px-2 py-0.5 rounded-md border border-secondary/10 transition-all focus:outline-none focus:ring-1 focus:ring-secondary"
+                              className="text-secondary font-extrabold hover:underline text-left flex items-center gap-1 bg-secondary/5 px-2 py-0.5 rounded-lg border border-secondary/10 transition-all focus:outline-none focus:ring-1 focus:ring-secondary"
                             >
                               <span className="material-symbols-outlined text-xs">rocket_launch</span>
                               {idea.startup.name}
                             </button>
-                            <span className="text-xs uppercase bg-white/5 px-1.5 py-0.5 rounded-md border border-white/5">
+                            <span className="text-xs uppercase bg-white/5 px-1.5 py-0.5 rounded-lg border border-white/5">
                               {categories.find(c => c.id === idea.startup?.category)?.name || idea.startup.category}
                             </span>
                           </>

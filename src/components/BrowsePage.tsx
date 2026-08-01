@@ -237,7 +237,7 @@ export default function BrowsePage({
               <span className="material-symbols-outlined">payments</span>
             </div>
             <div>
-              <p className="text-[10px] text-on-primary-container uppercase font-bold">Savdolar (24s)</p>
+              <p className="text-xs text-on-primary-container uppercase font-bold">Savdolar (24s)</p>
               <p className="text-lg font-black text-white">{socialProof.sales24h}</p>
             </div>
           </div>
@@ -246,7 +246,7 @@ export default function BrowsePage({
               <span className="material-symbols-outlined">person_add</span>
             </div>
             <div>
-              <p className="text-[10px] text-on-primary-container uppercase font-bold">Yangi a'zolar</p>
+              <p className="text-xs text-on-primary-container uppercase font-bold">Yangi a'zolar</p>
               <p className="text-lg font-black text-white">{socialProof.newUsers24h}</p>
             </div>
           </div>
@@ -255,7 +255,7 @@ export default function BrowsePage({
               <span className="material-symbols-outlined">rocket_launch</span>
             </div>
             <div>
-              <p className="text-[10px] text-on-primary-container uppercase font-bold">Yangi e'lonlar</p>
+              <p className="text-xs text-on-primary-container uppercase font-bold">Yangi e'lonlar</p>
               <p className="text-lg font-black text-white">{socialProof.newListings24h}</p>
             </div>
           </div>
@@ -264,7 +264,7 @@ export default function BrowsePage({
               <span className="material-symbols-outlined">star</span>
             </div>
             <div>
-              <p className="text-[10px] text-on-primary-container uppercase font-bold">Top Sharh</p>
+              <p className="text-xs text-on-primary-container uppercase font-bold">Top Sharh</p>
               <p className="text-xs font-bold text-white truncate max-w-[100px]">
                 {socialProof.topRated ? `"${socialProof.topRated.comment}"` : "Hali yo'q"}
               </p>
@@ -398,7 +398,7 @@ export default function BrowsePage({
                       <input
                         type="checkbox"
                         id={`filter-${field.key}`}
-                        className="w-4 h-4 accent-secondary-container bg-[#0b1426] border border-outline-variant/30 rounded cursor-pointer"
+                        className="w-4 h-4 accent-secondary-container bg-background border border-outline-variant/30 rounded cursor-pointer"
                         checked={!!subFilters[field.key]}
                         onChange={(e) => setSubFilters({ ...subFilters, [field.key]: e.target.checked })}
                       />
@@ -412,7 +412,7 @@ export default function BrowsePage({
                     <div key={field.key} className="space-y-1">
                       <label className="text-xs text-gray-400 block">{field.label}</label>
                       <select
-                        className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-2 text-xs focus:outline-none focus:border-secondary-container transition-all"
+                        className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-2 text-xs focus:outline-none focus:border-secondary-container transition-all"
                         value={subFilters[field.key] || ''}
                         onChange={(e) => setSubFilters({ ...subFilters, [field.key]: e.target.value })}
                       >
@@ -431,7 +431,7 @@ export default function BrowsePage({
                       <label className="text-xs text-gray-400 block">{field.label}</label>
                       <input
                         type={field.type}
-                        className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-2 text-xs focus:outline-none focus:border-secondary-container transition-all"
+                        className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-2 text-xs focus:outline-none focus:border-secondary-container transition-all"
                         placeholder={field.placeholder || "Izlash..."}
                         value={subFilters[field.key] || ''}
                         onChange={(e) => setSubFilters({ ...subFilters, [field.key]: e.target.value })}
@@ -455,11 +455,11 @@ export default function BrowsePage({
           <div className="flex flex-wrap items-center gap-4 text-left">
             {/* E'lon turi select */}
             <div className="flex items-center gap-2">
-              <label className="text-xs font-bold text-[#8892b0] whitespace-nowrap">Turi:</label>
+              <label className="text-xs font-bold text-on-primary-container whitespace-nowrap">Turi:</label>
               <select
                 value={listingTypeFilter}
                 onChange={(e) => setListingTypeFilter(e.target.value)}
-                className="bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-secondary-container transition-all"
+                className="bg-background border border-outline-variant/30 text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-secondary-container transition-all"
               >
                 <option value="All">Barchasi</option>
                 <option value="To'liq loyiha (manba kodi bilan)">To'liq loyiha (manba kodi bilan)</option>
@@ -469,12 +469,12 @@ export default function BrowsePage({
             </div>
 
             {/* Faqat faol e'lonlar checkbox */}
-            <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[#8892b0]">
+            <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-on-primary-container">
               <input
                 type="checkbox"
                 checked={onlyActive}
                 onChange={(e) => setOnlyActive(e.target.checked)}
-                className="w-4 h-4 accent-secondary-container bg-[#0b1426] border border-outline-variant/30 rounded cursor-pointer"
+                className="w-4 h-4 accent-secondary-container bg-background border border-outline-variant/30 rounded cursor-pointer"
                 aria-label="Faqat faol e'lonlar"
               />
               Faqat faol e'lonlar
@@ -483,7 +483,7 @@ export default function BrowsePage({
             {/* View Mode Toggle */}
             <button
               onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-              className={`p-1.5 border rounded-lg transition-colors border-outline-variant/30 hover:bg-white/5 text-[#8892b0]`}
+              className={`p-1.5 border rounded-lg transition-colors border-outline-variant/30 hover:bg-white/5 text-on-primary-container`}
               title={viewMode === 'grid' ? "Ro'yxat ko'rinishi" : "Jadval ko'rinishi"}
               aria-label={viewMode === 'grid' ? "Ro'yxat ko'rinishiga o'tish" : "Jadval ko'rinishiga o'tish"}
             >
@@ -499,9 +499,9 @@ export default function BrowsePage({
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div key={i} className="bg-white dark:bg-primary-container/40 border border-outline-variant/20 rounded-2xl overflow-hidden p-6 space-y-4 animate-pulse">
                 <div className="h-48 bg-white/5 rounded-xl"></div>
-                <div className="h-6 bg-white/10 rounded-md w-2/3"></div>
-                <div className="h-4 bg-white/5 rounded-md w-full"></div>
-                <div className="h-4 bg-white/5 rounded-md w-5/6"></div>
+                <div className="h-6 bg-white/10 rounded-lg w-2/3"></div>
+                <div className="h-4 bg-white/5 rounded-lg w-full"></div>
+                <div className="h-4 bg-white/5 rounded-lg w-5/6"></div>
                 <div className="flex justify-between items-center pt-4">
                   <div className="h-8 bg-white/10 rounded-lg w-1/3"></div>
                   <div className="h-10 bg-secondary-container/10 rounded-xl w-1/3"></div>
@@ -520,7 +520,7 @@ export default function BrowsePage({
             {selectedCategory ? (
               <button
                 onClick={() => setView('sell')}
-                className="px-6 py-2.5 bg-[#f0b90b] text-black font-extrabold text-sm rounded-xl hover:brightness-110 transition-all active:scale-95 shadow-md flex items-center gap-2"
+                className="px-6 py-2.5 bg-secondary text-black font-extrabold text-sm rounded-xl hover:brightness-110 transition-all active:scale-95 shadow-md flex items-center gap-2"
               >
                 <span className="material-symbols-outlined text-sm font-bold">add</span>
                 E'lon qo'shish
@@ -575,8 +575,8 @@ export default function BrowsePage({
                           >
                             {startup.name}
                             {startup.isTop && (
-                              <span className="text-[10px] bg-yellow-400/20 text-yellow-400 px-1.5 py-0.5 rounded font-black flex items-center gap-0.5">
-                                <span className="material-symbols-outlined text-[10px]">vertical_align_top</span>
+                              <span className="text-xs bg-yellow-400/20 text-yellow-400 px-1.5 py-0.5 rounded font-black flex items-center gap-0.5">
+                                <span className="material-symbols-outlined text-xs">vertical_align_top</span>
                                 TOP
                               </span>
                             )}
@@ -591,10 +591,10 @@ export default function BrowsePage({
                       </div>
                       
                       <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-on-primary-container">
-                        <span className="px-2.5 py-1 bg-white/5 rounded-lg border border-white/5 uppercase text-[10px]">
+                        <span className="px-2.5 py-1 bg-white/5 rounded-lg border border-white/5 uppercase text-xs">
                           {categories.find(c => c.id === startup.category)?.name || startup.category}
                         </span>
-                        <span className="px-2.5 py-1 bg-white/5 rounded-lg border border-white/5 text-[10px]">{startup.listingType}</span>
+                        <span className="px-2.5 py-1 bg-white/5 rounded-lg border border-white/5 text-xs">{startup.listingType}</span>
                         <span className="text-secondary-container font-black text-sm">${startup.price ? `${startup.price.toLocaleString()} USDT` : "Kelishilgan holda"}</span>
                       </div>
                     </div>
@@ -643,8 +643,8 @@ export default function BrowsePage({
                       >
                         {startup.name}
                         {startup.isTop && (
-                          <span className="text-[10px] bg-yellow-400/20 text-yellow-400 px-1.5 py-0.5 rounded font-black flex items-center gap-0.5">
-                            <span className="material-symbols-outlined text-[10px]">vertical_align_top</span>
+                          <span className="text-xs bg-yellow-400/20 text-yellow-400 px-1.5 py-0.5 rounded font-black flex items-center gap-0.5">
+                            <span className="material-symbols-outlined text-xs">vertical_align_top</span>
                             TOP
                           </span>
                         )}
@@ -668,12 +668,12 @@ export default function BrowsePage({
 
                       <div className="flex justify-between items-center text-xs">
                         <span className="font-bold text-on-primary-container">E'lon turi</span>
-                        <span className="font-mono text-[11px] text-white font-semibold leading-tight text-right truncate max-w-[140px]">
+                        <span className="font-mono text-xs text-white font-semibold leading-tight text-right truncate max-w-[140px]">
                           {startup.listingType || "To'liq loyiha (manba kodi bilan)"}
                         </span>
                       </div>
 
-                      <div className="flex justify-between items-center text-[10px] uppercase font-bold text-on-primary-container border-t border-white/5 pt-2 mt-1">
+                      <div className="flex justify-between items-center text-xs uppercase font-bold text-on-primary-container border-t border-white/5 pt-2 mt-1">
                         <span className="flex items-center gap-1">
                           <span className="material-symbols-outlined text-xs">code</span>
                           {startup.repoIncluded ? "Repo + Kod ✅" : "Faqat litsenziya"}
@@ -729,7 +729,7 @@ export default function BrowsePage({
                     onClick={() => setCurrentPage(pageNum)}
                     className={`w-9 h-9 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       isCurrent
-                        ? "bg-[#f3ba2f] text-[#12161c]"
+                        ? "bg-secondary text-on-secondary"
                         : "bg-white/5 hover:bg-white/10 border border-white/10 text-white"
                     }`}
                   >

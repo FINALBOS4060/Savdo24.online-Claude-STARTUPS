@@ -705,7 +705,7 @@ export default function AdminPage({
 
   if (!isAdmin) {
     return (
-      <div className="max-w-2xl mx-auto p-8 bg-red-500/10 border border-red-500/30 rounded-3xl text-center space-y-4 animate-fade-in text-left">
+      <div className="max-w-2xl mx-auto p-8 bg-red-500/10 border border-red-500/30 rounded-2xl text-center space-y-4 animate-fade-in text-left">
         <span className="material-symbols-outlined text-red-500 text-5xl">gpp_bad</span>
         <h2 className="text-xl font-black text-white">Kirish taqiqlangan</h2>
         <p className="text-sm text-on-primary-container leading-relaxed">
@@ -752,7 +752,7 @@ export default function AdminPage({
     <div className="space-y-8 animate-fade-in text-left">
       <div>
         <h1 className="text-2xl md:text-3xl font-extrabold text-white mb-2 flex items-center gap-2">
-          <span className="material-symbols-outlined text-[#f0b90b] text-3xl">admin_panel_settings</span>
+          <span className="material-symbols-outlined text-secondary text-3xl">admin_panel_settings</span>
           Admin boshqaruv paneli
         </h1>
         <p className="text-xs md:text-sm text-on-primary-container leading-relaxed">
@@ -798,8 +798,8 @@ export default function AdminPage({
           onClick={() => setActiveTab('dashboard')}
           className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
             activeTab === 'dashboard'
-              ? 'text-[#f0b90b] border-[#f0b90b]'
-              : 'text-[#8892b0] border-transparent hover:text-white'
+              ? 'text-secondary border-secondary'
+              : 'text-on-primary-container border-transparent hover:text-white'
           }`}
         >
           <span className="material-symbols-outlined text-sm">dashboard</span>
@@ -809,8 +809,8 @@ export default function AdminPage({
           onClick={() => setActiveTab('analytics')}
           className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
             activeTab === 'analytics'
-              ? 'text-[#f0b90b] border-[#f0b90b]'
-              : 'text-[#8892b0] border-transparent hover:text-white'
+              ? 'text-secondary border-secondary'
+              : 'text-on-primary-container border-transparent hover:text-white'
           }`}
         >
           <span className="material-symbols-outlined text-sm">analytics</span>
@@ -820,8 +820,8 @@ export default function AdminPage({
           onClick={() => setActiveTab('listings')}
           className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
             activeTab === 'listings'
-              ? 'text-[#f0b90b] border-[#f0b90b]'
-              : 'text-[#8892b0] border-transparent hover:text-white'
+              ? 'text-secondary border-secondary'
+              : 'text-on-primary-container border-transparent hover:text-white'
           }`}
         >
           <span className="material-symbols-outlined text-sm">pending_actions</span>
@@ -831,8 +831,8 @@ export default function AdminPage({
           onClick={() => setActiveTab('users')}
           className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
             activeTab === 'users'
-              ? 'text-[#f0b90b] border-[#f0b90b]'
-              : 'text-[#8892b0] border-transparent hover:text-white'
+              ? 'text-secondary border-secondary'
+              : 'text-on-primary-container border-transparent hover:text-white'
           }`}
         >
           <span className="material-symbols-outlined text-sm">group</span>
@@ -842,8 +842,8 @@ export default function AdminPage({
           onClick={() => setActiveTab('categories')}
           className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
             activeTab === 'categories'
-              ? 'text-[#f0b90b] border-[#f0b90b]'
-              : 'text-[#8892b0] border-transparent hover:text-white'
+              ? 'text-secondary border-secondary'
+              : 'text-on-primary-container border-transparent hover:text-white'
           }`}
         >
           <span className="material-symbols-outlined text-sm">category</span>
@@ -853,8 +853,8 @@ export default function AdminPage({
           onClick={() => setActiveTab('disputes')}
           className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
             activeTab === 'disputes'
-              ? 'text-[#f0b90b] border-[#f0b90b]'
-              : 'text-[#8892b0] border-transparent hover:text-white'
+              ? 'text-secondary border-secondary'
+              : 'text-on-primary-container border-transparent hover:text-white'
           }`}
         >
           <span className="material-symbols-outlined text-sm">gavel</span>
@@ -864,8 +864,8 @@ export default function AdminPage({
           onClick={() => setActiveTab('reports')}
           className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
             activeTab === 'reports'
-              ? 'text-[#f0b90b] border-[#f0b90b]'
-              : 'text-[#8892b0] border-transparent hover:text-white'
+              ? 'text-secondary border-secondary'
+              : 'text-on-primary-container border-transparent hover:text-white'
           }`}
         >
           <span className="material-symbols-outlined text-sm">flag</span>
@@ -875,8 +875,8 @@ export default function AdminPage({
           onClick={() => setActiveTab('sponsors')}
           className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
             activeTab === 'sponsors'
-              ? 'text-[#f0b90b] border-[#f0b90b]'
-              : 'text-[#8892b0] border-transparent hover:text-white'
+              ? 'text-secondary border-secondary'
+              : 'text-on-primary-container border-transparent hover:text-white'
           }`}
         >
           <span className="material-symbols-outlined text-sm">campaign</span>
@@ -886,8 +886,8 @@ export default function AdminPage({
           onClick={() => setActiveTab('audit')}
           className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
             activeTab === 'audit'
-              ? 'text-[#f0b90b] border-[#f0b90b]'
-              : 'text-[#8892b0] border-transparent hover:text-white'
+              ? 'text-secondary border-secondary'
+              : 'text-on-primary-container border-transparent hover:text-white'
           }`}
         >
           <span className="material-symbols-outlined text-sm">history</span>
@@ -898,8 +898,8 @@ export default function AdminPage({
           onClick={() => setActiveTab('support')}
           className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
             activeTab === 'support'
-              ? 'text-[#f0b90b] border-[#f0b90b]'
-              : 'text-[#8892b0] border-transparent hover:text-white'
+              ? 'text-secondary border-secondary'
+              : 'text-on-primary-container border-transparent hover:text-white'
           }`}
         >
           <span className="material-symbols-outlined text-sm">support_agent</span>
@@ -910,8 +910,8 @@ export default function AdminPage({
           onClick={() => setActiveTab('refunds')}
           className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
             activeTab === 'refunds'
-              ? 'text-[#f0b90b] border-[#f0b90b]'
-              : 'text-[#8892b0] border-transparent hover:text-white'
+              ? 'text-secondary border-secondary'
+              : 'text-on-primary-container border-transparent hover:text-white'
           }`}
         >
           <span className="material-symbols-outlined text-sm">payments</span>
@@ -922,8 +922,8 @@ export default function AdminPage({
           onClick={() => setActiveTab('b2b')}
           className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
             activeTab === 'b2b'
-              ? 'text-[#f0b90b] border-[#f0b90b]'
-              : 'text-[#8892b0] border-transparent hover:text-white'
+              ? 'text-secondary border-secondary'
+              : 'text-on-primary-container border-transparent hover:text-white'
           }`}
         >
           <span className="material-symbols-outlined text-sm">business_center</span>
@@ -934,8 +934,8 @@ export default function AdminPage({
           onClick={() => setActiveTab('settings')}
           className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
             activeTab === 'settings'
-              ? 'text-[#f0b90b] border-[#f0b90b]'
-              : 'text-[#8892b0] border-transparent hover:text-white'
+              ? 'text-secondary border-secondary'
+              : 'text-on-primary-container border-transparent hover:text-white'
           }`}
         >
           <span className="material-symbols-outlined text-sm">settings</span>

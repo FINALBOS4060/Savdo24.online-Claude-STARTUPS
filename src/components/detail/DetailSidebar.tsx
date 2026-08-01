@@ -32,12 +32,12 @@ export const DetailSidebar: React.FC<DetailSidebarProps> = ({
 }) => {
   return (
     <aside className="lg:sticky lg:top-24 space-y-6">
-      <div className="p-6 bg-[#0e1726]/95 border border-outline-variant/20 rounded-2xl shadow-xl space-y-6">
+      <div className="p-6 bg-surface-container/95 border border-outline-variant/20 rounded-2xl shadow-xl space-y-6">
         <div>
-          <span className="text-[10px] text-on-primary-container uppercase font-extrabold tracking-wider block mb-1">
+          <span className="text-xs text-on-primary-container uppercase font-extrabold tracking-wider block mb-1">
             Sotish narxi
           </span>
-          <div className="text-3xl md:text-4xl font-black font-mono text-[#f3ba2f] tracking-tight">
+          <div className="text-3xl md:text-4xl font-black font-mono text-secondary tracking-tight">
             ${startup.price ? startup.price.toLocaleString() : "Kelishilgan holda"}
           </div>
         </div>
@@ -47,7 +47,7 @@ export const DetailSidebar: React.FC<DetailSidebarProps> = ({
           <button
             onClick={handlePurchaseClick}
             disabled={startup.soldStatus === 'sotildi' || isOwnListing}
-            className="w-full py-4 bg-[#f3ba2f] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100 text-[#12161c] font-black text-sm rounded-xl active:scale-95 transition-all shadow-lg shadow-yellow-500/10 uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full py-4 bg-secondary hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100 text-on-secondary font-black text-sm rounded-xl active:scale-95 transition-all shadow-lg shadow-yellow-500/10 uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
           >
             <span className="material-symbols-outlined text-lg">shopping_cart</span>
             {startup.soldStatus === 'sotildi' ? "Sotilgan (Band qilingan)" : isOwnListing ? "Bu sizning e'loningiz" : "Loyihani sotib olish"}
@@ -167,16 +167,16 @@ export const DetailSidebar: React.FC<DetailSidebarProps> = ({
         {/* Tech Stack Chips Block */}
         {startup.techStack && startup.techStack.length > 0 && (
           <div className="border-t border-white/5 pt-4 space-y-2.5">
-            <span className="text-[10px] text-on-primary-container uppercase font-extrabold tracking-wider block">
+            <span className="text-xs text-on-primary-container uppercase font-extrabold tracking-wider block">
               Texnologiyalar
             </span>
             <div className="flex flex-wrap gap-1.5">
               {startup.techStack.map((tech) => (
                 <span
                   key={tech}
-                  className="px-2.5 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs font-bold text-[#f3ba2f] flex items-center gap-1"
+                  className="px-2.5 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs font-bold text-secondary flex items-center gap-1"
                 >
-                  <span className="w-1.5 h-1.5 bg-[#f3ba2f] rounded-full"></span>
+                  <span className="w-1.5 h-1.5 bg-secondary rounded-full"></span>
                   {tech}
                 </span>
               ))}
@@ -187,8 +187,8 @@ export const DetailSidebar: React.FC<DetailSidebarProps> = ({
 
       {/* Sotuvchi va Reyting */}
       {startup.userId && (
-        <div className="p-6 bg-[#0e1726]/95 border border-outline-variant/20 rounded-2xl shadow-xl space-y-4">
-          <span className="text-[10px] text-on-primary-container uppercase font-extrabold tracking-wider block">
+        <div className="p-6 bg-surface-container/95 border border-outline-variant/20 rounded-2xl shadow-xl space-y-4">
+          <span className="text-xs text-on-primary-container uppercase font-extrabold tracking-wider block">
             Sotuvchi ma'lumotlari
           </span>
           <div className="flex items-center gap-3">
@@ -200,11 +200,11 @@ export const DetailSidebar: React.FC<DetailSidebarProps> = ({
                 {sellerReviewsData?.sellerName || "Sotuvchi"}
               </h4>
               <div className="flex items-center gap-1.5 mt-1">
-                <span className="material-symbols-outlined text-[#f3ba2f] text-sm fill-1">star</span>
+                <span className="material-symbols-outlined text-secondary text-sm fill-1">star</span>
                 <span className="text-white text-xs font-bold font-mono">
                   {sellerReviewsData?.averageRating || "0.0"}
                 </span>
-                <span className="text-on-primary-container text-[11px]">
+                <span className="text-on-primary-container text-xs">
                   ({sellerReviewsData?.totalReviews || 0} sharh)
                 </span>
               </div>
@@ -234,7 +234,7 @@ export const DetailSidebar: React.FC<DetailSidebarProps> = ({
           {!isOwnListing && (
             <button
               onClick={() => handleOpenReportModal('user', String(startup.userId))}
-              className="w-full py-2.5 border-t border-white/5 pt-4 mt-2 hover:text-red-400 text-on-primary-container text-[11px] font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              className="w-full py-2.5 border-t border-white/5 pt-4 mt-2 hover:text-red-400 text-on-primary-container text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <span className="material-symbols-outlined text-xs">flag</span>
               Sotuvchini shikoyat qilish

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Send, MessageCircle } from 'lucide-react';
+import { Send, MessageCircle, Search, Bell, BellOff, Sun, Moon, Menu, X, Trophy, Crown } from 'lucide-react';
 import { UserProfileData, Notification, ProfileTab } from '../types';
 import { apiFetch as fetch } from '../lib/api';
 import { formatDateTime } from '../lib/formatDate';
@@ -96,13 +96,14 @@ export default function Navbar({
           </button>
           <button
             onClick={() => setView('ideas-rating')}
-            className={`font-semibold text-sm transition-colors py-1 ${
+            className={`font-semibold text-sm transition-colors py-1 flex items-center gap-1.5 ${
               currentView === 'ideas-rating'
                 ? 'text-secondary-container border-b-2 border-secondary-container'
                 : 'text-on-primary-container hover:text-secondary-container'
             }`}
           >
-            🏆 G'oyalar reytingi
+            <Trophy className="w-4 h-4 text-yellow-400" />
+            G'oyalar reytingi
           </button>
           <button
             onClick={() => setView('browse')}
@@ -132,7 +133,7 @@ export default function Navbar({
       <div className="flex items-center gap-4">
         {/* Search bar inside header */}
         <div className="hidden lg:flex items-center bg-white/5 dark:bg-on-primary-fixed-variant/20 rounded-lg px-3 py-1.5 border border-outline-variant/30">
-          <span className="material-symbols-outlined text-on-primary-container text-sm select-none">search</span>
+          <Search className="w-4 h-4 text-on-primary-container shrink-0" />
           <input
             type="text"
             className="bg-transparent border-none text-white focus:ring-0 text-sm w-48 placeholder-on-primary-container focus:outline-none ml-1"
@@ -175,9 +176,9 @@ export default function Navbar({
               className="p-2 text-on-primary-container hover:text-secondary-container transition-colors rounded-lg bg-white/5 relative"
               title="Bildirishnomalar"
             >
-              <span className="material-symbols-outlined select-none text-xl leading-none">notifications</span>
+              <Bell className="w-4 h-4" />
               {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}
@@ -190,7 +191,7 @@ export default function Navbar({
                   {unreadCount > 0 && (
                     <button
                       onClick={markAllAsRead}
-                      className="text-[10px] font-bold text-[#f0b90b] hover:underline bg-transparent border-none cursor-pointer"
+                      className="text-xs font-bold text-secondary hover:underline bg-transparent border-none cursor-pointer"
                     >
                       Barchasini o'qildi deb belgilash
                     </button>
@@ -199,7 +200,7 @@ export default function Navbar({
                 <div className="max-h-[400px] overflow-y-auto no-scrollbar">
                   {notifications.length === 0 ? (
                     <div className="p-8 text-center">
-                      <span className="material-symbols-outlined text-4xl text-on-primary-container mb-2">notifications_off</span>
+                      <BellOff className="w-8 h-8 text-on-primary-container mb-2 mx-auto" />
                       <p className="text-xs text-on-primary-container">Hozircha bildirishnomalar yo'q</p>
                     </div>
                   ) : (
@@ -242,12 +243,12 @@ export default function Navbar({
                         }`}
                       >
                         <div className="flex justify-between items-start mb-1">
-                          <h4 className={`text-xs font-bold ${!notif.isRead ? 'text-[#f0b90b]' : 'text-white'}`}>
+                          <h4 className={`text-xs font-bold ${!notif.isRead ? 'text-secondary' : 'text-white'}`}>
                             {notif.title}
                           </h4>
-                          {!notif.isRead && <div className="w-2 h-2 rounded-full bg-[#f0b90b]" />}
+                          {!notif.isRead && <div className="w-2 h-2 rounded-full bg-secondary" />}
                         </div>
-                        <p className="text-[11px] text-on-primary-container leading-relaxed mb-2">
+                        <p className="text-xs text-on-primary-container leading-relaxed mb-2">
                           {notif.message}
                         </p>
                         <span className="text-xs text-on-primary-container/60">
@@ -269,9 +270,7 @@ export default function Navbar({
           title={isDark ? "Yorug' rejimga o'tish" : "Qorong'i rejimga o'tish"}
           aria-label={isDark ? "Yorug' rejimga o'tish" : "Qorong'i rejimga o'tish"}
         >
-          <span className="material-symbols-outlined select-none text-xl leading-none">
-            {isDark ? 'light_mode' : 'dark_mode'}
-          </span>
+          {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
 
         <button
@@ -279,7 +278,7 @@ export default function Navbar({
           className="hidden sm:block font-semibold text-sm text-on-primary-container hover:text-secondary-container transition-colors"
         >
           <span className="flex items-center gap-1.5">
-            {user.isVip && <span className="text-[14px]" title="VIP a'zo">👑</span>}
+            {user.isVip && <span title="VIP a'zo"><Crown className="w-4 h-4 text-yellow-400 fill-yellow-400" /></span>}
             {user.name !== 'Mehmon' ? user.name : 'Kirish'}
           </span>
         </button>
@@ -289,9 +288,7 @@ export default function Navbar({
           className="md:hidden p-2 text-on-primary-container hover:text-secondary-container transition-colors"
           aria-label={mobileMenuOpen ? "Menuni yopish" : "Menuni ochish"}
         >
-          <span className="material-symbols-outlined select-none">
-            {mobileMenuOpen ? 'close' : 'menu'}
-          </span>
+          {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
         </button>
       </div>
 
@@ -314,7 +311,7 @@ export default function Navbar({
             }}
             className="text-left py-2 text-secondary-container hover:text-secondary-container font-bold flex items-center gap-1.5"
           >
-            <span>🏆</span> G'oyalar reytingi
+            <Trophy className="w-4 h-4 text-yellow-400" /> G'oyalar reytingi
           </button>
           <button
             onClick={() => {
@@ -357,9 +354,7 @@ export default function Navbar({
               onClick={toggleTheme}
               className="flex items-center gap-2 text-on-primary-container hover:text-secondary-container font-semibold"
             >
-              <span className="material-symbols-outlined text-xl">
-                {isDark ? 'light_mode' : 'dark_mode'}
-              </span>
+              {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
               <span>Mavzu</span>
             </button>
           </div>
