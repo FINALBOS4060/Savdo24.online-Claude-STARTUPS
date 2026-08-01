@@ -18,7 +18,7 @@ export const ProfileB2BTab: React.FC<ProfileB2BTabProps> = ({
   return (
     <section className="space-y-8 animate-fade-in">
       <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-8 text-center space-y-6">
-        <span className="material-symbols-outlined text-6xl text-blue-400">corporate_fare</span>
+        <span className="material-symbols-outlined text-6xl text-secondary">corporate_fare</span>
         <h3 className="text-2xl font-black text-white">Savdo24 B2B — Kompaniyalar uchun maxsus imkoniyatlar</h3>
         <p className="text-on-primary-container max-w-2xl mx-auto text-sm leading-relaxed">
           B2B hisob orqali siz ulgurji xaridorlar uchun <b>20% gacha chegirma</b>, korporativ hisob-faktura va 
@@ -26,20 +26,20 @@ export const ProfileB2BTab: React.FC<ProfileB2BTabProps> = ({
         </p>
 
         {b2bAccount ? (
-          <div className="bg-[#0b1426] border border-outline-variant/20 rounded-2xl p-6 text-left max-w-xl mx-auto space-y-4">
+          <div className="bg-surface-container border border-outline-variant/20 rounded-2xl p-6 text-left max-w-xl mx-auto space-y-4">
             <div className="flex justify-between border-b border-white/5 pb-2">
               <span className="text-on-primary-container text-xs font-bold uppercase">Kompaniya:</span>
               <span className="text-white font-bold">{b2bAccount.companyName}</span>
             </div>
             <div className="flex justify-between border-b border-white/5 pb-2">
               <span className="text-on-primary-container text-xs font-bold uppercase">Holati:</span>
-              <span className={`text-xs font-black uppercase ${b2bAccount.verified ? 'text-emerald-400' : 'text-yellow-400'}`}>
+              <span className={`text-xs font-black uppercase ${b2bAccount.verified ? 'text-success' : 'text-secondary'}`}>
                 {b2bAccount.verified ? 'Tasdiqlangan' : 'Tekshirilmoqda'}
               </span>
             </div>
             <div className="flex justify-between border-b border-white/5 pb-2">
               <span className="text-on-primary-container text-xs font-bold uppercase">Ulgurji chegirma:</span>
-              <span className="text-blue-400 font-bold">{b2bAccount.discount}%</span>
+              <span className="text-secondary font-bold">{b2bAccount.discount}%</span>
             </div>
           </div>
         ) : (
@@ -73,20 +73,20 @@ export const ProfileB2BTab: React.FC<ProfileB2BTabProps> = ({
                 setIsSubmittingB2B(false);
               }
             }}
-            className="max-w-md mx-auto space-y-4 bg-[#0b1426] p-8 rounded-2xl border border-outline-variant/20"
+            className="max-w-md mx-auto space-y-4 bg-surface-container p-8 rounded-2xl border border-outline-variant/20"
           >
             <div className="space-y-2 text-left">
               <label className="text-xs font-bold text-on-primary-container uppercase">Kompaniya nomi</label>
-              <input name="companyName" required className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-400" placeholder="MCHJ ..." />
+              <input name="companyName" required className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface" placeholder="MCHJ ..." />
             </div>
             <div className="space-y-2 text-left">
               <label className="text-xs font-bold text-on-primary-container uppercase">STIR (INN) / Soliq ID</label>
-              <input name="taxId" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-400" placeholder="123456789" />
+              <input name="taxId" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface" placeholder="123456789" />
             </div>
             <button
               type="submit"
               disabled={isSubmittingB2B}
-              className="w-full py-4 bg-blue-500 text-black font-black rounded-xl hover:bg-blue-400 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-4 bg-secondary text-on-secondary font-black rounded-xl hover:brightness-110 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
             >
               {isSubmittingB2B ? 'Yuborilmoqda...' : "B2B a'zolik so'rovini yuborish"}
             </button>

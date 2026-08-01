@@ -448,9 +448,9 @@ export default function ProfilePage({
   return (
     <div className="space-y-8 animate-fade-in text-left">
       {!user.emailVerified && user.id && (
-        <div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="bg-secondary-container/10 border border-secondary-container/20 p-4 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-start gap-3">
-            <span className="material-symbols-outlined text-yellow-400 mt-0.5">warning</span>
+            <span className="material-symbols-outlined text-secondary mt-0.5">warning</span>
             <div>
               <h4 className="text-white font-bold text-sm">Hisobingiz tasdiqlanmagan</h4>
               <p className="text-on-primary-container text-xs mt-1">
@@ -460,7 +460,7 @@ export default function ProfilePage({
           </div>
           <button 
             onClick={generateLinkCode}
-            className="shrink-0 bg-yellow-400 text-black px-4 py-2 rounded-lg text-xs font-bold hover:bg-yellow-300 transition-colors"
+            className="shrink-0 bg-secondary text-on-secondary px-4 py-2 rounded-lg text-xs font-bold hover:brightness-110 transition-all focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
           >
             Yangi kod olish
           </button>
@@ -471,7 +471,7 @@ export default function ProfilePage({
       <header className="relative mb-10 bg-primary-container border border-outline-variant/20 rounded-2xl overflow-hidden pb-6">
         <div className="h-48 w-full bg-gradient-to-br from-[#131b2e] to-[#0b1426] relative overflow-hidden flex items-center justify-center">
           {user.coverUrl ? (
-            <img src={user.coverUrl} alt="Cover" className="absolute inset-0 w-full h-full object-cover" />
+            <img src={user.coverUrl} alt="Cover" className="absolute inset-0 w-full h-full object-cover" loading="eager" fetchPriority="high" />
           ) : (
             <div className="absolute inset-0 bg-gradient-to-t from-[#0b1426] to-transparent"></div>
           )}
@@ -606,10 +606,10 @@ export default function ProfilePage({
         </button>
         <button
           onClick={() => setActiveTab('referral')}
-          className={`px-8 py-4 font-bold text-sm border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
+          className={`px-8 py-4 font-bold text-sm border-b-2 flex items-center gap-2 whitespace-nowrap transition-all focus:outline-none focus:ring-2 focus:ring-success ${
             activeTab === 'referral'
-              ? 'text-emerald-400 border-emerald-400'
-              : 'text-on-primary-container border-transparent hover:text-emerald-400'
+              ? 'text-success border-success'
+              : 'text-on-primary-container border-transparent hover:text-success'
           }`}
         >
           <span className="material-symbols-outlined text-lg">group_add</span>
@@ -617,10 +617,10 @@ export default function ProfilePage({
         </button>
         <button
           onClick={() => setActiveTab('b2b')}
-          className={`px-8 py-4 font-bold text-sm border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
+          className={`px-8 py-4 font-bold text-sm border-b-2 flex items-center gap-2 whitespace-nowrap transition-all focus:outline-none focus:ring-2 focus:ring-secondary ${
             activeTab === 'b2b'
-              ? 'text-blue-400 border-blue-400'
-              : 'text-on-primary-container border-transparent hover:text-blue-400'
+              ? 'text-secondary border-secondary'
+              : 'text-on-primary-container border-transparent hover:text-secondary'
           }`}
         >
           <span className="material-symbols-outlined text-lg">business</span>
@@ -628,7 +628,7 @@ export default function ProfilePage({
         </button>
         <button
           onClick={() => setActiveTab('settings')}
-          className={`px-8 py-4 font-bold text-sm border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
+          className={`px-8 py-4 font-bold text-sm border-b-2 flex items-center gap-2 whitespace-nowrap transition-all focus:outline-none focus:ring-2 focus:ring-secondary-container ${
             activeTab === 'settings'
               ? 'text-secondary-container border-secondary-container'
               : 'text-on-primary-container border-transparent hover:text-secondary-container'
@@ -639,10 +639,10 @@ export default function ProfilePage({
         </button>
         <button
           onClick={() => setActiveTab('vip')}
-          className={`px-8 py-4 font-bold text-sm border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
+          className={`px-8 py-4 font-bold text-sm border-b-2 flex items-center gap-2 whitespace-nowrap transition-all focus:outline-none focus:ring-2 focus:ring-secondary ${
             activeTab === 'vip'
-              ? 'text-yellow-400 border-yellow-400'
-              : 'text-on-primary-container border-transparent hover:text-yellow-400'
+              ? 'text-secondary border-secondary'
+              : 'text-on-primary-container border-transparent hover:text-secondary'
           }`}
         >
           <span className="material-symbols-outlined text-lg">workspace_premium</span>
@@ -650,7 +650,7 @@ export default function ProfilePage({
         </button>
         <button
           onClick={() => setActiveTab('security')}
-          className={`px-8 py-4 font-bold text-sm border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
+          className={`px-8 py-4 font-bold text-sm border-b-2 flex items-center gap-2 whitespace-nowrap transition-all focus:outline-none focus:ring-2 focus:ring-secondary-container ${
             activeTab === 'security'
               ? 'text-secondary-container border-secondary-container'
               : 'text-on-primary-container border-transparent hover:text-secondary-container'
@@ -702,10 +702,11 @@ export default function ProfilePage({
       {/* TOP Boost Modal */}
       {topModal.isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="glass-card w-full max-w-md p-8 rounded-3xl border-secondary-container/30 space-y-6 shadow-2xl relative overflow-hidden">
+          <div className="glass-card w-full max-w-md p-8 rounded-2xl border-secondary-container/30 space-y-6 shadow-2xl relative overflow-hidden">
             <button 
               onClick={() => setTopModal({ ...topModal, isOpen: false })}
-              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-all text-white"
+              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-all text-white focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
+              aria-label="Yopish"
             >
               <span className="material-symbols-outlined">close</span>
             </button>
@@ -718,13 +719,13 @@ export default function ProfilePage({
 
             <div className="space-y-4">
               <div>
-                <label className="text-[10px] uppercase font-bold text-on-primary-container mb-2 block">Kunlar soni</label>
+                <label className="text-xs uppercase font-bold text-on-primary-container mb-2 block">Kunlar soni</label>
                 <div className="grid grid-cols-4 gap-2">
                   {[3, 7, 14, 30].map(d => (
                     <button 
                       key={d}
                       onClick={() => setBoostDays(d)}
-                      className={`py-2 rounded-xl border font-bold text-xs transition-all ${
+                      className={`py-2 rounded-xl border font-bold text-xs transition-all focus:outline-none focus:ring-2 focus:ring-secondary-container ${
                         boostDays === d 
                           ? 'bg-secondary-container text-on-secondary-fixed border-secondary-container' 
                           : 'bg-white/5 border-white/10 text-white hover:bg-white/10'
@@ -738,7 +739,7 @@ export default function ProfilePage({
                   type="number"
                   value={boostDays}
                   onChange={(e) => setBoostDays(Math.min(365, Math.max(1, parseInt(e.target.value) || 1)))}
-                  className="w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-mono font-bold focus:border-secondary-container outline-none"
+                  className="w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-mono font-bold outline-none focus:outline-none focus:ring-2 focus:ring-secondary-container focus:ring-offset-2 focus:ring-offset-surface"
                   placeholder="Boshqa kun..."
                 />
               </div>
@@ -748,7 +749,7 @@ export default function ProfilePage({
                   <span className="text-xs font-bold text-on-primary-container">Hisoblangan narx:</span>
                   <span className="text-2xl font-black text-secondary-container">${estimatedPrice}</span>
                 </div>
-                <p className="text-[9px] text-on-primary-container mt-2 leading-tight">
+                <p className="text-xs text-on-primary-container mt-2 leading-tight">
                   * Narx joriy talab (aktiv TOP elonlar soni) asosida dinamik ravishda hisoblanadi.
                 </p>
               </div>
@@ -756,7 +757,7 @@ export default function ProfilePage({
               <button 
                 onClick={handleBuyTop}
                 disabled={isBuyingTop}
-                className="w-full py-4 bg-secondary-container text-on-secondary-fixed font-black rounded-xl hover:brightness-110 transition-all shadow-lg shadow-secondary-container/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-4 bg-secondary-container text-on-secondary-fixed font-black rounded-xl hover:brightness-110 transition-all shadow-lg shadow-secondary-container/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-secondary-container focus:ring-offset-2 focus:ring-offset-surface"
               >
                 {isBuyingTop ? 'Yuklanmoqda...' : "🔝 To'lovga o'tish"}
               </button>

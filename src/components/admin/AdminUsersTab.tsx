@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { apiFetch as fetch } from '../../lib/api';
+import { LoadingState } from '../LoadingState';
+import { formatDate, formatDateTime } from '../../lib/formatDate';
 
 interface AdminUsersTabProps {
   usersSearch: string;
@@ -197,7 +199,8 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
         <button
           disabled={currentPage <= 1}
           onClick={() => onPageChange(currentPage - 1)}
-          className="p-2 bg-white/5 hover:bg-white/10 disabled:opacity-40 text-white rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed"
+          className="p-2 bg-white/5 hover:bg-white/10 disabled:opacity-40 text-white rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-secondary-container"
+          aria-label="Oldingi sahifa"
         >
           <span className="material-symbols-outlined text-sm block">chevron_left</span>
         </button>
@@ -207,7 +210,8 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
         <button
           disabled={currentPage >= totalPages}
           onClick={() => onPageChange(currentPage + 1)}
-          className="p-2 bg-white/5 hover:bg-white/10 disabled:opacity-40 text-white rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed"
+          className="p-2 bg-white/5 hover:bg-white/10 disabled:opacity-40 text-white rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-secondary-container"
+          aria-label="Keyingi sahifa"
         >
           <span className="material-symbols-outlined text-sm block">chevron_right</span>
         </button>
@@ -220,7 +224,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
       <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-white/5 pb-6">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <span className="material-symbols-outlined text-secondary-container">group</span>
+            <span className="material-symbols-outlined text-secondary">group</span>
             Foydalanuvchilar ({totalAdminUsers})
           </h2>
           <div className="relative w-full md:w-64">
@@ -237,7 +241,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                   fetchAdminUsers(1, val);
                 }, 500);
               }}
-              className="w-full pl-9 pr-4 py-2 bg-[#0b1426] border border-white/10 rounded-xl text-xs text-white focus:border-[#f0b90b] outline-none"
+              className="w-full pl-9 pr-4 py-2 bg-surface-container border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:ring-2 focus:ring-secondary"
             />
           </div>
         </div>
@@ -255,7 +259,11 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
             </thead>
             <tbody className="divide-y divide-white/5">
               {isLoadingUsers ? (
-                <tr><td colSpan={5} className="py-8 text-center text-on-primary-container">Yuklanmoqda...</td></tr>
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-on-primary-container">
+                    <LoadingState variant="inline" text="Foydalanuvchilar yuklanmoqda..." />
+                  </td>
+                </tr>
               ) : adminUsers.map((u: any) => (
                 <tr 
                   key={u.id} 
@@ -273,21 +281,21 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                         height={32}
                       />
                       <div>
-                        <div className="font-bold text-white group-hover:text-secondary-container transition-colors flex items-center gap-1.5">
+                        <div className="font-bold text-white group-hover:text-secondary-container transition-colors flex items-center gap-1.5 text-xs">
                           {u.name}
-                          {u.isVip && <span className="text-yellow-400 text-[10px]">👑</span>}
+                          {u.isVip && <span className="text-yellow-400 text-xs">👑</span>}
                         </div>
-                        <div className="text-[10px] text-on-primary-container">{u.email}</div>
+                        <div className="text-xs text-on-primary-container">{u.email}</div>
                       </div>
                     </div>
                   </td>
                   <td className="py-4 px-4">
-                    <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${u.role === 'Admin' ? 'bg-purple-500/10 text-purple-400' : 'bg-blue-500/10 text-blue-400'}`}>
+                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${u.role === 'Admin' ? 'bg-purple-500/10 text-purple-400' : 'bg-blue-500/10 text-blue-400'}`}>
                       {u.role}
                     </span>
                   </td>
-                  <td className="py-4 px-4 text-on-primary-container">{u.joinDate}</td>
-                  <td className="py-4 px-4 text-center text-white font-mono font-bold">{u.totalPayments}</td>
+                  <td className="py-4 px-4 text-on-primary-container text-xs">{u.joinDate}</td>
+                  <td className="py-4 px-4 text-center text-white font-mono font-bold text-xs">{u.totalPayments}</td>
                   <td className="py-4 px-4 text-right">
                     <button
                       onClick={(e) => {
@@ -295,13 +303,13 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                         handleBanUser(u.id, !u.isBanned);
                       }}
                       disabled={isBanningId === u.id}
-                      className={`px-3 py-1.5 rounded-lg font-bold text-[10px] transition-all active:scale-95 cursor-pointer ${
+                      className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all active:scale-95 cursor-pointer focus:outline-none focus:ring-2 focus:ring-secondary-container ${
                         u.isBanned 
-                          ? 'bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20' 
+                          ? 'bg-success-container/10 text-success border border-success/20 hover:bg-success-container/20' 
                           : 'bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20'
                       }`}
                     >
-                      {u.isBanned ? 'Blokdan ochish' : 'Bloklash'}
+                      {u.isBanned ? "Blokdan ochish" : "Bloklash"}
                     </button>
                   </td>
                 </tr>
@@ -315,10 +323,11 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
       {/* Admin User Detail Modal */}
       {selectedUserDetail && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="glass-card w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 md:p-10 rounded-3xl border-white/5 shadow-2xl relative custom-scrollbar">
+          <div className="glass-card w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 md:p-10 rounded-3xl border border-white/5 shadow-2xl relative custom-scrollbar">
             <button 
               onClick={() => setSelectedUserDetail(null)}
-              className="absolute top-6 right-6 w-12 h-12 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-all text-white border border-white/10"
+              className="absolute top-6 right-6 w-12 h-12 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-all text-white border border-white/10 focus:outline-none focus:ring-2 focus:ring-secondary-container"
+              aria-label="Yopish"
             >
               <span className="material-symbols-outlined">close</span>
             </button>
@@ -326,7 +335,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Profile Card */}
               <div className="lg:col-span-1 space-y-6">
-                <div className="bg-[#0b1426] border border-white/5 rounded-3xl p-6 text-center space-y-4">
+                <div className="bg-surface-container-low border border-white/5 rounded-3xl p-6 text-center space-y-4">
                   <div className="relative inline-block">
                     <img 
                       src={selectedUserDetail.user.avatarUrl || '/default-avatar.jpg'} 
@@ -347,19 +356,19 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                     <p className="text-xs text-on-primary-container">{selectedUserDetail.user.email}</p>
                   </div>
                   <div className="flex flex-wrap justify-center gap-2">
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
+                    <span className={`px-3 py-1 rounded-full text-xs font-black uppercase ${
                       selectedUserDetail.user.role === 'Admin' ? 'bg-purple-500/20 text-purple-400' : 'bg-blue-500/20 text-blue-400'
                     }`}>
                       {selectedUserDetail.user.role}
                     </span>
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
-                      selectedUserDetail.user.isBanned ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'
+                    <span className={`px-3 py-1 rounded-full text-xs font-black uppercase ${
+                      selectedUserDetail.user.isBanned ? 'bg-red-500/20 text-red-400' : 'bg-success-container/20 text-success'
                     }`}>
-                      {selectedUserDetail.user.isBanned ? 'Bloklangan' : 'Faol'}
+                      {selectedUserDetail.user.isBanned ? "Bloklangan" : "Faol"}
                     </span>
                   </div>
-                  <p className="text-[10px] text-on-primary-container font-medium pt-2">
-                    A'zo bo'lgan sana: <br/> {new Date(selectedUserDetail.user.joinDate).toLocaleDateString("uz-UZ", { day: 'numeric', month: 'long', year: 'numeric' })}
+                  <p className="text-xs text-on-primary-container font-medium pt-2">
+                    A'zo bo'lgan sana: <br/> {formatDate(selectedUserDetail.user.joinDate, { day: 'numeric', month: 'long', year: 'numeric' })}
                   </p>
                 </div>
 
@@ -367,19 +376,19 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                   <h4 className="text-xs font-black text-white uppercase tracking-widest border-b border-white/5 pb-2">Statistika</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <p className="text-[10px] text-on-primary-container font-bold uppercase tracking-wider">E'lonlar</p>
+                      <p className="text-xs text-on-primary-container font-bold uppercase tracking-wider">E'lonlar</p>
                       <p className="text-xl font-black text-white">{selectedUserDetail.user.totalStartups}</p>
                     </div>
                     <div className="space-y-1">
-                      <p className="text-[10px] text-on-primary-container font-bold uppercase tracking-wider">Xaridlar</p>
+                      <p className="text-xs text-on-primary-container font-bold uppercase tracking-wider">Xaridlar</p>
                       <p className="text-xl font-black text-white">{selectedUserDetail.user.totalPurchases}</p>
                     </div>
                     <div className="space-y-1">
-                      <p className="text-[10px] text-on-primary-container font-bold uppercase tracking-wider">Sotilgan</p>
+                      <p className="text-xs text-on-primary-container font-bold uppercase tracking-wider">Sotilgan</p>
                       <p className="text-xl font-black text-secondary-container">${selectedUserDetail.user.totalSoldAmount}</p>
                     </div>
                     <div className="space-y-1">
-                      <p className="text-[10px] text-on-primary-container font-bold uppercase tracking-wider">Reyting</p>
+                      <p className="text-xs text-on-primary-container font-bold uppercase tracking-wider">Reyting</p>
                       <p className="text-xl font-black text-white flex items-center gap-1">
                         ⭐ 
                         {selectedUserDetail.user.averageRating ? (
@@ -406,13 +415,13 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                       {selectedUserDetail.user.isVip ? (
                         <div className="space-y-1">
                           <p className="text-xs text-white font-bold flex items-center gap-1.5">
-                            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                            VIP faol (tugash: {new Date(selectedUserDetail.user.vipExpiresAt).toLocaleDateString()})
+                            <span className="w-2 h-2 bg-success rounded-full animate-pulse"></span>
+                            VIP faol (tugash: {formatDate(selectedUserDetail.user.vipExpiresAt)})
                           </p>
                           <button
                             onClick={() => handleUpdateUserVip(selectedUserDetail.user.id, false, 0)}
                             disabled={isUpdatingUser}
-                            className="text-[10px] text-red-400 font-bold hover:underline bg-transparent border-none cursor-pointer p-0 disabled:opacity-40"
+                            className="text-xs text-red-400 font-bold hover:underline bg-transparent border-none cursor-pointer p-0 disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-red-500"
                           >
                             VIP maqomini bekor qilish
                           </button>
@@ -428,7 +437,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                             key={days}
                             onClick={() => handleUpdateUserVip(selectedUserDetail.user.id, true, days)}
                             disabled={isUpdatingUser}
-                            className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-lg text-[10px] font-bold transition-all disabled:opacity-40 cursor-pointer active:scale-95"
+                            className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-lg text-xs font-bold transition-all disabled:opacity-40 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-secondary-container"
                           >
                             +{days} kun VIP
                           </button>
@@ -452,7 +461,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                           key={role}
                           onClick={() => handleUpdateUserRole(selectedUserDetail.user.id, role)}
                           disabled={isUpdatingUser || selectedUserDetail.user.role === role}
-                          className={`w-full px-4 py-2.5 rounded-xl font-bold text-xs flex justify-between items-center transition-all disabled:opacity-50 cursor-pointer ${
+                          className={`w-full px-4 py-2.5 rounded-xl font-bold text-xs flex justify-between items-center transition-all disabled:opacity-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-secondary-container ${
                             selectedUserDetail.user.role === role 
                               ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
                               : 'bg-white/5 text-white border border-white/5 hover:bg-white/10'
@@ -477,7 +486,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                       <button
                         onClick={() => handleSendResetLink(selectedUserDetail.user.email)}
                         disabled={isUpdatingUser}
-                        className="w-full px-4 py-2.5 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 border border-yellow-500/20 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40"
+                        className="w-full px-4 py-2.5 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 border border-yellow-500/20 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                       >
                         <span className="material-symbols-outlined text-sm">lock_reset</span>
                         Parolni tiklash havolasi
@@ -486,9 +495,9 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                       <button
                         onClick={() => handleBanUser(selectedUserDetail.user.id, !selectedUserDetail.user.isBanned)}
                         disabled={isUpdatingUser || isBanningId === selectedUserDetail.user.id}
-                        className={`w-full px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 ${
+                        className={`w-full px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-secondary-container ${
                           selectedUserDetail.user.isBanned 
-                            ? 'bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/20' 
+                            ? 'bg-success-container/10 hover:bg-success-container/20 text-success border border-success/20' 
                             : 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20'
                         }`}
                       >
@@ -500,21 +509,21 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
 
                       {showDeleteConfirm ? (
                         <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-2xl space-y-3">
-                          <p className="text-[11px] text-red-400 font-bold text-center leading-relaxed">
+                          <p className="text-xs text-red-400 font-bold text-center leading-relaxed">
                             Diqqat! Ushbu foydalanuvchi bilan bog'liq barcha e'lonlar, xaridlar va ma'lumotlar butunlay o'chiriladi. Bu amalni ortga qaytarib bo'lmaydi!
                           </p>
                           <div className="flex gap-2">
                             <button
                               onClick={() => handleDeleteUser(selectedUserDetail.user.id)}
                               disabled={isUpdatingUser}
-                              className="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-[10px] font-bold cursor-pointer"
+                              className="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-500"
                             >
                               Ha, o'chirilsin
                             </button>
                             <button
                               onClick={() => setShowDeleteConfirm(false)}
                               disabled={isUpdatingUser}
-                              className="flex-1 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-[10px] font-bold cursor-pointer"
+                              className="flex-1 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-xs font-bold cursor-pointer focus:outline-none focus:ring-2 focus:ring-white/50"
                             >
                               Bekor qilish
                             </button>
@@ -524,7 +533,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                         <button
                           onClick={() => setShowDeleteConfirm(true)}
                           disabled={isUpdatingUser}
-                          className="w-full px-4 py-2.5 bg-red-600/10 hover:bg-red-600/20 text-red-500 border border-red-600/20 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40"
+                          className="w-full px-4 py-2.5 bg-red-600/10 hover:bg-red-600/20 text-red-500 border border-red-600/20 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-red-500"
                         >
                           <span className="material-symbols-outlined text-sm">delete_forever</span>
                           Hisobni butunlay o'chirish
@@ -548,11 +557,11 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                         {selectedUserDetail.auditLogs.map((log: any) => (
                           <div key={log.id} className="p-4 hover:bg-white/5 transition-colors">
                             <div className="flex justify-between items-start mb-1">
-                              <span className="text-[10px] font-black text-secondary-container uppercase tracking-widest">{log.action}</span>
-                              <span className="text-[9px] text-on-primary-container font-mono">{new Date(log.createdAt).toLocaleString()}</span>
+                              <span className="text-xs font-black text-secondary-container uppercase tracking-widest">{log.action}</span>
+                              <span className="text-xs text-on-primary-container font-mono">{formatDateTime(log.createdAt)}</span>
                             </div>
-                            <p className="text-[11px] text-white font-medium leading-relaxed mb-1">{log.details}</p>
-                            <p className="text-[9px] text-[#8892b0]">Admin: <span className="text-white font-bold">{log.admin?.name || "Tizim"}</span></p>
+                            <p className="text-xs text-white font-medium leading-relaxed mb-1">{log.details}</p>
+                            <p className="text-xs text-[#8892b0]">Admin: <span className="text-white font-bold">{log.admin?.name || "Tizim"}</span></p>
                           </div>
                         ))}
                       </div>

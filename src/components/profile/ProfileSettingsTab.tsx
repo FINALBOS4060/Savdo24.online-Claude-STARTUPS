@@ -2,7 +2,7 @@ import React from 'react';
 
 interface ProfileSettingsTabProps {
   handleSaveSettings: (e: React.FormEvent) => void;
-  fileInputRef: React.RefObject<HTMLInputElement>;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
   isUploadingAvatar: boolean;
   editAvatar: string;
   setEditAvatar: (url: string) => void;
@@ -95,7 +95,7 @@ export const ProfileSettingsTab: React.FC<ProfileSettingsTabProps> = ({
                     editAvatar === url ? 'border-secondary-container scale-110 shadow-lg' : 'border-transparent opacity-50 hover:opacity-100'
                   }`}
                 >
-                  <img src={url} alt="Avatar variant" className="w-full h-full object-cover" />
+                  <img src={url} alt="Avatar variant" className="w-full h-full object-cover" loading="lazy" />
                 </button>
               ))}
             </div>

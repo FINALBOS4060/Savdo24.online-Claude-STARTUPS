@@ -1,16 +1,18 @@
 import React from 'react';
 
 interface ProfileReferralsTabProps {
+  user?: any;
   referralStats: {
     referralCount: number;
     totalEarned: number;
     tier: any;
     referrals: any[];
   };
-  handleGenerateReferral: () => void;
-  isGeneratingReferral: boolean;
-  copiedCode: boolean;
-  setCopiedCode: (val: boolean) => void;
+  handleGenerateReferral?: () => void;
+  isGeneratingReferral?: boolean;
+  copiedCode?: boolean;
+  setCopiedCode?: (val: boolean) => void;
+  onActionToast?: (msg: string) => void;
 }
 
 export const ProfileReferralsTab: React.FC<ProfileReferralsTabProps> = ({
@@ -21,11 +23,11 @@ export const ProfileReferralsTab: React.FC<ProfileReferralsTabProps> = ({
   setCopiedCode,
 }) => {
   return (
-    <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
+    <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
       <div className="border-b border-white/5 pb-4 flex justify-between items-center flex-wrap gap-4">
         <div>
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <span className="material-symbols-outlined text-[#f0b90b]">share</span>
+            <span className="material-symbols-outlined text-secondary">share</span>
             Referral Dasturi (Do'stlaringizni taklif qiling)
           </h2>
           <p className="text-xs text-on-primary-container mt-0.5">
@@ -35,17 +37,17 @@ export const ProfileReferralsTab: React.FC<ProfileReferralsTabProps> = ({
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-[#0b1426] border border-white/5 p-5 rounded-2xl space-y-1">
-          <span className="text-[10px] text-on-primary-container uppercase font-bold">Joriy Daraja</span>
+        <div className="bg-surface-container border border-white/5 p-5 rounded-2xl space-y-1">
+          <span className="text-xs text-on-primary-container uppercase font-bold">Joriy Daraja</span>
           <p className="text-xl font-black text-white">{referralStats.tier?.badge || 'Yangi'}</p>
-          <p className="text-[10px] text-emerald-400 font-bold">Komissiya: {referralStats.tier?.commission}%</p>
+          <p className="text-xs text-success font-bold">Komissiya: {referralStats.tier?.commission}%</p>
         </div>
-        <div className="bg-[#0b1426] border border-white/5 p-5 rounded-2xl space-y-1">
-          <span className="text-[10px] text-on-primary-container uppercase font-bold">Takliflar Soni</span>
+        <div className="bg-surface-container border border-white/5 p-5 rounded-2xl space-y-1">
+          <span className="text-xs text-on-primary-container uppercase font-bold">Takliflar Soni</span>
           <p className="text-3xl font-black text-white">{referralStats.referralCount}</p>
         </div>
-        <div className="bg-[#0b1426] border border-white/5 p-5 rounded-2xl space-y-1">
-          <span className="text-[10px] text-on-primary-container uppercase font-bold">Ishlab Topilgan</span>
+        <div className="bg-surface-container border border-white/5 p-5 rounded-2xl space-y-1">
+          <span className="text-xs text-on-primary-container uppercase font-bold">Ishlab Topilgan</span>
           <p className="text-3xl font-black text-white">${referralStats.totalEarned.toLocaleString()}</p>
         </div>
       </div>
@@ -58,9 +60,9 @@ export const ProfileReferralsTab: React.FC<ProfileReferralsTabProps> = ({
 
         {!referralStats.referrals.length ? (
           <button
-            onClick={handleGenerateReferral}
+            onClick={() => handleGenerateReferral?.()}
             disabled={isGeneratingReferral}
-            className="px-6 py-3 bg-[#f0b90b] hover:bg-[#f0b90b]/90 text-black font-extrabold text-xs rounded-xl transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            className="px-6 py-3 bg-secondary hover:brightness-110 text-on-secondary font-extrabold text-xs rounded-xl transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
           >
             <span className="material-symbols-outlined text-sm">bolt</span>
             {isGeneratingReferral ? "Yaratilmoqda..." : "Referral Kod Yaratish"}
@@ -72,15 +74,15 @@ export const ProfileReferralsTab: React.FC<ProfileReferralsTabProps> = ({
                 type="text"
                 readOnly
                 value={`${window.location.origin}/browse?ref=${referralStats.referrals[0].code}`}
-                className="bg-[#0b1426] border border-white/10 rounded-xl px-4 py-2.5 text-white text-xs font-mono flex-1 focus:outline-none"
+                className="bg-surface-container border border-white/10 rounded-xl px-4 py-2.5 text-white text-xs font-mono flex-1 focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
               />
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(`${window.location.origin}/browse?ref=${referralStats.referrals[0].code}`);
-                  setCopiedCode(true);
-                  setTimeout(() => setCopiedCode(false), 2000);
+                  setCopiedCode?.(true);
+                  setTimeout(() => setCopiedCode?.(false), 2000);
                 }}
-                className="px-5 py-2.5 bg-[#f0b90b] hover:bg-[#f0b90b]/90 text-black font-extrabold text-xs rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                className="px-5 py-2.5 bg-secondary hover:brightness-110 text-on-secondary font-extrabold text-xs rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
               >
                 <span className="material-symbols-outlined text-sm">{copiedCode ? "done" : "content_copy"}</span>
                 {copiedCode ? "Nusxalandi!" : "Havolani nusxalash"}

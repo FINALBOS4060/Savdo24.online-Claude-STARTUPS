@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Send, MessageCircle } from 'lucide-react';
 import { UserProfileData, Notification, ProfileTab } from '../types';
 import { apiFetch as fetch } from '../lib/api';
+import { formatDateTime } from '../lib/formatDate';
 
 interface NavbarProps {
   currentView: string;
@@ -249,8 +250,8 @@ export default function Navbar({
                         <p className="text-[11px] text-on-primary-container leading-relaxed mb-2">
                           {notif.message}
                         </p>
-                        <span className="text-[9px] text-on-primary-container/60">
-                          {new Date(notif.createdAt).toLocaleString()}
+                        <span className="text-xs text-on-primary-container/60">
+                          {formatDateTime(notif.createdAt)}
                         </span>
                       </div>
                     ))

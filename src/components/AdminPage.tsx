@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import { Startup, UserProfileData, Category } from '../types';
 import { apiFetch as fetch } from '../lib/api';
+import { ConfirmDialog } from './ConfirmDialog';
 import { AdminB2BTab } from './admin/AdminB2BTab';
 import { AdminUsersTab } from './admin/AdminUsersTab';
 import { AdminCategoriesTab } from './admin/AdminCategoriesTab';
@@ -51,6 +52,9 @@ export default function AdminPage({
   const [listingsView, setListingsView] = useState<'pending' | 'all'>('pending');
   const [listingsSearch, setListingsSearch] = useState('');
   const [isDeletingStartupId, setIsDeletingStartupId] = useState<string | null>(null);
+
+  const [reportDeleteConfirm, setReportDeleteConfirm] = useState<{ reportId: number; targetType: string; targetId: string } | null>(null);
+  const [startupDeleteConfirm, setStartupDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
 
   // 88-band: "Barcha e'lonlar" ilgari App.tsx'ning umumiy `startups`
   // prop'idan (standart limit=50, max=100) ko'rsatilardi — 100+ e'lon
@@ -574,18 +578,15 @@ export default function AdminPage({
     }
   };
 
-  const handleDeleteReportedItem = async (reportId: number, targetType: string, targetId: string) => {
-    // 97-band: 'user' nishon turi endi DetailPage'dan haqiqiy shikoyat sifatida
-    // kelishi mumkin — bu funksiya avval faqat 'startup'/boshqa (idea deb
-    // faraz qilingan) uchun yozilgan edi, 'user' kelsa targetId (foydalanuvchi
-    // ID) tasodifan mos keladigan boshqa bir g'oyani (Idea) o'chirib
-    // yuborishi mumkin edi. Endi 'user' uchun o'chirish tugmasi umuman
-    // chaqirilmaydi (pastdagi render qismida bloklangan), shu yerda ham
-    // ehtiyot chorasi sifatida qaytariladi.
+  const handleDeleteReportedItem = (reportId: number, targetType: string, targetId: string) => {
     if (targetType === 'user') return;
-    if (!window.confirm(`Haqiqatan ham ushbu ${targetType === 'startup' ? "startap e'lonini" : "izoh/g'oyani"} butunlay o'chirmoqchimisiz? Bu amal qaytarilmas!`)) {
-      return;
-    }
+    setReportDeleteConfirm({ reportId, targetType, targetId });
+  };
+
+  const executeDeleteReportedItem = async () => {
+    if (!reportDeleteConfirm) return;
+    const { reportId, targetType, targetId } = reportDeleteConfirm;
+    setReportDeleteConfirm(null);
     setIsDeletingReportedItem(reportId);
     try {
       const endpoint = targetType === 'startup' 
@@ -672,10 +673,14 @@ export default function AdminPage({
     }
   };
 
-  const handleDeleteStartup = async (id: string, name: string) => {
-    if (!window.confirm(`"${name}" e'lonini BUTUNLAY o'chirmoqchimisiz? Bu amal qaytarilmas — unga bog'liq barcha to'lov, g'oya, sharh va suhbat ma'lumotlari ham o'chib ketadi.`)) {
-      return;
-    }
+  const handleDeleteStartup = (id: string, name: string) => {
+    setStartupDeleteConfirm({ id, name });
+  };
+
+  const executeDeleteStartup = async () => {
+    if (!startupDeleteConfirm) return;
+    const { id, name } = startupDeleteConfirm;
+    setStartupDeleteConfirm(null);
     setIsDeletingStartupId(id);
     try {
       const res = await fetch(`/api/admin/startups/${id}`, { method: 'DELETE' });
@@ -1075,6 +1080,28 @@ export default function AdminPage({
       {activeTab === 'b2b' && (
         <AdminB2BTab onActionToast={onActionToast} />
       )}
+
+      <ConfirmDialog
+        isOpen={!!reportDeleteConfirm}
+        title="O'chirishni tasdiqlang"
+        message="Haqiqatan ham ushbu e'lon yoki izohni butunlay o'chirmoqchimisiz? Bu amal qaytarilmas!"
+        variant="danger"
+        confirmText="O'chirish"
+        cancelText="Bekor qilish"
+        onConfirm={executeDeleteReportedItem}
+        onCancel={() => setReportDeleteConfirm(null)}
+      />
+
+      <ConfirmDialog
+        isOpen={!!startupDeleteConfirm}
+        title="E'lonni butunlay o'chirish"
+        message={startupDeleteConfirm ? `"${startupDeleteConfirm.name}" e'lonini BUTUNLAY o'chirmoqchimisiz? Bu amal qaytarilmas — unga bog'liq barcha to'lov, g'oya, sharh va suhbat ma'lumotlari ham o'chib ketadi.` : ""}
+        variant="danger"
+        confirmText="Butunlay o'chirish"
+        cancelText="Bekor qilish"
+        onConfirm={executeDeleteStartup}
+        onCancel={() => setStartupDeleteConfirm(null)}
+      />
     </div>
   );
 }

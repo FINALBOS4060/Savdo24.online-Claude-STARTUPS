@@ -1,5 +1,5 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { Startup, UserProfileData, ProfileTab, Category, Notification } from './types';
 import Navbar from './components/Navbar';
@@ -55,9 +55,31 @@ export default function App() {
     return [];
   });
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [isDark, setIsDark] = useState<boolean>(true);
+  const [isDark, setIsDark] = useState<boolean>(() => {
+    const saved = localStorage.getItem('savdo24_theme');
+    if (saved !== null) {
+      return saved === 'true';
+    }
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
   const [checkoutAmount, setCheckoutAmount] = useState<number>(1250.00);
   const [isLoadingStartups, setIsLoadingStartups] = useState<boolean>(true);
+  const shouldReduceMotion = useReducedMotion();
+  const pageAnim = shouldReduceMotion ? {} : {
+    initial: { opacity: 0, y: 15 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: -15 },
+    transition: { duration: 0.25, ease: 'easeInOut' }
+  };
+
+  useEffect(() => {
+    localStorage.setItem('savdo24_theme', String(isDark));
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDark]);
 
   useEffect(() => {
     if (currentView === 'profile' && initialProfileTab) {
@@ -515,7 +537,7 @@ export default function App() {
   };
 
   return (
-    <div className={isDark ? 'dark bg-[#0b1426] text-white min-h-screen' : 'bg-[#f7f9ff] text-[#171c22] min-h-screen'}>
+    <div className={isDark ? 'dark bg-background text-on-background min-h-screen' : 'bg-background text-on-background min-h-screen'}>
       {/* Top Navigation */}
       <Navbar
         currentView={currentView}
@@ -773,7 +795,7 @@ export default function App() {
                   exit={{ opacity: 0, y: -15 }}
                   transition={{ duration: 0.25, ease: 'easeInOut' }}
                 >
-                  <SupportPage setView={setView} />
+                  <SupportPage setView={setView} onActionToast={showToast} />
                 </motion.div>
               } />
 

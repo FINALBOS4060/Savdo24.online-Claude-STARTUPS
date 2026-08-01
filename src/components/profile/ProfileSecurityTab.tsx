@@ -3,7 +3,7 @@ import React from 'react';
 interface ProfileSecurityTabProps {
   sessions: any[];
   revokeAllSessions: () => void;
-  revokeSession: (id: string) => void;
+  revokeSession: (id: number) => void;
 }
 
 export const ProfileSecurityTab: React.FC<ProfileSecurityTabProps> = ({

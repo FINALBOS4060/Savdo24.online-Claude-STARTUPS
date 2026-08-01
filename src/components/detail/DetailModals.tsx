@@ -62,10 +62,11 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
       {/* Review Modal */}
       {isReviewModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-[#0e1726] border border-outline-variant/30 rounded-2xl shadow-2xl p-6 space-y-6 relative animate-in fade-in zoom-in-95 duration-200">
+          <div className="w-full max-w-md bg-surface-container border border-outline-variant/30 rounded-2xl shadow-2xl p-6 space-y-6 relative animate-in fade-in zoom-in-95 duration-200">
             <button
               onClick={() => setIsReviewModalOpen(false)}
-              className="absolute top-4 right-4 text-on-primary-container hover:text-white transition-colors"
+              className="absolute top-4 right-4 text-on-primary-container hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface rounded-full p-1"
+              aria-label="Yopish"
             >
               <span className="material-symbols-outlined">close</span>
             </button>
@@ -82,11 +83,11 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
                       key={star}
                       type="button"
                       onClick={() => setReviewRating(star)}
-                      className="text-2xl transition-all active:scale-90 hover:scale-110 cursor-pointer"
+                      className="text-2xl transition-all active:scale-90 hover:scale-110 cursor-pointer focus:outline-none focus:ring-2 focus:ring-secondary rounded-full"
                     >
                       <span
                         className={`material-symbols-outlined text-3xl ${
-                          star <= reviewRating ? "text-[#f3ba2f] fill-1" : "text-gray-600"
+                          star <= reviewRating ? "text-secondary fill-1" : "text-gray-600"
                         }`}
                       >
                         star
@@ -103,7 +104,7 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
                   onChange={(e) => setReviewComment(e.target.value)}
                   placeholder="Loyihaning sifati, kod tozaligi va sotuvchining muloqoti haqida yozing..."
                   rows={4}
-                  className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white text-xs placeholder-on-primary-container/60 focus:border-secondary-container focus:outline-none transition-all"
+                  className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white text-xs placeholder-on-primary-container/60 transition-all focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
                 />
               </div>
 
@@ -111,14 +112,14 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsReviewModalOpen(false)}
-                  className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs rounded-xl transition-all"
+                  className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-white/50"
                 >
                   Bekor qilish
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingReview || !reviewComment.trim()}
-                  className="flex-1 py-3 bg-[#f3ba2f] hover:brightness-110 disabled:opacity-40 text-[#12161c] font-black text-xs rounded-xl transition-all"
+                  className="flex-1 py-3 bg-secondary hover:brightness-110 disabled:opacity-40 text-on-secondary font-black text-xs rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
                 >
                   {isSubmittingReview ? "Yuborilmoqda..." : "Sharh qoldirish"}
                 </button>
@@ -131,10 +132,11 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
       {/* Dispute Modal */}
       {isDisputeModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-[#0e1726] border border-outline-variant/30 rounded-2xl shadow-2xl p-6 space-y-6 relative animate-in fade-in zoom-in-95 duration-200">
+          <div className="w-full max-w-md bg-surface-container border border-outline-variant/30 rounded-2xl shadow-2xl p-6 space-y-6 relative animate-in fade-in zoom-in-95 duration-200">
             <button
               onClick={() => setIsDisputeModalOpen(false)}
-              className="absolute top-4 right-4 text-on-primary-container hover:text-white transition-colors"
+              className="absolute top-4 right-4 text-on-primary-container hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface rounded-full p-1"
+              aria-label="Yopish"
             >
               <span className="material-symbols-outlined">close</span>
             </button>
@@ -153,7 +155,7 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
                   value={disputeReason}
                   onChange={(e) => setDisputeReason(e.target.value)}
                   placeholder="Masalan: Fayllar to'liq emas, Sotuvchi Telegramda javob bermayapti"
-                  className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white text-xs placeholder-on-primary-container/60 focus:border-red-500 focus:outline-none transition-all"
+                  className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white text-xs placeholder-on-primary-container/60 transition-all focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-surface"
                 />
               </div>
 
@@ -164,7 +166,7 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
                   onChange={(e) => setDisputeDescription(e.target.value)}
                   placeholder="Muammo haqida barcha tafsilotlarni qoldiring. Loyiha topshirilmadi yoki va'da qilingan texnik standartga mos kelmasligi sabablarini tushuntirib bering..."
                   rows={4}
-                  className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white text-xs placeholder-on-primary-container/60 focus:border-red-500 focus:outline-none transition-all"
+                  className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white text-xs placeholder-on-primary-container/60 transition-all focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-surface"
                 />
               </div>
 
@@ -172,14 +174,14 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsDisputeModalOpen(false)}
-                  className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs rounded-xl transition-all"
+                  className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-white/50"
                 >
                   Bekor qilish
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingDispute || !disputeReason.trim() || !disputeDescription.trim()}
-                  className="flex-1 py-3 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white font-black text-xs rounded-xl transition-all"
+                  className="flex-1 py-3 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white font-black text-xs rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-surface"
                 >
                   {isSubmittingDispute ? "Yuborilmoqda..." : "Nizo ochish"}
                 </button>
@@ -192,10 +194,11 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
       {/* Report Modal */}
       {reportModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-[#0e1726] border border-outline-variant/30 rounded-2xl shadow-2xl p-6 space-y-6 relative animate-in fade-in zoom-in-95 duration-200">
+          <div className="w-full max-w-md bg-surface-container border border-outline-variant/30 rounded-2xl shadow-2xl p-6 space-y-6 relative animate-in fade-in zoom-in-95 duration-200">
             <button
               onClick={() => setReportModalOpen(false)}
-              className="absolute top-4 right-4 text-on-primary-container hover:text-white transition-colors"
+              className="absolute top-4 right-4 text-on-primary-container hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface rounded-full p-1"
+              aria-label="Yopish"
             >
               <span className="material-symbols-outlined">close</span>
             </button>
@@ -212,7 +215,7 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
                 <select
                   value={reportReason}
                   onChange={(e) => setReportReason(e.target.value)}
-                  className="w-full p-3 bg-[#162235] border border-white/10 rounded-xl text-white text-xs focus:border-red-500 focus:outline-none transition-all font-semibold"
+                  className="w-full p-3 bg-surface-container-low border border-white/10 rounded-xl text-white text-xs transition-all font-semibold focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-surface"
                 >
                   <option value="Firibgar elon">Firibgar elon</option>
                   <option value="Zararli havola">Zararli havola</option>
@@ -228,7 +231,7 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
                   onChange={(e) => setReportDescription(e.target.value)}
                   placeholder="Shikoyatingizni asoslovchi qo'shimcha tafsilotlarni yozing..."
                   rows={4}
-                  className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white text-xs placeholder-on-primary-container/60 focus:border-red-500 focus:outline-none transition-all font-medium"
+                  className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white text-xs placeholder-on-primary-container/60 transition-all font-medium focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-surface"
                 />
               </div>
 
@@ -236,14 +239,14 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
                 <button
                   type="button"
                   onClick={() => setReportModalOpen(false)}
-                  className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs rounded-xl transition-all"
+                  className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-white/50"
                 >
                   Bekor qilish
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingReport}
-                  className="flex-1 py-3 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white font-black text-xs rounded-xl transition-all"
+                  className="flex-1 py-3 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white font-black text-xs rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-surface"
                 >
                   {isSubmittingReport ? "Yuborilmoqda..." : "Shikoyat yuborish"}
                 </button>

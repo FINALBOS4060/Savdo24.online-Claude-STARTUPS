@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { ConfirmDialog } from '../ConfirmDialog';
 
 interface AdminSponsorsTabProps {
   newSponsor: any;
@@ -19,90 +20,107 @@ export const AdminSponsorsTab: React.FC<AdminSponsorsTabProps> = ({
   isLoadingSponsors,
   handleSponsorAction,
 }) => {
+  const [sponsorToDeleteId, setSponsorToDeleteId] = useState<any | null>(null);
+
   return (
     <div className="space-y-6">
+      <ConfirmDialog
+        isOpen={!!sponsorToDeleteId}
+        title="Kanalni o'chirish"
+        message="Haqiqatan ham ushbu sponsor kanalini o'chirmoqchimisiz? Bu amal qaytarilmas."
+        variant="danger"
+        confirmText="O'chirish"
+        cancelText="Bekor qilish"
+        onConfirm={() => {
+          if (sponsorToDeleteId) {
+            handleSponsorAction(sponsorToDeleteId, 'delete');
+            setSponsorToDeleteId(null);
+          }
+        }}
+        onCancel={() => setSponsorToDeleteId(null)}
+      />
       <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
         <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4">
-          <span className="material-symbols-outlined text-[#f0b90b]">campaign</span>
+          <span className="material-symbols-outlined text-secondary">campaign</span>
           Yangi sponsor kanal qo'shish
         </h2>
         <form onSubmit={handleAddSponsor} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-[#8892b0] uppercase">Kanal ID</label>
+            <label className="text-xs font-bold text-[#8892b0] uppercase tracking-wider">Kanal ID</label>
             <input
               required
               type="text"
               placeholder="-100..."
               value={newSponsor.channelId}
               onChange={e => setNewSponsor({...newSponsor, channelId: e.target.value})}
-              className="w-full p-2.5 bg-[#0e1726] border border-white/10 rounded-xl text-white text-xs focus:border-[#f0b90b] outline-none"
+              className="w-full p-2.5 bg-[#0e1726] border border-white/10 rounded-xl text-white text-xs focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/50"
             />
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-[#8892b0] uppercase">Kanal Username</label>
+            <label className="text-xs font-bold text-[#8892b0] uppercase tracking-wider">Kanal Username</label>
             <input
               required
               type="text"
               placeholder="savdo24_uz"
               value={newSponsor.channelUsername}
               onChange={e => setNewSponsor({...newSponsor, channelUsername: e.target.value})}
-              className="w-full p-2.5 bg-[#0e1726] border border-white/10 rounded-xl text-white text-xs focus:border-[#f0b90b] outline-none"
+              className="w-full p-2.5 bg-[#0e1726] border border-white/10 rounded-xl text-white text-xs focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/50"
             />
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-[#8892b0] uppercase">Ko'rinadigan nom</label>
+            <label className="text-xs font-bold text-[#8892b0] uppercase tracking-wider">Ko'rinadigan nom</label>
             <input
               required
               type="text"
               placeholder="Savdo24 Rasmiy"
               value={newSponsor.displayName}
               onChange={e => setNewSponsor({...newSponsor, displayName: e.target.value})}
-              className="w-full p-2.5 bg-[#0e1726] border border-white/10 rounded-xl text-white text-xs focus:border-[#f0b90b] outline-none"
+              className="w-full p-2.5 bg-[#0e1726] border border-white/10 rounded-xl text-white text-xs focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/50"
             />
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-[#8892b0] uppercase">Reklamaberuvchi kontakti</label>
+            <label className="text-xs font-bold text-[#8892b0] uppercase tracking-wider">Reklamaberuvchi kontakti</label>
             <input
               type="text"
               placeholder="@user_admin"
               value={newSponsor.advertiserContact}
               onChange={e => setNewSponsor({...newSponsor, advertiserContact: e.target.value})}
-              className="w-full p-2.5 bg-[#0e1726] border border-white/10 rounded-xl text-white text-xs focus:border-[#f0b90b] outline-none"
+              className="w-full p-2.5 bg-[#0e1726] border border-white/10 rounded-xl text-white text-xs focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/50"
             />
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-[#8892b0] uppercase">Narxi (oyiga $)</label>
+            <label className="text-xs font-bold text-[#8892b0] uppercase tracking-wider">Narxi (oyiga $)</label>
             <input
               type="number"
               placeholder="10"
               value={newSponsor.pricePerMonth}
               onChange={e => setNewSponsor({...newSponsor, pricePerMonth: e.target.value})}
-              className="w-full p-2.5 bg-[#0e1726] border border-white/10 rounded-xl text-white text-xs focus:border-[#f0b90b] outline-none"
+              className="w-full p-2.5 bg-[#0e1726] border border-white/10 rounded-xl text-white text-xs focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/50"
             />
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-[#8892b0] uppercase">Boshlanish sanasi</label>
+            <label className="text-xs font-bold text-[#8892b0] uppercase tracking-wider">Boshlanish sanasi</label>
             <input
               type="date"
               value={newSponsor.startDate}
               onChange={e => setNewSponsor({...newSponsor, startDate: e.target.value})}
-              className="w-full p-2.5 bg-[#0e1726] border border-white/10 rounded-xl text-white text-xs focus:border-[#f0b90b] outline-none"
+              className="w-full p-2.5 bg-[#0e1726] border border-white/10 rounded-xl text-white text-xs focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/50"
             />
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-[#8892b0] uppercase">Tugash sanasi</label>
+            <label className="text-xs font-bold text-[#8892b0] uppercase tracking-wider">Tugash sanasi</label>
             <input
               type="date"
               value={newSponsor.endDate}
               onChange={e => setNewSponsor({...newSponsor, endDate: e.target.value})}
-              className="w-full p-2.5 bg-[#0e1726] border border-white/10 rounded-xl text-white text-xs focus:border-[#f0b90b] outline-none"
+              className="w-full p-2.5 bg-[#0e1726] border border-white/10 rounded-xl text-white text-xs focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/50"
             />
           </div>
           <div className="flex gap-2 items-end">
             <button
               type="submit"
               disabled={isAddingSponsor}
-              className="w-full px-6 py-2.5 bg-[#f0b90b] hover:bg-[#d4a009] disabled:opacity-50 text-[#12161c] font-black text-xs rounded-xl transition-all h-[42px] cursor-pointer"
+              className="w-full px-6 py-2.5 bg-secondary hover:brightness-110 disabled:opacity-50 text-on-secondary font-black text-xs rounded-xl transition-all h-[42px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-secondary-container"
             >
               {isAddingSponsor ? 'Qo\'shilmoqda...' : 'Qo\'shish'}
             </button>
@@ -112,13 +130,13 @@ export const AdminSponsorsTab: React.FC<AdminSponsorsTabProps> = ({
 
       <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl">
         <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4 mb-6">
-          <span className="material-symbols-outlined text-[#f0b90b]">list</span>
+          <span className="material-symbols-outlined text-secondary">list</span>
           Mavjud sponsor kanallar ({sponsorChannels.length})
         </h2>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-white/5 text-xs text-left">
             <thead>
-              <tr className="text-[#8892b0] font-bold uppercase tracking-wider text-[10px]">
+              <tr className="text-[#8892b0] font-bold uppercase tracking-wider text-xs">
                 <th className="py-3 px-4">Kanal</th>
                 <th className="py-3 px-4">Username</th>
                 <th className="py-3 px-4">Holat</th>
@@ -132,7 +150,7 @@ export const AdminSponsorsTab: React.FC<AdminSponsorsTabProps> = ({
                   <td className="py-3.5 px-4 font-bold text-white">{chan.displayName || chan.title}</td>
                   <td className="py-3.5 px-4 text-[#8892b0]">@{chan.channelUsername || chan.username}</td>
                   <td className="py-3.5 px-4">
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${chan.isActive ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase ${chan.isActive ? 'bg-success-container/10 text-success border border-success/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
                       {chan.isActive ? 'Faol' : 'Nofaol'}
                     </span>
                   </td>
@@ -140,17 +158,17 @@ export const AdminSponsorsTab: React.FC<AdminSponsorsTabProps> = ({
                   <td className="py-3.5 px-4 flex items-center gap-2">
                     <button
                       onClick={() => handleSponsorAction(chan.id, 'toggle', chan.isActive)}
-                      className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+                      className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-secondary-container"
                       title={chan.isActive ? 'Nofaol qilish' : 'Faollashtirish'}
+                      aria-label={chan.isActive ? 'Nofaol qilish' : 'Faollashtirish'}
                     >
                       <span className="material-symbols-outlined text-sm">{chan.isActive ? 'visibility_off' : 'visibility'}</span>
                     </button>
                     <button
-                      onClick={() => {
-                        if(window.confirm("Haqiqatan ham o'chirmoqchimisiz?")) handleSponsorAction(chan.id, 'delete');
-                      }}
-                      className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors cursor-pointer"
+                      onClick={() => setSponsorToDeleteId(chan.id)}
+                      className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-500"
                       title="O'chirish"
+                      aria-label="Sponsor kanalini o'chirish"
                     >
                       <span className="material-symbols-outlined text-sm">delete</span>
                     </button>

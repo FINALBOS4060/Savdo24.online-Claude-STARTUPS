@@ -385,21 +385,21 @@ export default function CheckoutPage({
             {/* Order Details Grid */}
             <div className="grid grid-cols-2 gap-6 bg-white/5 p-5 rounded-2xl border border-white/5">
               <div>
-                <p className="text-[10px] text-on-primary-container font-extrabold uppercase tracking-wider mb-1">Loyha nomi</p>
+                <p className="text-xs text-on-primary-container font-extrabold uppercase tracking-wider mb-1">Loyha nomi</p>
                 <p className="text-sm font-bold text-white truncate">{startup?.name || "Loyiha xaridi"}</p>
               </div>
               <div>
-                <p className="text-[10px] text-on-primary-container font-extrabold uppercase tracking-wider mb-1">Buyurtma ID</p>
+                <p className="text-xs text-on-primary-container font-extrabold uppercase tracking-wider mb-1">Buyurtma ID</p>
                 <p className="text-sm font-bold text-white font-mono">{activeOrderId || "Yaratilmoqda..."}</p>
               </div>
               <div className="col-span-2 pt-4 border-t border-white/5 flex justify-between items-center">
                 <div>
-                  <p className="text-[10px] text-on-primary-container font-extrabold uppercase tracking-wider mb-1">To'lanadigan summa</p>
+                  <p className="text-xs text-on-primary-container font-extrabold uppercase tracking-wider mb-1">To'lanadigan summa</p>
                   <p className={gateway === 'stripe' ? "text-2xl font-black text-[#818cf8] font-mono" : "text-2xl font-black text-[#10b981] font-mono"}>
                     ${(discountData ? amount * (1 - discountData.discountPercent / 100) : amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {gateway === 'stripe' ? 'USD' : 'USDT'}
                   </p>
                   {discountData && (
-                    <p className="text-[10px] text-emerald-400 font-bold">
+                    <p className="text-xs text-emerald-400 font-bold">
                       {discountData.type === 'b2b'
                         ? `-${discountData.discountPercent}% B2B ulgurji chegirmasi qo'llanildi`
                         : `-${discountData.discountPercent}% referral chegirmasi qo'llanildi`}
@@ -413,19 +413,19 @@ export default function CheckoutPage({
               </div>
 
               <div className="col-span-2 space-y-2">
-                <label className="text-[10px] text-on-primary-container font-extrabold uppercase tracking-wider block">Referral kod (Chegirma uchun)</label>
+                <label className="text-xs text-on-primary-container font-extrabold uppercase tracking-wider block">Referral kod (Chegirma uchun)</label>
                 <div className="flex gap-2">
                   <input 
                     type="text"
                     value={referralCode}
                     onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-                    className={`flex-1 bg-[#0b1426] border border-white/10 rounded-xl px-4 py-2 text-xs text-white outline-none ${gateway === 'stripe' ? 'focus:border-[#6366f1]' : 'focus:border-[#10b981]'}`}
+                    className={`flex-1 bg-surface-container-low border border-white/10 rounded-xl px-4 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface ${gateway === 'stripe' ? 'focus:border-[#6366f1]' : 'focus:border-[#10b981]'}`}
                     placeholder="KODNI KIRITING"
                   />
                   <button 
                     onClick={applyReferralCode}
                     disabled={isApplyingReferral}
-                    className="px-4 py-2 bg-emerald-500 text-black font-bold text-xs rounded-xl hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    className="px-4 py-2 bg-emerald-500 text-black font-bold text-xs rounded-xl hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
                   >
                     {isApplyingReferral ? "Kutilyapti..." : "Qo'llash"}
                   </button>

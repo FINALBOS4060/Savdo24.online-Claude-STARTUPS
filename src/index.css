@@ -2,9 +2,40 @@
 @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
 @import "tailwindcss";
 
-@theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+:root {
+  --color-primary: #171c22;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #e2e8f0;
+  --color-on-primary-container: #475569;
   
+  --color-secondary: #d97706;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #fef3c7;
+  --color-on-secondary-container: #92400e;
+
+  --color-success: #16a34a;
+  --color-on-success: #ffffff;
+  --color-success-container: #dcfce7;
+  --color-on-success-container: #166534;
+  
+  --color-surface: #ffffff;
+  --color-on-surface: #171c22;
+  --color-surface-container: #f1f5f9;
+  --color-surface-container-low: #f8fafc;
+  --color-surface-container-high: #e2e8f0;
+  --color-surface-container-highest: #cbd5e1;
+  
+  --color-background: #f7f9ff;
+  --color-on-background: #171c22;
+  
+  --color-outline: #cbd5e1;
+  --color-error: #ef4444;
+
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(0, 0, 0, 0.08);
+}
+
+.dark {
   --color-primary: #ffffff;
   --color-on-primary: #000000;
   --color-primary-container: #1d2b47;
@@ -14,6 +45,11 @@
   --color-on-secondary: #000000;
   --color-secondary-container: #f0b90b;
   --color-on-secondary-container: #000000;
+
+  --color-success: #22c55e;
+  --color-on-success: #000000;
+  --color-success-container: rgba(34, 197, 94, 0.15);
+  --color-on-success-container: #4ade80;
   
   --color-surface: #0d1420;
   --color-on-surface: #ffffff;
@@ -22,29 +58,66 @@
   --color-surface-container-high: #243046;
   --color-surface-container-highest: #2e3b52;
   
-  --color-background: #0d1420;
+  --color-background: #0b1426;
   --color-on-background: #ffffff;
   
   --color-outline: #455a80;
   --color-error: #ff4d4d;
+
+  --glass-bg: rgba(19, 27, 46, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.08);
+}
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  
+  --color-primary: var(--color-primary);
+  --color-on-primary: var(--color-on-primary);
+  --color-primary-container: var(--color-primary-container);
+  --color-on-primary-container: var(--color-on-primary-container);
+  
+  --color-secondary: var(--color-secondary);
+  --color-on-secondary: var(--color-on-secondary);
+  --color-secondary-container: var(--color-secondary-container);
+  --color-on-secondary-container: var(--color-on-secondary-container);
+
+  --color-success: var(--color-success);
+  --color-on-success: var(--color-on-success);
+  --color-success-container: var(--color-success-container);
+  --color-on-success-container: var(--color-on-success-container);
+  
+  --color-surface: var(--color-surface);
+  --color-on-surface: var(--color-on-surface);
+  --color-surface-container: var(--color-surface-container);
+  --color-surface-container-low: var(--color-surface-container-low);
+  --color-surface-container-high: var(--color-surface-container-high);
+  --color-surface-container-highest: var(--color-surface-container-highest);
+  
+  --color-background: var(--color-background);
+  --color-on-background: var(--color-on-background);
+  
+  --color-outline: var(--color-outline);
+  --color-error: var(--color-error);
 }
 
 /* Custom global styles to handle smooth transitions and custom UI components */
 body {
   font-family: 'Inter', sans-serif;
+  background-color: var(--color-background);
+  color: var(--color-on-background);
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .glass-card {
-  background: rgba(19, 27, 46, 0.7);
+  background: var(--glass-bg);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
 }
 
 .glass-panel {
-  background: rgba(19, 27, 46, 0.8);
+  background: var(--glass-bg);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--glass-border);
 }
 
 .status-chip-active {
@@ -82,5 +155,14 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #7b849a;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 

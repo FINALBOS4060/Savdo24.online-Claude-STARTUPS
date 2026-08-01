@@ -283,7 +283,7 @@ export default function BrowsePage({
           <span className="inline-block bg-secondary-container/20 text-secondary-container border border-secondary-container/30 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4">
             G'oyalaringizni ulashing
           </span>
-          <h1 className="text-3xl md:text-5xl font-extrabold text-white mb-6 leading-tight select-none">
+          <h1 className="text-3xl md:text-5xl font-extrabold text-white mb-6 leading-tight">
             Startaplar, AI mahsulotlar va tayyor loyihalarni xarid qiling yoki soting
           </h1>
           <p className="text-sm md:text-base text-on-primary-container mb-8 leading-relaxed max-w-lg">
@@ -314,7 +314,8 @@ export default function BrowsePage({
             className="w-full h-full object-contain object-right-bottom p-4 max-h-[380px]"
             src="https://lh3.googleusercontent.com/aida-public/AB6AXuB0iLGg-o6MQzTDLv1u5AjmyWEA7UwnBl07faLmhB9Lskr3vDBhBkAvHMSU94EOGnfeZ2WXSt8R_6kVK6qrJIsjTKKADfxvmQzJh5lKX1sQqs7YDjY9uuEeCTXERqBb233TqiEPyV-KQN8wGLFKheOFBmjKICwB6vVNx-l4p_dIElaGoETLdPaxA1Z4TLX5e86GVNoX7acF2qLdndudADhXDwxb93oXoUtubCd4o59IQDBh5CpmBxHzUWyx2pYWZVGzwiplk9y-yHE"
             alt="G'oyalar va startaplar bozori modeli"
-            loading="lazy"
+            loading="eager"
+            fetchPriority="high"
             width={500}
             height={380}
           />
@@ -401,7 +402,7 @@ export default function BrowsePage({
                         checked={!!subFilters[field.key]}
                         onChange={(e) => setSubFilters({ ...subFilters, [field.key]: e.target.checked })}
                       />
-                      <label htmlFor={`filter-${field.key}`} className="text-xs font-semibold text-gray-300 cursor-pointer select-none">
+                      <label htmlFor={`filter-${field.key}`} className="text-xs font-semibold text-gray-300 cursor-pointer">
                         {field.label}
                       </label>
                     </div>
@@ -468,7 +469,7 @@ export default function BrowsePage({
             </div>
 
             {/* Faqat faol e'lonlar checkbox */}
-            <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[#8892b0] select-none">
+            <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[#8892b0]">
               <input
                 type="checkbox"
                 checked={onlyActive}

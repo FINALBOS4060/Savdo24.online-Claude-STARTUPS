@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch as fetch } from '../../lib/api';
+import { LoadingState } from '../LoadingState';
+import { formatDateTime } from '../../lib/formatDate';
 
 interface AdminB2BTabProps {
   onActionToast: (message: string) => void;
@@ -63,12 +65,13 @@ export const AdminB2BTab: React.FC<AdminB2BTabProps> = ({ onActionToast }) => {
       <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
         <div className="flex justify-between items-center border-b border-white/5 pb-4">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <span className="material-symbols-outlined text-[#f0b90b]">business_center</span>
+            <span className="material-symbols-outlined text-secondary">business_center</span>
             Tasdiqlash kutilayotgan B2B arizalar ({pendingAccounts.length})
           </h2>
           <button
             onClick={fetchB2bAccounts}
-            className="px-4 py-2 bg-secondary-container/10 text-secondary-container rounded-xl font-bold text-xs hover:bg-secondary-container/20 transition-all flex items-center gap-2 cursor-pointer"
+            className="px-4 py-2 bg-secondary-container/10 text-secondary-container rounded-xl font-bold text-xs hover:bg-secondary-container/20 transition-all flex items-center gap-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-secondary-container"
+            aria-label="Arizalar ro'yxatini yangilash"
           >
             <span className="material-symbols-outlined text-sm">refresh</span>
             Yangilash
@@ -76,7 +79,7 @@ export const AdminB2BTab: React.FC<AdminB2BTabProps> = ({ onActionToast }) => {
         </div>
 
         {isLoading ? (
-          <div className="py-12 text-center text-on-primary-container text-sm">Yuklanmoqda...</div>
+          <LoadingState variant="block" text="Arizalar yuklanmoqda..." />
         ) : pendingAccounts.length === 0 ? (
           <div className="py-12 text-center text-on-primary-container space-y-2">
             <span className="material-symbols-outlined text-4xl opacity-40">task_alt</span>
@@ -86,10 +89,10 @@ export const AdminB2BTab: React.FC<AdminB2BTabProps> = ({ onActionToast }) => {
         ) : (
           <div className="space-y-4">
             {pendingAccounts.map((b2b) => (
-              <div key={b2b.id} className="bg-[#0b1426] border border-[#f0b90b]/30 rounded-2xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div key={b2b.id} className="bg-surface-container-low border border-secondary/30 rounded-2xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs rounded font-bold">Kutilmoqda</span>
+                    <span className="px-2 py-0.5 bg-secondary-container/20 text-secondary text-xs rounded font-bold">Kutilmoqda</span>
                     <span className="text-xs text-on-primary-container font-mono">ID: {b2b.id}</span>
                   </div>
                   <h4 className="font-bold text-white text-base">{b2b.companyName}</h4>
@@ -98,8 +101,8 @@ export const AdminB2BTab: React.FC<AdminB2BTabProps> = ({ onActionToast }) => {
                   </p>
                   <div className="flex items-center gap-4 text-xs text-on-primary-container mt-1">
                     <span>Soliq ID / STIR: <strong className="text-white font-mono">{b2b.taxId || 'Ko\'rsatilmagan'}</strong></span>
-                    <span>Chegirma: <strong className="text-emerald-400">{b2b.discount}%</strong></span>
-                    <span>Sana: {new Date(b2b.createdAt).toLocaleString()}</span>
+                    <span>Chegirma: <strong className="text-success">{b2b.discount}%</strong></span>
+                    <span>Sana: {formatDateTime(b2b.createdAt)}</span>
                   </div>
                 </div>
 
@@ -107,7 +110,8 @@ export const AdminB2BTab: React.FC<AdminB2BTabProps> = ({ onActionToast }) => {
                   <button
                     onClick={() => handleVerify(b2b.id, true)}
                     disabled={updatingId === b2b.id}
-                    className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-black font-extrabold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md disabled:opacity-50"
+                    className="px-4 py-2.5 bg-success hover:brightness-110 text-black font-extrabold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-success"
+                    aria-label="B2B hisobni tasdiqlash"
                   >
                     <span className="material-symbols-outlined text-sm">check_circle</span>
                     {updatingId === b2b.id ? "Jarayonda..." : "Tasdiqlash"}
@@ -115,7 +119,8 @@ export const AdminB2BTab: React.FC<AdminB2BTabProps> = ({ onActionToast }) => {
                   <button
                     onClick={() => handleVerify(b2b.id, false)}
                     disabled={updatingId === b2b.id}
-                    className="px-4 py-2.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    className="px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-500"
+                    aria-label="B2B hisobni rad etish"
                   >
                     <span className="material-symbols-outlined text-sm">cancel</span>
                     Rad etish
@@ -131,13 +136,13 @@ export const AdminB2BTab: React.FC<AdminB2BTabProps> = ({ onActionToast }) => {
       <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
         <div className="flex justify-between items-center border-b border-white/5 pb-4">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <span className="material-symbols-outlined text-emerald-400">verified</span>
+            <span className="material-symbols-outlined text-success">verified</span>
             Tasdiqlangan B2B Hisoblar ({verifiedAccounts.length})
           </h2>
         </div>
 
         {isLoading ? (
-          <div className="py-12 text-center text-on-primary-container text-sm">Yuklanmoqda...</div>
+          <LoadingState variant="block" text="Yuklanmoqda..." />
         ) : verifiedAccounts.length === 0 ? (
           <div className="py-12 text-center text-on-primary-container space-y-2">
             <span className="material-symbols-outlined text-4xl opacity-40">domain_disabled</span>
@@ -146,10 +151,10 @@ export const AdminB2BTab: React.FC<AdminB2BTabProps> = ({ onActionToast }) => {
         ) : (
           <div className="space-y-4">
             {verifiedAccounts.map((b2b) => (
-              <div key={b2b.id} className="bg-[#0b1426] border border-emerald-500/30 rounded-2xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div key={b2b.id} className="bg-surface-container-low border border-success-container/30 rounded-2xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs rounded font-bold">Tasdiqlangan</span>
+                    <span className="px-2 py-0.5 bg-success-container/25 text-success text-xs rounded font-bold">Tasdiqlangan</span>
                     <span className="text-xs text-on-primary-container font-mono">ID: {b2b.id}</span>
                   </div>
                   <h4 className="font-bold text-white text-base">{b2b.companyName}</h4>
@@ -158,8 +163,8 @@ export const AdminB2BTab: React.FC<AdminB2BTabProps> = ({ onActionToast }) => {
                   </p>
                   <div className="flex items-center gap-4 text-xs text-on-primary-container mt-1">
                     <span>Soliq ID / STIR: <strong className="text-white font-mono">{b2b.taxId || 'Ko\'rsatilmagan'}</strong></span>
-                    <span>Chegirma: <strong className="text-emerald-400">{b2b.discount}%</strong></span>
-                    <span>Sana: {new Date(b2b.createdAt).toLocaleString()}</span>
+                    <span>Chegirma: <strong className="text-success">{b2b.discount}%</strong></span>
+                    <span>Sana: {formatDateTime(b2b.createdAt)}</span>
                   </div>
                 </div>
 
@@ -167,7 +172,8 @@ export const AdminB2BTab: React.FC<AdminB2BTabProps> = ({ onActionToast }) => {
                   <button
                     onClick={() => handleVerify(b2b.id, false)}
                     disabled={updatingId === b2b.id}
-                    className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 font-bold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 font-bold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-500"
+                    aria-label="Tasdiqni bekor qilish"
                   >
                     <span className="material-symbols-outlined text-xs">block</span>
                     Bekor qilish

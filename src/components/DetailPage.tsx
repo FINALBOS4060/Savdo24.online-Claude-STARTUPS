@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { Startup, Idea, UserProfileData, Category } from '../types';
 import { apiFetch as fetch } from '../lib/api';
+import { formatDate } from '../lib/formatDate';
 
 import { DetailHeroSection } from './detail/DetailHeroSection';
 import { DetailTechnicalSpecs } from './detail/DetailTechnicalSpecs';
@@ -622,8 +623,8 @@ export default function DetailPage({
                         />
                         <div>
                           <span className="text-white font-bold text-xs block">{rev.buyer?.name}</span>
-                          <span className="text-on-primary-container text-[10px] block">
-                            {new Date(rev.createdAt).toLocaleDateString("uz-UZ")}
+                          <span className="text-xs text-on-primary-container block">
+                            {formatDate(rev.createdAt)}
                           </span>
                         </div>
                       </div>

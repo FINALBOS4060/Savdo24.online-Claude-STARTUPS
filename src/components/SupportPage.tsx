@@ -6,7 +6,7 @@ interface FAQItem {
   answer: string;
 }
 
-export default function SupportPage({ setView }: { setView: (view: string) => void }) {
+export default function SupportPage({ setView, onActionToast }: { setView: (view: string) => void; onActionToast?: (msg: string) => void }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -59,12 +59,13 @@ export default function SupportPage({ setView }: { setView: (view: string) => vo
           setEmail('');
           setSubject('');
           setMessage('');
+          onActionToast?.("Murojaatingiz muvaffaqiyatli yuborildi!");
         } else {
           const err = await res.json();
-          alert(err.error || "Xatolik yuz berdi.");
+          onActionToast?.(err.error || "Xatolik yuz berdi.");
         }
       } catch (err) {
-        alert("Server bilan ulanishda xatolik.");
+        onActionToast?.("Server bilan ulanishda xatolik.");
       } finally {
         setSubmitting(false);
       }

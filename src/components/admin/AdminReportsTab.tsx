@@ -1,5 +1,6 @@
 import React from 'react';
 import { Startup } from '../../types';
+import { formatDateTime } from '../../lib/formatDate';
 
 interface AdminReportsTabProps {
   reports: any[];
@@ -53,15 +54,15 @@ export const AdminReportsTab: React.FC<AdminReportsTabProps> = ({
             return (
               <div
                 key={report.id}
-                className="bg-[#0b1426] border border-white/5 hover:border-white/10 rounded-2xl p-5 space-y-4 transition-all"
+                className="bg-surface-container-low border border-white/5 hover:border-white/10 rounded-2xl p-5 space-y-4 transition-all"
               >
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-3">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">
+                      <span className="text-xs uppercase font-extrabold px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">
                         {report.targetType === 'startup' ? "E'lon" : report.targetType === 'user' ? "Foydalanuvchi" : "Izoh / G'oya"}
                       </span>
-                      <span className="text-[#8892b0] text-[10px]">ID: {report.targetId}</span>
+                      <span className="text-[#8892b0] text-xs">ID: {report.targetId}</span>
                     </div>
                     <h4 className="text-white font-black text-sm">
                       {report.targetType === 'startup' 
@@ -74,11 +75,11 @@ export const AdminReportsTab: React.FC<AdminReportsTabProps> = ({
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <span className={`text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-md border ${
+                    <span className={`text-xs font-extrabold uppercase px-2.5 py-1 rounded-md border ${
                       report.status === 'pending'
                         ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
                         : report.status === 'reviewed'
-                        ? 'bg-green-500/10 text-green-400 border-green-500/20'
+                        ? 'bg-success-container/10 text-success border-success/20'
                         : 'bg-gray-500/10 text-gray-400 border-gray-500/20'
                     }`}>
                       {report.status === 'pending' ? 'Kutilmoqda' : report.status === 'reviewed' ? 'Ko\'rib chiqildi' : 'Rad etildi'}
@@ -87,15 +88,15 @@ export const AdminReportsTab: React.FC<AdminReportsTabProps> = ({
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                  <div className="space-y-1 bg-[#0e1726] p-3.5 rounded-xl border border-white/5">
-                    <span className="text-[#f3ba2f] font-bold uppercase text-[9px] tracking-wider block">Shikoyat sababi</span>
+                  <div className="space-y-1 bg-surface-container p-3.5 rounded-xl border border-white/5">
+                    <span className="text-secondary font-bold uppercase text-xs tracking-wider block">Shikoyat sababi</span>
                     <p className="text-white font-extrabold">"{report.reason}"</p>
-                    <p className="text-[#8892b0] text-[10px] mt-1.5">{new Date(report.createdAt).toLocaleString("uz-UZ")}</p>
+                    <p className="text-[#8892b0] text-xs mt-1.5">{formatDateTime(report.createdAt)}</p>
                   </div>
 
-                  <div className="space-y-1 bg-[#0e1726] p-3.5 rounded-xl border border-white/5">
-                    <span className="text-red-400/80 font-bold uppercase text-[9px] tracking-wider block">Tavsif / Izoh</span>
-                    <p className="text-on-primary-container text-[11px] leading-relaxed italic">
+                  <div className="space-y-1 bg-surface-container p-3.5 rounded-xl border border-white/5">
+                    <span className="text-red-400/80 font-bold uppercase text-xs tracking-wider block">Tavsif / Izoh</span>
+                    <p className="text-on-primary-container text-xs leading-relaxed italic">
                       {report.description ? `"${report.description}"` : "Izoh qoldirilmagan"}
                     </p>
                   </div>
@@ -108,7 +109,7 @@ export const AdminReportsTab: React.FC<AdminReportsTabProps> = ({
                         <button
                           onClick={() => handleReportStatusChange(report.id, 'reviewed')}
                           disabled={updatingReportId === report.id || isDeletingReportedItem === report.id}
-                          className="px-3 py-2 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-[#12161c] font-bold text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                          className="px-3 py-2 bg-success hover:brightness-110 disabled:opacity-50 text-[#12161c] font-bold text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-success"
                         >
                           <span className="material-symbols-outlined text-xs">check</span>
                           Tasdiqlash (Ko'rib chiqildi)
@@ -116,7 +117,7 @@ export const AdminReportsTab: React.FC<AdminReportsTabProps> = ({
                         <button
                           onClick={() => handleReportStatusChange(report.id, 'dismissed')}
                           disabled={updatingReportId === report.id || isDeletingReportedItem === report.id}
-                          className="px-3 py-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 disabled:opacity-50 font-bold text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                          className="px-3 py-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 disabled:opacity-50 font-bold text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
                         >
                           <span className="material-symbols-outlined text-xs">close</span>
                           Inkor etish (Rad etish)
@@ -131,7 +132,7 @@ export const AdminReportsTab: React.FC<AdminReportsTabProps> = ({
                         setActiveTab('users');
                         setUsersSearch(report.targetId);
                       }}
-                      className="px-3 py-2 bg-white/5 text-white border border-white/10 hover:bg-white/10 font-black text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                      className="px-3 py-2 bg-white/5 text-white border border-white/10 hover:bg-white/10 font-black text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
                     >
                       <span className="material-symbols-outlined text-xs">person_search</span>
                       Foydalanuvchini ko'rish
@@ -140,7 +141,7 @@ export const AdminReportsTab: React.FC<AdminReportsTabProps> = ({
                     <button
                       onClick={() => handleDeleteReportedItem(report.id, report.targetType, report.targetId)}
                       disabled={updatingReportId === report.id || isDeletingReportedItem === report.id}
-                      className="px-3 py-2 bg-red-600/20 text-red-400 border border-red-500/30 hover:bg-red-500 hover:text-white disabled:opacity-50 font-black text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                      className="px-3 py-2 bg-red-600/20 text-red-400 border border-red-500/30 hover:bg-red-500 hover:text-white disabled:opacity-50 font-black text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-red-500"
                     >
                       <span className="material-symbols-outlined text-xs">delete</span>
                       {isDeletingReportedItem === report.id ? "O'chirilmoqda..." : (report.targetType === 'startup' ? "E'lonni o'chirish" : "Izohni o'chirish")}

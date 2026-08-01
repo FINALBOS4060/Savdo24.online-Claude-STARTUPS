@@ -305,7 +305,7 @@ export default function SellPage({
     <div className="max-w-3xl mx-auto animate-fade-in text-left">
       <div className="bg-primary-container border border-outline-variant/20 rounded-3xl p-6 md:p-10 shadow-2xl space-y-8">
         <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-white mb-2 select-none">
+          <h1 className="text-2xl md:text-3xl font-extrabold text-white mb-2">
             Yangi g'oya yoki loyihani e'lon qilish
           </h1>
           <p className="text-xs md:text-sm text-on-primary-container leading-relaxed">
@@ -364,7 +364,7 @@ export default function SellPage({
                         checked={!!dynamicAttributes[field.key]}
                         onChange={(e) => setDynamicAttributes({ ...dynamicAttributes, [field.key]: e.target.checked })}
                       />
-                      <label htmlFor={field.key} className="text-xs font-semibold text-gray-300 cursor-pointer select-none">
+                      <label htmlFor={field.key} className="text-xs font-semibold text-gray-300 cursor-pointer">
                         {field.label}
                       </label>
                     </div>
