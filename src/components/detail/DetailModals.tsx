@@ -1,4 +1,5 @@
 import React from 'react';
+import { X, Star, Gavel, Flag } from 'lucide-react';
 
 interface DetailModalsProps {
   isReviewModalOpen: boolean;
@@ -65,10 +66,10 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
           <div className="w-full max-w-md bg-surface-container border border-outline-variant/30 rounded-2xl shadow-2xl p-6 space-y-6 relative animate-in fade-in zoom-in-95 duration-200">
             <button
               onClick={() => setIsReviewModalOpen(false)}
-              className="absolute top-4 right-4 text-on-primary-container hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface rounded-full p-1"
+              className="absolute top-4 right-4 text-on-primary-container hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface rounded-full p-1 cursor-pointer flex items-center justify-center"
               aria-label="Yopish"
             >
-              <span className="material-symbols-outlined">close</span>
+              <X className="w-5 h-5" />
             </button>
             <div className="text-center space-y-1">
               <h3 className="text-white font-black text-lg">Loyiha va Sotuvchi haqida sharh</h3>
@@ -85,13 +86,11 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
                       onClick={() => setReviewRating(star)}
                       className="text-2xl transition-all active:scale-90 hover:scale-110 cursor-pointer focus:outline-none focus:ring-2 focus:ring-secondary rounded-full"
                     >
-                      <span
-                        className={`material-symbols-outlined text-3xl ${
-                          star <= reviewRating ? "text-secondary fill-1" : "text-gray-600"
+                      <Star
+                        className={`w-6 h-6 ${
+                          star <= reviewRating ? "text-secondary fill-secondary" : "text-gray-600"
                         }`}
-                      >
-                        star
-                      </span>
+                      />
                     </button>
                   ))}
                 </div>
@@ -112,14 +111,14 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsReviewModalOpen(false)}
-                  className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-white/50"
+                  className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer"
                 >
                   Bekor qilish
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingReview || !reviewComment.trim()}
-                  className="flex-1 py-3 bg-secondary hover:brightness-110 disabled:opacity-40 text-on-secondary font-black text-xs rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
+                  className="flex-1 py-3 bg-secondary hover:brightness-110 disabled:opacity-40 text-on-secondary font-black text-xs rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface cursor-pointer"
                 >
                   {isSubmittingReview ? "Yuborilmoqda..." : "Sharh qoldirish"}
                 </button>
@@ -135,14 +134,14 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
           <div className="w-full max-w-md bg-surface-container border border-outline-variant/30 rounded-2xl shadow-2xl p-6 space-y-6 relative animate-in fade-in zoom-in-95 duration-200">
             <button
               onClick={() => setIsDisputeModalOpen(false)}
-              className="absolute top-4 right-4 text-on-primary-container hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface rounded-full p-1"
+              className="absolute top-4 right-4 text-on-primary-container hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface rounded-full p-1 cursor-pointer flex items-center justify-center"
               aria-label="Yopish"
             >
-              <span className="material-symbols-outlined">close</span>
+              <X className="w-5 h-5" />
             </button>
             <div className="text-center space-y-1">
               <h3 className="text-red-400 font-black text-lg flex items-center justify-center gap-1.5">
-                <span className="material-symbols-outlined">gavel</span>
+                <Gavel className="w-5 h-5 text-red-400" />
                 Nizo (Dispute) ochish
               </h3>
               <p className="text-xs text-on-primary-container">Muammoni hal qilish maqsadida administratorga nizo arizasini yuborish.</p>
@@ -174,14 +173,14 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsDisputeModalOpen(false)}
-                  className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-white/50"
+                  className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer"
                 >
                   Bekor qilish
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingDispute || !disputeReason.trim() || !disputeDescription.trim()}
-                  className="flex-1 py-3 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white font-black text-xs rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-surface"
+                  className="flex-1 py-3 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white font-black text-xs rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-surface cursor-pointer"
                 >
                   {isSubmittingDispute ? "Yuborilmoqda..." : "Nizo ochish"}
                 </button>
@@ -197,14 +196,14 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
           <div className="w-full max-w-md bg-surface-container border border-outline-variant/30 rounded-2xl shadow-2xl p-6 space-y-6 relative animate-in fade-in zoom-in-95 duration-200">
             <button
               onClick={() => setReportModalOpen(false)}
-              className="absolute top-4 right-4 text-on-primary-container hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface rounded-full p-1"
+              className="absolute top-4 right-4 text-on-primary-container hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface rounded-full p-1 cursor-pointer flex items-center justify-center"
               aria-label="Yopish"
             >
-              <span className="material-symbols-outlined">close</span>
+              <X className="w-5 h-5" />
             </button>
             <div className="text-center space-y-1">
               <h3 className="text-red-400 font-black text-lg flex items-center justify-center gap-1.5">
-                <span className="material-symbols-outlined text-red-500">flag</span>
+                <Flag className="w-5 h-5 text-red-500" />
                 Shikoyat qilish (Report)
               </h3>
               <p className="text-xs text-on-primary-container">E'lon yoki kontentdagi qonunbuzarliklar haqida adminstratsiyaga xabar berish.</p>
@@ -239,14 +238,14 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
                 <button
                   type="button"
                   onClick={() => setReportModalOpen(false)}
-                  className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-white/50"
+                  className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer"
                 >
                   Bekor qilish
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingReport}
-                  className="flex-1 py-3 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white font-black text-xs rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-surface"
+                  className="flex-1 py-3 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white font-black text-xs rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-surface cursor-pointer"
                 >
                   {isSubmittingReport ? "Yuborilmoqda..." : "Shikoyat yuborish"}
                 </button>

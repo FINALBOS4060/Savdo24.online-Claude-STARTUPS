@@ -1,4 +1,21 @@
 import React, { useState, useEffect } from 'react';
+import { 
+  CreditCard, 
+  Lock, 
+  RefreshCw, 
+  ExternalLink, 
+  Clock, 
+  AlertTriangle, 
+  CheckCircle2, 
+  Truck, 
+  Send, 
+  Hourglass, 
+  Download, 
+  Code, 
+  Mail, 
+  Phone, 
+  ShieldCheck 
+} from 'lucide-react';
 import { UserProfileData, Startup } from '../types';
 import { apiFetch as fetch } from '../lib/api';
 import { trackEvent } from '../lib/analytics';
@@ -343,9 +360,7 @@ export default function CheckoutPage({
           {/* Header */}
           <div className={gateway === 'stripe' ? "bg-gradient-to-r from-indigo-600 to-indigo-700 px-8 py-5 flex items-center justify-between text-white" : "bg-gradient-to-r from-success to-emerald-700 px-8 py-5 flex items-center justify-between text-white"}>
             <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-3xl select-none font-bold">
-                {gateway === 'stripe' ? 'credit_card' : 'lock'}
-              </span>
+              {gateway === 'stripe' ? <CreditCard className="w-6 h-6" /> : <Lock className="w-6 h-6" />}
               <span className="font-extrabold text-xl tracking-tight">
                 {gateway === 'stripe' ? "Karta orqali xavfsiz to'lov" : "CoinGate Secure Checkout"}
               </span>
@@ -360,7 +375,7 @@ export default function CheckoutPage({
             {/* Redirect Banner */}
             <div className={gateway === 'stripe' ? "bg-indigo-600/10 border border-indigo-600/20 rounded-2xl p-6 text-center space-y-4" : "bg-success/10 border border-success/20 rounded-2xl p-6 text-center space-y-4"}>
               <div className={gateway === 'stripe' ? "flex items-center justify-center gap-2 text-indigo-400" : "flex items-center justify-center gap-2 text-success"}>
-                <span className="material-symbols-outlined animate-spin">sync</span>
+                <RefreshCw className="w-4 h-4 animate-spin" />
                 <span className="font-bold text-sm">
                   {gateway === 'stripe' ? "Stripe to'lov tizimiga yo'naltirilmoqda..." : "CoinGate to'lov tizimiga yo'naltirilmoqda..."}
                 </span>
@@ -376,7 +391,7 @@ export default function CheckoutPage({
                   onClick={handleCoinGateRedirect}
                   className={gateway === 'stripe' ? "px-6 py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-black text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/10" : "px-6 py-3 bg-success hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-success/10"}
                 >
-                  <span className="material-symbols-outlined text-sm font-bold">open_in_new</span>
+                  <ExternalLink className="w-4 h-4 font-bold" />
                   To'lov sahifasiga o'tish
                 </button>
               </div>
@@ -407,7 +422,7 @@ export default function CheckoutPage({
                   )}
                 </div>
                 <div className={`text-right rounded-xl px-3 py-1.5 font-mono text-xs font-bold flex items-center gap-1.5 border ${isExpired ? 'bg-red-500/10 text-red-400 border-red-500/20' : (gateway === 'stripe' ? 'bg-indigo-600/10 text-indigo-400 border-indigo-600/20' : 'bg-success/10 text-success border-success/20')}`}>
-                  <span className="material-symbols-outlined text-sm">schedule</span>
+                  <Clock className="w-4 h-4" />
                   {isExpired ? "Vaqt tugadi" : formatTime(timeLeft)}
                 </div>
               </div>
@@ -437,7 +452,7 @@ export default function CheckoutPage({
             {apiKeysMissing && (
               <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-4 text-xs text-yellow-500 leading-relaxed space-y-1">
                 <p className="font-extrabold uppercase tracking-wide flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-sm">warning</span>
+                  <AlertTriangle className="w-4 h-4 text-yellow-500" />
                   Eslatma: CoinGate API kaliti sozlanmagan
                 </p>
                 <p>
@@ -459,9 +474,7 @@ export default function CheckoutPage({
                     ? "px-6 py-3 border border-indigo-600/30 hover:bg-indigo-600/5 active:scale-95 text-indigo-400 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                     : "px-6 py-3 border border-success/30 hover:bg-success/5 active:scale-95 text-success font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"}
                 >
-                  <span className={`material-symbols-outlined text-sm ${isChecking ? 'animate-spin' : ''}`}>
-                    {isChecking ? 'sync' : 'verified_user'}
-                  </span>
+                  {isChecking ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
                   {isChecking ? "Tekshirilmoqda..." : "To'lov holatini tekshirish"}
                 </button>
               )}
@@ -477,9 +490,7 @@ export default function CheckoutPage({
             <div className={`absolute inset-0 border-4 ${gateway === 'stripe' ? 'border-indigo-600/20' : 'border-success/20'} rounded-full`}></div>
             <div className={`absolute inset-0 border-4 ${gateway === 'stripe' ? 'border-indigo-600' : 'border-success'} border-t-transparent rounded-full animate-spin`}></div>
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className={`material-symbols-outlined text-3xl ${gateway === 'stripe' ? 'text-indigo-400' : 'text-success'} animate-pulse`}>
-                {gateway === 'stripe' ? 'credit_card' : 'lock'}
-              </span>
+              {gateway === 'stripe' ? <CreditCard className={`w-8 h-8 ${gateway === 'stripe' ? 'text-indigo-400' : 'text-success'} animate-pulse`} /> : <Lock className={`w-8 h-8 ${gateway === 'stripe' ? 'text-indigo-400' : 'text-success'} animate-pulse`} />}
             </div>
           </div>
           <div className="space-y-2 max-w-sm">
@@ -498,7 +509,7 @@ export default function CheckoutPage({
         <div className="bg-background border border-green-500/30 rounded-2xl p-8 shadow-2xl space-y-8 animate-scale-up">
           <div className="flex flex-col items-center text-center space-y-4">
             <div className="w-16 h-16 bg-green-500/10 text-green-400 border border-green-500/30 rounded-full flex items-center justify-center shadow-lg">
-              <span className="material-symbols-outlined text-3xl font-bold">check_circle</span>
+              <CheckCircle2 className="w-8 h-8 font-bold" />
             </div>
             <div>
               <h2 className="text-2xl font-black text-white">Xarid tasdiqlandi!</h2>
@@ -524,7 +535,7 @@ export default function CheckoutPage({
             </div>
 
             <div className="pt-4 border-t border-white/5 flex flex-col gap-1.5 mt-4">
-              <span className="text-xs text-on-primary-container uppercase mb-1 flex items-center gap-1"><span className="material-symbols-outlined text-sm">local_shipping</span> Yetkazib berish ma'lumoti</span>
+              <span className="text-xs text-on-primary-container uppercase mb-1 flex items-center gap-1"><Truck className="w-4 h-4" /> Yetkazib berish ma'lumoti</span>
               {deliveryData.deliveryUrl ? (
                 <div className="space-y-3">
                   <a 
@@ -547,7 +558,7 @@ export default function CheckoutPage({
                     className="w-full flex items-center justify-center gap-2 py-3 bg-success/10 border border-success/30 text-success rounded-xl font-bold hover:bg-success/20 transition-all text-sm"
                   >
                     Loyihani yuklab olish (Sotuvchi havolasi)
-                    <span className="material-symbols-outlined text-sm">open_in_new</span>
+                    <ExternalLink className="w-4 h-4" />
                   </a>
                   {deliveryData.telegramToken && (
                     <a 
@@ -557,14 +568,14 @@ export default function CheckoutPage({
                       className="w-full flex items-center justify-center gap-2 py-3 bg-sky-400/10 border border-sky-400/30 text-sky-400 rounded-xl font-bold hover:bg-sky-400/20 transition-all text-sm"
                     >
                       📥 Telegram bot orqali yuklab olish
-                      <span className="material-symbols-outlined text-sm">send</span>
+                      <Send className="w-4 h-4" />
                     </a>
                   )}
                 </div>
               ) : (
                 // Hide seller contact - use encrypted/masked display
                 <div className="bg-success/10 border border-success/30 rounded-xl p-4 flex flex-col items-center text-center">
-                  <span className="material-symbols-outlined text-success text-2xl mb-2">hourglass_top</span>
+                  <Hourglass className="text-success w-6 h-6 mb-2 text-2xl" />
                   <p className="text-white text-sm font-bold mb-1">Sotuvchi 24 soat ichida siz bilan bog'lanadi</p>
                   <p className="text-success text-xs">
                     Aloqa ma'lumotlari maxfiy: {deliveryData.sellerContact ? '✓ Qabul qilindi' : '⏳ Kutilmoqda'}
@@ -584,7 +595,7 @@ export default function CheckoutPage({
           {/* Manba kodiga kirish / Loyihani olish */}
           <div className="bg-secondary-container/10 border border-success/20 rounded-2xl p-5 space-y-4 text-left">
             <h4 className="text-success font-bold text-sm flex items-center gap-2">
-              <span className="material-symbols-outlined">download_done</span>
+              <Download className="w-4 h-4" />
               Loyihani qabul qilib olish
             </h4>
             
@@ -600,7 +611,7 @@ export default function CheckoutPage({
                     rel="noreferrer"
                     className="w-full py-3 px-4 bg-slate-800 hover:bg-white/10 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 border border-white/10"
                   >
-                    <span className="material-symbols-outlined text-sm">code</span>
+                    <Code className="w-4 h-4" />
                     Loyiha omboriga / Havolasiga o'tish
                   </a>
                 ) : (
@@ -623,7 +634,7 @@ export default function CheckoutPage({
                     rel="noreferrer"
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-400/10 text-sky-400 hover:bg-sky-400/20 rounded-xl transition-all font-bold"
                   >
-                    <span className="material-symbols-outlined text-xs">send</span>
+                    <Send className="w-3.5 h-3.5" />
                     Telegram: {startup.contactTelegram}
                   </a>
                 )}
@@ -632,7 +643,7 @@ export default function CheckoutPage({
                     href={`mailto:${startup.contactEmail}`}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 text-white/80 hover:bg-white/10 rounded-xl transition-all font-bold font-mono"
                   >
-                    <span className="material-symbols-outlined text-xs">mail</span>
+                    <Mail className="w-3.5 h-3.5" />
                     {startup.contactEmail}
                   </a>
                 )}
@@ -641,7 +652,7 @@ export default function CheckoutPage({
                     href={`tel:${startup.contactPhone}`}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 text-white/80 hover:bg-white/10 rounded-xl transition-all font-bold font-mono"
                   >
-                    <span className="material-symbols-outlined text-xs">call</span>
+                    <Phone className="w-3.5 h-3.5" />
                     {startup.contactPhone}
                   </a>
                 )}

@@ -1,4 +1,14 @@
 import React from 'react';
+import { 
+  ShoppingCart, 
+  ExternalLink, 
+  Code, 
+  Bookmark, 
+  Flag, 
+  Star, 
+  MessageSquarePlus, 
+  Gavel 
+} from 'lucide-react';
 import { Startup, Category } from '../../types';
 
 interface DetailSidebarProps {
@@ -49,7 +59,7 @@ export const DetailSidebar: React.FC<DetailSidebarProps> = ({
             disabled={startup.soldStatus === 'sotildi' || isOwnListing}
             className="w-full py-4 bg-secondary hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100 text-on-secondary font-black text-sm rounded-xl active:scale-95 transition-all shadow-lg shadow-yellow-500/10 uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
           >
-            <span className="material-symbols-outlined text-lg">shopping_cart</span>
+            <ShoppingCart className="w-4 h-4 text-on-secondary" />
             {startup.soldStatus === 'sotildi' ? "Sotilgan (Band qilingan)" : isOwnListing ? "Bu sizning e'loningiz" : "Loyihani sotib olish"}
           </button>
 
@@ -71,7 +81,7 @@ export const DetailSidebar: React.FC<DetailSidebarProps> = ({
               }}
               className="w-full py-3 bg-white/5 hover:bg-white/10 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 border border-white/10 transition-all active:scale-95 text-center uppercase tracking-wider"
             >
-              <span className="material-symbols-outlined text-sm">open_in_new</span>
+              <ExternalLink className="w-4 h-4" />
               Demoni ko'rish
             </a>
           )}
@@ -94,7 +104,7 @@ export const DetailSidebar: React.FC<DetailSidebarProps> = ({
               }}
               className="w-full py-3 bg-white/5 hover:bg-white/10 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 border border-white/10 transition-all active:scale-95 text-center uppercase tracking-wider"
             >
-              <span className="material-symbols-outlined text-sm">code</span>
+              <Code className="w-4 h-4" />
               Repozitoriyani ko'rish
             </a>
           )}
@@ -111,12 +121,7 @@ export const DetailSidebar: React.FC<DetailSidebarProps> = ({
             }}
             className="w-full py-3 border border-white/10 hover:bg-white/5 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase tracking-wider cursor-pointer"
           >
-            <span
-              className="material-symbols-outlined text-base leading-none"
-              style={{ fontVariationSettings: isBookmarked ? "'FILL' 1" : "'FILL' 0" }}
-            >
-              bookmark
-            </span>
+            <Bookmark className={`w-4 h-4 ${isBookmarked ? 'fill-secondary text-secondary' : 'text-white'}`} />
             <span>{isBookmarked ? "Saqlab qo'yilgan" : "Saqlab qo'yish"}</span>
           </button>
 
@@ -125,9 +130,7 @@ export const DetailSidebar: React.FC<DetailSidebarProps> = ({
             onClick={() => handleOpenReportModal('startup', startup.id)}
             className="w-full py-3 border border-red-500/30 hover:bg-red-500/10 text-red-400 font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase tracking-wider cursor-pointer"
           >
-            <span className="material-symbols-outlined text-base text-red-500">
-              flag
-            </span>
+            <Flag className="w-4 h-4 text-red-500" />
             <span>🚩 Shikoyat qilish</span>
           </button>
         </div>
@@ -200,7 +203,7 @@ export const DetailSidebar: React.FC<DetailSidebarProps> = ({
                 {sellerReviewsData?.sellerName || "Sotuvchi"}
               </h4>
               <div className="flex items-center gap-1.5 mt-1">
-                <span className="material-symbols-outlined text-secondary text-sm fill-1">star</span>
+                <Star className="w-3.5 h-3.5 text-secondary fill-secondary" />
                 <span className="text-white text-xs font-bold font-mono">
                   {sellerReviewsData?.averageRating || "0.0"}
                 </span>
@@ -218,14 +221,14 @@ export const DetailSidebar: React.FC<DetailSidebarProps> = ({
                 onClick={() => setIsReviewModalOpen(true)}
                 className="w-full py-2.5 bg-secondary-container/10 hover:bg-secondary-container/20 border border-secondary-container/30 text-secondary-container rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <span className="material-symbols-outlined text-sm">rate_review</span>
+                <MessageSquarePlus className="w-4 h-4 text-secondary-container" />
                 Sharh qoldirish
               </button>
               <button
                 onClick={() => setIsDisputeModalOpen(true)}
                 className="w-full py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <span className="material-symbols-outlined text-sm">gavel</span>
+                <Gavel className="w-4 h-4 text-red-400" />
                 Nizo ochish
               </button>
             </div>
@@ -236,7 +239,7 @@ export const DetailSidebar: React.FC<DetailSidebarProps> = ({
               onClick={() => handleOpenReportModal('user', String(startup.userId))}
               className="w-full py-2.5 border-t border-white/5 pt-4 mt-2 hover:text-red-400 text-on-primary-container text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-xs">flag</span>
+              <Flag className="w-3.5 h-3.5 text-on-primary-container hover:text-red-400" />
               Sotuvchini shikoyat qilish
             </button>
           )}

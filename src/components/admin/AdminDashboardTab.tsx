@@ -1,4 +1,5 @@
 import React from 'react';
+import { Users, Rocket, Handshake, DollarSign, Gavel, Flag } from 'lucide-react';
 import { formatDate } from '../../lib/formatDate';
 
 interface AdminDashboardTabProps {
@@ -15,7 +16,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ stats, set
         <div className="p-6 bg-surface-container-low border border-white/5 rounded-2xl space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-on-primary-container uppercase tracking-wider">Foydalanuvchilar</span>
-            <span className="material-symbols-outlined text-blue-400">group</span>
+            <Users className="text-blue-400 w-5 h-5" />
           </div>
           <div className="text-2xl font-black font-mono text-white">{stats.totalUsers}</div>
           <p className="text-xs text-on-primary-container">Jami ro'yxatdan o'tganlar</p>
@@ -24,7 +25,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ stats, set
         <div className="p-6 bg-surface-container-low border border-white/5 rounded-2xl space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-on-primary-container uppercase tracking-wider">Faol e'lonlar</span>
-            <span className="material-symbols-outlined text-success">rocket_launch</span>
+            <Rocket className="text-success w-5 h-5" />
           </div>
           <div className="text-2xl font-black font-mono text-white">{stats.totalActiveStartups}</div>
           <p className="text-xs text-on-primary-container">Hozirda sotuvdagilar</p>
@@ -33,7 +34,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ stats, set
         <div className="p-6 bg-surface-container-low border border-white/5 rounded-2xl space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-on-primary-container uppercase tracking-wider">Yakunlangan savdolar</span>
-            <span className="material-symbols-outlined text-secondary">handshake</span>
+            <Handshake className="text-secondary w-5 h-5" />
           </div>
           <div className="text-2xl font-black font-mono text-white">{stats.totalCompletedSales}</div>
           <p className="text-xs text-success font-bold">Muvaffaqiyatli bitimlar</p>
@@ -42,7 +43,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ stats, set
         <div className="p-6 bg-surface-container-low border border-white/5 rounded-2xl space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-on-primary-container uppercase tracking-wider">Platforma daromadi</span>
-            <span className="material-symbols-outlined text-success">toll</span>
+            <DollarSign className="text-success w-5 h-5" />
           </div>
           <div className="text-2xl font-black font-mono text-secondary">${stats.totalCommission.toLocaleString()}</div>
           <p className="text-xs text-success font-bold">Joriy oy: +${stats.monthlyCommission.toLocaleString()}</p>
@@ -54,7 +55,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ stats, set
         <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 shadow-2xl">
           <h3 className="text-lg font-bold text-white mb-6 flex items-center justify-between">
             <span className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-red-400">gavel</span>
+              <Gavel className="text-red-400 w-5 h-5" />
               Oxirgi 5 ta nizo
             </span>
             <button
@@ -84,7 +85,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ stats, set
         <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 shadow-2xl">
           <h3 className="text-lg font-bold text-white mb-6 flex items-center justify-between">
             <span className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-secondary">flag</span>
+              <Flag className="text-secondary w-5 h-5" />
               Oxirgi 5 ta shikoyat
             </span>
             <button

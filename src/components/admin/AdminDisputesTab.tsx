@@ -1,4 +1,5 @@
 import React from 'react';
+import { Gavel, Ban, Scale, CheckCircle, Undo } from 'lucide-react';
 import { LoadingState } from '../LoadingState';
 import { formatDateTime } from '../../lib/formatDate';
 
@@ -42,13 +43,13 @@ export const AdminDisputesTab: React.FC<AdminDisputesTabProps> = ({
       {/* General Disputes */}
       <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
         <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4">
-          <span className="material-symbols-outlined text-red-400">gavel</span>
+          <Gavel className="text-red-400 w-5 h-5" />
           Sotib oluvchilar arizalari va Nizolar ({disputes.length})
         </h2>
 
         {disputes.length === 0 ? (
           <div className="py-12 text-center text-on-primary-container space-y-2">
-            <span className="material-symbols-outlined text-4xl opacity-40">gavel</span>
+            <Gavel className="w-10 h-10 mx-auto opacity-40 text-on-primary-container" />
             <p className="text-sm font-bold">Hech qanday nizo arizalari mavjud emas</p>
             <p className="text-xs">Platformada barcha xaridlar muammosiz davom etmoqda.</p>
           </div>
@@ -109,17 +110,17 @@ export const AdminDisputesTab: React.FC<AdminDisputesTabProps> = ({
                       <button
                         disabled={updatingDisputeId !== null}
                         onClick={() => handleDisputeUpdate(disp.id, 'resolved')}
-                        className="px-4 py-2 bg-success hover:brightness-110 disabled:opacity-50 text-on-secondary font-extrabold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95 shadow-md focus:outline-none focus:ring-2 focus:ring-success"
+                        className="px-4 py-2 bg-success hover:brightness-110 disabled:opacity-50 text-on-secondary font-extrabold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-md focus:outline-none focus:ring-2 focus:ring-success"
                       >
-                        <span className="material-symbols-outlined text-xs">gavel</span>
+                        <Gavel className="w-3.5 h-3.5" />
                         Nizoni hal etish (Yopish)
                       </button>
                       <button
                         disabled={updatingDisputeId !== null}
                         onClick={() => handleDisputeUpdate(disp.id, 'rejected')}
-                        className="px-4 py-2 bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 disabled:opacity-50 font-bold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-red-500"
+                        className="px-4 py-2 bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 disabled:opacity-50 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-red-500"
                       >
-                        <span className="material-symbols-outlined text-xs">cancel</span>
+                        <Ban className="w-3.5 h-3.5" />
                         Rad etish
                       </button>
                     </div>
@@ -142,7 +143,7 @@ export const AdminDisputesTab: React.FC<AdminDisputesTabProps> = ({
       {/* Escrow Disputes */}
       <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
         <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4">
-          <span className="material-symbols-outlined text-red-400">account_balance</span>
+          <Scale className="text-red-400 w-5 h-5" />
           Escrow (kafolatlangan to'lov) nizolari ({escrowDisputes.length})
         </h2>
 
@@ -150,7 +151,7 @@ export const AdminDisputesTab: React.FC<AdminDisputesTabProps> = ({
           <LoadingState variant="block" text="Escrow nizolari yuklanmoqda..." />
         ) : escrowDisputes.length === 0 ? (
           <div className="py-12 text-center text-on-primary-container space-y-2">
-            <span className="material-symbols-outlined text-4xl opacity-40">account_balance</span>
+            <Scale className="w-10 h-10 mx-auto opacity-40 text-on-primary-container" />
             <p className="text-sm font-bold">Hech qanday escrow nizosi mavjud emas</p>
             <p className="text-xs">Barcha kafolatlangan to'lovlar muammosiz davom etmoqda.</p>
           </div>
@@ -201,17 +202,17 @@ export const AdminDisputesTab: React.FC<AdminDisputesTabProps> = ({
                     <button
                       disabled={updatingEscrowDisputeId !== null}
                       onClick={() => handleEscrowDisputeUpdate(ed.id, 'released')}
-                      className="px-4 py-2 bg-success hover:brightness-110 disabled:opacity-50 text-on-secondary font-extrabold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95 shadow-md focus:outline-none focus:ring-2 focus:ring-success"
+                      className="px-4 py-2 bg-success hover:brightness-110 disabled:opacity-50 text-on-secondary font-extrabold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-md focus:outline-none focus:ring-2 focus:ring-success"
                     >
-                      <span className="material-symbols-outlined text-xs">check_circle</span>
+                      <CheckCircle className="w-3.5 h-3.5" />
                       Sotuvchiga ozod qilish
                     </button>
                     <button
                       disabled={updatingEscrowDisputeId !== null}
                       onClick={() => handleEscrowDisputeUpdate(ed.id, 'refunded')}
-                      className="px-4 py-2 bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 disabled:opacity-50 font-bold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-red-500"
+                      className="px-4 py-2 bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 disabled:opacity-50 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-red-500"
                     >
-                      <span className="material-symbols-outlined text-xs">undo</span>
+                      <Undo className="w-3.5 h-3.5" />
                       Xaridorga qaytarish
                     </button>
                   </div>

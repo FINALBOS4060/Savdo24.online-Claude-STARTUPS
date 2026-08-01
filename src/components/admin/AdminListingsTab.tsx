@@ -1,4 +1,5 @@
 import React from 'react';
+import { Clock, Search, Loader2, CheckCircle, XCircle, Trash2 } from 'lucide-react';
 import { Startup } from '../../types';
 
 interface AdminListingsTabProps {
@@ -45,7 +46,7 @@ export const AdminListingsTab: React.FC<AdminListingsTabProps> = ({
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-white/5 pb-4">
         <div>
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <span className="material-symbols-outlined text-secondary">pending_actions</span>
+            <Clock className="text-secondary w-5 h-5" />
             Platformadagi e'lonlar va arizalar boshqaruvi
           </h2>
           <p className="text-xs text-on-primary-container mt-0.5">
@@ -79,7 +80,7 @@ export const AdminListingsTab: React.FC<AdminListingsTabProps> = ({
 
       {listingsView === 'all' && (
         <div className="relative">
-          <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-primary-container text-sm">search</span>
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-primary-container w-4 h-4" />
           <input
             type="text"
             placeholder="E'lon nomi yoki ID bo'yicha qidirish..."
@@ -96,11 +97,11 @@ export const AdminListingsTab: React.FC<AdminListingsTabProps> = ({
       {listingsView === 'pending' ? (
         isLoadingPending ? (
           <div className="py-12 text-center text-on-primary-container">
-            <span className="material-symbols-outlined text-4xl opacity-40 animate-spin">progress_activity</span>
+            <Loader2 className="w-10 h-10 mx-auto opacity-40 animate-spin text-on-primary-container" />
           </div>
         ) : pendingStartups.length === 0 ? (
           <div className="py-12 text-center text-on-primary-container space-y-2">
-            <span className="material-symbols-outlined text-4xl opacity-40">task_alt</span>
+            <CheckCircle className="w-10 h-10 mx-auto opacity-40 text-on-primary-container" />
             <p className="text-sm font-bold">Kutilayotgan arizalar yo'q!</p>
             <p className="text-xs">Barcha yuborilgan startaplar ko'rib chiqilgan.</p>
           </div>
@@ -143,7 +144,7 @@ export const AdminListingsTab: React.FC<AdminListingsTabProps> = ({
                     onClick={() => handleStatusChange(startup.id, 'active')}
                     className="flex-1 md:flex-none px-4 py-2.5 bg-success hover:brightness-110 disabled:opacity-50 text-on-secondary font-extrabold text-xs rounded-xl transition-all flex items-center justify-center gap-1 active:scale-95 shadow-lg shadow-success/10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-success"
                   >
-                    <span className="material-symbols-outlined text-sm font-bold">check_circle</span>
+                    <CheckCircle className="w-4 h-4" />
                     Tasdiqlash
                   </button>
                   <button
@@ -151,7 +152,7 @@ export const AdminListingsTab: React.FC<AdminListingsTabProps> = ({
                     onClick={() => handleStatusChange(startup.id, 'rejected')}
                     className="flex-1 md:flex-none px-4 py-2.5 bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 disabled:opacity-50 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1 active:scale-95 cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-500"
                   >
-                    <span className="material-symbols-outlined text-sm">cancel</span>
+                    <XCircle className="w-4 h-4" />
                     Rad etish
                   </button>
                 </div>
@@ -161,11 +162,11 @@ export const AdminListingsTab: React.FC<AdminListingsTabProps> = ({
         )
       ) : isLoadingAllListings ? (
         <div className="py-12 text-center text-on-primary-container">
-          <span className="material-symbols-outlined text-4xl opacity-40 animate-spin">progress_activity</span>
+          <Loader2 className="w-10 h-10 mx-auto opacity-40 animate-spin text-on-primary-container" />
         </div>
       ) : allListings.length === 0 ? (
         <div className="py-12 text-center text-on-primary-container space-y-2">
-          <span className="material-symbols-outlined text-4xl opacity-40">search_off</span>
+          <Search className="w-10 h-10 mx-auto opacity-40 text-on-primary-container" />
           <p className="text-sm font-bold">Hech qanday e'lon topilmadi</p>
         </div>
       ) : (
@@ -207,7 +208,7 @@ export const AdminListingsTab: React.FC<AdminListingsTabProps> = ({
                 onClick={() => handleDeleteStartup(startup.id, startup.name)}
                 className="w-full md:w-auto px-4 py-2 bg-red-600/20 text-red-400 border border-red-500/30 hover:bg-red-500 hover:text-white disabled:opacity-50 font-black text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-500"
               >
-                <span className="material-symbols-outlined text-sm">delete_forever</span>
+                <Trash2 className="w-4 h-4" />
                 {isDeletingStartupId === startup.id ? "O'chirilmoqda..." : "Butunlay o'chirish"}
               </button>
             </div>

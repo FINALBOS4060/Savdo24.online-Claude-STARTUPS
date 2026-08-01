@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Megaphone, List, EyeOff, Eye, Trash2 } from 'lucide-react';
 import { ConfirmDialog } from '../ConfirmDialog';
 
 interface AdminSponsorsTabProps {
@@ -41,7 +42,7 @@ export const AdminSponsorsTab: React.FC<AdminSponsorsTabProps> = ({
       />
       <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
         <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4">
-          <span className="material-symbols-outlined text-secondary">campaign</span>
+          <Megaphone className="text-secondary w-5 h-5" />
           Yangi sponsor kanal qo'shish
         </h2>
         <form onSubmit={handleAddSponsor} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -130,7 +131,7 @@ export const AdminSponsorsTab: React.FC<AdminSponsorsTabProps> = ({
 
       <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl">
         <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4 mb-6">
-          <span className="material-symbols-outlined text-secondary">list</span>
+          <List className="text-secondary w-5 h-5" />
           Mavjud sponsor kanallar ({sponsorChannels.length})
         </h2>
         <div className="overflow-x-auto">
@@ -158,19 +159,19 @@ export const AdminSponsorsTab: React.FC<AdminSponsorsTabProps> = ({
                   <td className="py-3.5 px-4 flex items-center gap-2">
                     <button
                       onClick={() => handleSponsorAction(chan.id, 'toggle', chan.isActive)}
-                      className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-secondary-container"
+                      className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-secondary-container flex items-center justify-center"
                       title={chan.isActive ? 'Nofaol qilish' : 'Faollashtirish'}
                       aria-label={chan.isActive ? 'Nofaol qilish' : 'Faollashtirish'}
                     >
-                      <span className="material-symbols-outlined text-sm">{chan.isActive ? 'visibility_off' : 'visibility'}</span>
+                      {chan.isActive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                     <button
                       onClick={() => setSponsorToDeleteId(chan.id)}
-                      className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-500"
+                      className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-500 flex items-center justify-center"
                       title="O'chirish"
                       aria-label="Sponsor kanalini o'chirish"
                     >
-                      <span className="material-symbols-outlined text-sm">delete</span>
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </td>
                 </tr>

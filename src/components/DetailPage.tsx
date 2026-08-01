@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
+import { MessageSquare, Star } from 'lucide-react';
 import { Startup, Idea, UserProfileData, Category } from '../types';
 import { apiFetch as fetch } from '../lib/api';
 import { formatDate } from '../lib/formatDate';
@@ -605,7 +606,7 @@ export default function DetailPage({
           {sellerReviewsData && sellerReviewsData.reviews && sellerReviewsData.reviews.length > 0 && (
             <section className="bg-white/5 dark:bg-primary-container/20 border border-outline-variant/10 rounded-2xl p-6 md:p-8 space-y-6">
               <h3 className="text-secondary-container font-extrabold text-xl md:text-2xl flex items-center gap-2">
-                <span className="material-symbols-outlined text-secondary">reviews</span>
+                <MessageSquare className="text-secondary w-5 h-5" />
                 Sotuvchi haqida sharhlar ({sellerReviewsData.totalReviews})
               </h3>
               <div className="space-y-4">
@@ -630,14 +631,12 @@ export default function DetailPage({
                       </div>
                       <div className="flex items-center gap-0.5">
                         {[...Array(5)].map((_, i) => (
-                          <span
+                          <Star
                             key={i}
-                            className={`material-symbols-outlined text-xs ${
-                              i < rev.rating ? "text-secondary fill-1" : "text-gray-600"
+                            className={`w-3.5 h-3.5 ${
+                              i < rev.rating ? "text-secondary fill-secondary" : "text-gray-600"
                             }`}
-                          >
-                            star
-                          </span>
+                          />
                         ))}
                       </div>
                     </div>

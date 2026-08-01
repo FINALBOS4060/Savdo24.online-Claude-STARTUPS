@@ -1,4 +1,5 @@
 import React from 'react';
+import { ArrowUpCircle, MessageSquare, Image } from 'lucide-react';
 import { Startup } from '../../types';
 
 interface DetailHeroSectionProps {
@@ -30,7 +31,7 @@ export const DetailHeroSection: React.FC<DetailHeroSectionProps> = ({
             {startup.name}
             {startup.isTop && (
               <span className="text-xs bg-yellow-400/20 text-yellow-400 px-2 py-0.5 rounded-full font-black flex items-center gap-1">
-                <span className="material-symbols-outlined text-xs">vertical_align_top</span>
+                <ArrowUpCircle className="w-3.5 h-3.5 text-xs" />
                 TOP
               </span>
             )}
@@ -42,7 +43,6 @@ export const DetailHeroSection: React.FC<DetailHeroSectionProps> = ({
             onClick={handleContactSeller}
             className="mt-4 px-4 py-2 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
           >
-            <span className="material-symbols-outlined text-sm">chat</span>
             💬 Sotuvchi bilan bog'lanish
           </button>
         </div>
@@ -62,7 +62,7 @@ export const DetailHeroSection: React.FC<DetailHeroSectionProps> = ({
         </div>
       ) : (
         <div className="hidden md:block bg-white/5 border border-dashed border-outline-variant/30 rounded-2xl flex items-center justify-center text-on-primary-container">
-          <span className="material-symbols-outlined text-4xl">photo</span>
+          <Image className="w-8 h-8 text-on-primary-container" />
         </div>
       )}
 
@@ -79,7 +79,7 @@ export const DetailHeroSection: React.FC<DetailHeroSectionProps> = ({
         </div>
       ) : (
         <div className="hidden md:block bg-white/5 border border-dashed border-outline-variant/30 rounded-2xl flex items-center justify-center text-on-primary-container">
-          <span className="material-symbols-outlined text-4xl">photo</span>
+          <Image className="w-8 h-8 text-on-primary-container" />
         </div>
       )}
 

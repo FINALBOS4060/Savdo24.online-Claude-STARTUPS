@@ -1,4 +1,5 @@
 import React from 'react';
+import { ArrowLeft } from 'lucide-react';
 
 interface RefundPolicyPageProps {
   setView: (view: string) => void;
@@ -12,7 +13,7 @@ export default function RefundPolicyPage({ setView }: RefundPolicyPageProps) {
           onClick={() => setView('browse')}
           className="p-2 bg-white/5 hover:bg-white/10 text-white rounded-xl transition-all cursor-pointer flex items-center justify-center"
         >
-          <span className="material-symbols-outlined text-sm">arrow_back</span>
+          <ArrowLeft className="w-4 h-4" />
         </button>
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold text-white">Qaytarish va nizolar siyosati</h1>

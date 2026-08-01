@@ -1,4 +1,5 @@
 import React, { ReactNode } from 'react';
+import { AlertOctagon } from 'lucide-react';
 
 interface Props {
   children: ReactNode;
@@ -44,7 +45,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
       return (
         <div className="min-h-screen bg-background text-white flex items-center justify-center p-4">
           <div className="max-w-md text-center p-8 bg-white/5 border border-white/10 rounded-2xl shadow-2xl">
-            <span className="material-symbols-outlined text-red-500 text-6xl mb-4 select-none">error</span>
+            <AlertOctagon className="text-red-500 w-16 h-16 mx-auto mb-4 select-none" />
             <h2 className="text-2xl font-bold mb-4">Oops! Xatolik yuz berdi</h2>
             <p className="text-gray-400 mb-6 text-sm">
               Sayt kutilmagan xatolikka duch keldi. Iltimos, sahifani yangilang yoki keyinroq qayta urinib ko'ring.

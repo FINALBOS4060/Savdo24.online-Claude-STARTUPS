@@ -1,4 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { 
+  Briefcase, 
+  RefreshCw, 
+  CheckCircle, 
+  XCircle, 
+  ShieldCheck, 
+  Building2, 
+  Ban 
+} from 'lucide-react';
 import { apiFetch as fetch } from '../../lib/api';
 import { LoadingState } from '../LoadingState';
 import { formatDateTime } from '../../lib/formatDate';
@@ -65,7 +74,7 @@ export const AdminB2BTab: React.FC<AdminB2BTabProps> = ({ onActionToast }) => {
       <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
         <div className="flex justify-between items-center border-b border-white/5 pb-4">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <span className="material-symbols-outlined text-secondary">business_center</span>
+            <Briefcase className="text-secondary w-5 h-5" />
             Tasdiqlash kutilayotgan B2B arizalar ({pendingAccounts.length})
           </h2>
           <button
@@ -73,7 +82,7 @@ export const AdminB2BTab: React.FC<AdminB2BTabProps> = ({ onActionToast }) => {
             className="px-4 py-2 bg-secondary-container/10 text-secondary-container rounded-xl font-bold text-xs hover:bg-secondary-container/20 transition-all flex items-center gap-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-secondary-container"
             aria-label="Arizalar ro'yxatini yangilash"
           >
-            <span className="material-symbols-outlined text-sm">refresh</span>
+            <RefreshCw className="w-3.5 h-3.5" />
             Yangilash
           </button>
         </div>
@@ -82,7 +91,7 @@ export const AdminB2BTab: React.FC<AdminB2BTabProps> = ({ onActionToast }) => {
           <LoadingState variant="block" text="Arizalar yuklanmoqda..." />
         ) : pendingAccounts.length === 0 ? (
           <div className="py-12 text-center text-on-primary-container space-y-2">
-            <span className="material-symbols-outlined text-4xl opacity-40">task_alt</span>
+            <CheckCircle className="w-10 h-10 mx-auto opacity-40 text-on-primary-container" />
             <p className="text-sm font-bold">Kutilayotgan B2B arizalar mavjud emas</p>
             <p className="text-xs">Barcha arizalar ko'rib chiqilgan.</p>
           </div>
@@ -113,7 +122,7 @@ export const AdminB2BTab: React.FC<AdminB2BTabProps> = ({ onActionToast }) => {
                     className="px-4 py-2.5 bg-success hover:brightness-110 text-black font-extrabold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-success"
                     aria-label="B2B hisobni tasdiqlash"
                   >
-                    <span className="material-symbols-outlined text-sm">check_circle</span>
+                    <CheckCircle className="w-4 h-4" />
                     {updatingId === b2b.id ? "Jarayonda..." : "Tasdiqlash"}
                   </button>
                   <button
@@ -122,7 +131,7 @@ export const AdminB2BTab: React.FC<AdminB2BTabProps> = ({ onActionToast }) => {
                     className="px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-500"
                     aria-label="B2B hisobni rad etish"
                   >
-                    <span className="material-symbols-outlined text-sm">cancel</span>
+                    <XCircle className="w-4 h-4" />
                     Rad etish
                   </button>
                 </div>
@@ -136,7 +145,7 @@ export const AdminB2BTab: React.FC<AdminB2BTabProps> = ({ onActionToast }) => {
       <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
         <div className="flex justify-between items-center border-b border-white/5 pb-4">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <span className="material-symbols-outlined text-success">verified</span>
+            <ShieldCheck className="text-success w-5 h-5" />
             Tasdiqlangan B2B Hisoblar ({verifiedAccounts.length})
           </h2>
         </div>
@@ -145,7 +154,7 @@ export const AdminB2BTab: React.FC<AdminB2BTabProps> = ({ onActionToast }) => {
           <LoadingState variant="block" text="Yuklanmoqda..." />
         ) : verifiedAccounts.length === 0 ? (
           <div className="py-12 text-center text-on-primary-container space-y-2">
-            <span className="material-symbols-outlined text-4xl opacity-40">domain_disabled</span>
+            <Building2 className="w-10 h-10 mx-auto opacity-40 text-on-primary-container" />
             <p className="text-sm font-bold">Tasdiqlangan B2B hisoblar mavjud emas</p>
           </div>
         ) : (
@@ -175,7 +184,7 @@ export const AdminB2BTab: React.FC<AdminB2BTabProps> = ({ onActionToast }) => {
                     className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 font-bold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-500"
                     aria-label="Tasdiqni bekor qilish"
                   >
-                    <span className="material-symbols-outlined text-xs">block</span>
+                    <Ban className="w-3.5 h-3.5" />
                     Bekor qilish
                   </button>
                 </div>

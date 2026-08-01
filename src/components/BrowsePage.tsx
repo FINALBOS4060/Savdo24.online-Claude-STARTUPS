@@ -1,4 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Coins, 
+  UserPlus, 
+  Rocket, 
+  Star, 
+  ArrowRight, 
+  SlidersHorizontal, 
+  Grid, 
+  List, 
+  FolderOpen, 
+  Plus, 
+  ArrowUpToLine, 
+  BadgeCheck, 
+  Code, 
+  ChevronLeft, 
+  ChevronRight, 
+  Mail 
+} from 'lucide-react';
+import { CategoryIcon } from './CategoryIcon';
 import { Startup, UserProfileData, Category } from '../types';
 import { CATEGORY_FIELDS } from '../categoryFields';
 import { apiFetch as fetch } from '../lib/api';
@@ -234,7 +253,7 @@ export default function BrowsePage({
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
           <div className="bg-primary-container border border-outline-variant/10 rounded-2xl p-4 flex items-center gap-4">
             <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-              <span className="material-symbols-outlined">payments</span>
+              <Coins className="w-5 h-5" />
             </div>
             <div>
               <p className="text-xs text-on-primary-container uppercase font-bold">Savdolar (24s)</p>
@@ -243,7 +262,7 @@ export default function BrowsePage({
           </div>
           <div className="bg-primary-container border border-outline-variant/10 rounded-2xl p-4 flex items-center gap-4">
             <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
-              <span className="material-symbols-outlined">person_add</span>
+              <UserPlus className="w-5 h-5" />
             </div>
             <div>
               <p className="text-xs text-on-primary-container uppercase font-bold">Yangi a'zolar</p>
@@ -252,7 +271,7 @@ export default function BrowsePage({
           </div>
           <div className="bg-primary-container border border-outline-variant/10 rounded-2xl p-4 flex items-center gap-4">
             <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-500">
-              <span className="material-symbols-outlined">rocket_launch</span>
+              <Rocket className="w-5 h-5" />
             </div>
             <div>
               <p className="text-xs text-on-primary-container uppercase font-bold">Yangi e'lonlar</p>
@@ -261,7 +280,7 @@ export default function BrowsePage({
           </div>
           <div className="bg-primary-container border border-outline-variant/10 rounded-2xl p-4 flex items-center gap-4">
             <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center text-yellow-500">
-              <span className="material-symbols-outlined">star</span>
+              <Star className="w-5 h-5" />
             </div>
             <div>
               <p className="text-xs text-on-primary-container uppercase font-bold">Top Sharh</p>
@@ -336,7 +355,7 @@ export default function BrowsePage({
             className="text-secondary-container hover:underline text-sm font-semibold flex items-center gap-1"
           >
             Barchasini ko'rish
-            <span className="material-symbols-outlined text-xs">arrow_forward</span>
+            <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
@@ -363,7 +382,7 @@ export default function BrowsePage({
                       : 'bg-surface dark:bg-white/5 text-secondary-container group-hover:bg-secondary-container group-hover:text-on-secondary-fixed'
                   }`}
                 >
-                  <span className="material-symbols-outlined text-lg">{cat.icon}</span>
+                  <CategoryIcon name={cat.icon} className="w-5 h-5" />
                 </div>
                 <span className="text-xs font-bold text-on-surface dark:text-white group-hover:text-secondary-container transition-colors text-center">
                   {cat.name}
@@ -378,7 +397,7 @@ export default function BrowsePage({
           <div className="mt-6 p-4 bg-white dark:bg-primary-container/20 border border-outline-variant/10 rounded-2xl animate-fade-in space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-secondary-container uppercase tracking-wider flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-sm">tune</span>
+                <SlidersHorizontal className="w-4 h-4" />
                 Qo'shimcha filtrlar
               </span>
               {Object.values(subFilters).some(v => v !== '' && v !== false) && (
@@ -487,9 +506,7 @@ export default function BrowsePage({
               title={viewMode === 'grid' ? "Ro'yxat ko'rinishi" : "Jadval ko'rinishi"}
               aria-label={viewMode === 'grid' ? "Ro'yxat ko'rinishiga o'tish" : "Jadval ko'rinishiga o'tish"}
             >
-              <span className="material-symbols-outlined text-lg leading-none">
-                {viewMode === 'grid' ? 'view_list' : 'grid_view'}
-              </span>
+              {viewMode === 'grid' ? <List className="w-5 h-5" /> : <Grid className="w-5 h-5" />}
             </button>
           </div>
         </div>
@@ -511,7 +528,7 @@ export default function BrowsePage({
           </div>
         ) : (visibleStartups.length === 0) ? (
           <div className="text-center py-16 border border-dashed border-outline-variant/20 rounded-xl bg-white/5 max-w-lg mx-auto flex flex-col items-center p-8">
-            <span className="material-symbols-outlined text-5xl text-on-primary-container mb-3">folder_open</span>
+            <FolderOpen className="text-5xl text-on-primary-container mb-3 w-12 h-12" />
             <p className="text-on-primary-container font-semibold mb-4 text-base">
               {selectedCategory 
                 ? "Bu kategoriyada hali e'lonlar yo'q. Birinchi bo'lib siz qo'shing!" 
@@ -522,7 +539,7 @@ export default function BrowsePage({
                 onClick={() => setView('sell')}
                 className="px-6 py-2.5 bg-secondary text-black font-extrabold text-sm rounded-xl hover:brightness-110 transition-all active:scale-95 shadow-md flex items-center gap-2"
               >
-                <span className="material-symbols-outlined text-sm font-bold">add</span>
+                <Plus className="w-4 h-4" />
                 E'lon qo'shish
               </button>
             ) : (
@@ -576,14 +593,12 @@ export default function BrowsePage({
                             {startup.name}
                             {startup.isTop && (
                               <span className="text-xs bg-yellow-400/20 text-yellow-400 px-1.5 py-0.5 rounded font-black flex items-center gap-0.5">
-                                <span className="material-symbols-outlined text-xs">vertical_align_top</span>
+                                <ArrowUpToLine className="w-3 h-3" />
                                 TOP
                               </span>
                             )}
                           </h3>
-                          <span className="material-symbols-outlined text-secondary-container text-md select-none">
-                            verified
-                          </span>
+                          <BadgeCheck className="text-secondary-container w-4 h-4 shrink-0 select-none" />
                         </div>
                         <p className="text-xs text-on-surface-variant dark:text-on-primary-container line-clamp-2 mb-4 leading-relaxed">
                           {startup.description}
@@ -644,14 +659,12 @@ export default function BrowsePage({
                         {startup.name}
                         {startup.isTop && (
                           <span className="text-xs bg-yellow-400/20 text-yellow-400 px-1.5 py-0.5 rounded font-black flex items-center gap-0.5">
-                            <span className="material-symbols-outlined text-xs">vertical_align_top</span>
+                            <ArrowUpToLine className="w-3 h-3" />
                             TOP
                           </span>
                         )}
                       </h3>
-                      <span className="material-symbols-outlined text-secondary-container text-md select-none">
-                        verified
-                      </span>
+                      <BadgeCheck className="text-secondary-container w-4 h-4 shrink-0 select-none" />
                     </div>
 
                     <p className="text-xs text-on-surface-variant dark:text-on-primary-container line-clamp-2 mb-6 leading-relaxed">
@@ -675,7 +688,7 @@ export default function BrowsePage({
 
                       <div className="flex justify-between items-center text-xs uppercase font-bold text-on-primary-container border-t border-white/5 pt-2 mt-1">
                         <span className="flex items-center gap-1">
-                          <span className="material-symbols-outlined text-xs">code</span>
+                          <Code className="w-3.5 h-3.5" />
                           {startup.repoIncluded ? "Repo + Kod ✅" : "Faqat litsenziya"}
                         </span>
                         <span>
@@ -715,7 +728,7 @@ export default function BrowsePage({
               disabled={currentPage === 1}
               className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-white disabled:opacity-40 disabled:hover:bg-white/5 transition-all flex items-center gap-1 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-xs">chevron_left</span>
+              <ChevronLeft className="w-3.5 h-3.5" />
               Oldingi
             </button>
 
@@ -745,7 +758,7 @@ export default function BrowsePage({
               className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-white disabled:opacity-40 disabled:hover:bg-white/5 transition-all flex items-center gap-1 cursor-pointer"
             >
               Keyingi
-              <span className="material-symbols-outlined text-xs">chevron_right</span>
+              <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
         )}
@@ -754,7 +767,7 @@ export default function BrowsePage({
       {/* Newsletter Subscription */}
       <section className="p-6 md:p-12 rounded-2xl bg-secondary-container flex flex-col lg:flex-row items-center justify-between gap-6 overflow-hidden relative">
         <div className="absolute right-0 top-0 opacity-5 pointer-events-none transform translate-x-12 -translate-y-12">
-          <span className="material-symbols-outlined text-[200px]">mail</span>
+          <Mail className="w-[200px] h-[200px]" />
         </div>
         
         <div className="relative z-10 max-w-lg text-left">

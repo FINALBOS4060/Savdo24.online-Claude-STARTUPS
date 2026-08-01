@@ -1,4 +1,5 @@
 import React from 'react';
+import { Flag, Check, X, Search, Trash2 } from 'lucide-react';
 import { Startup } from '../../types';
 import { formatDateTime } from '../../lib/formatDate';
 
@@ -34,13 +35,13 @@ export const AdminReportsTab: React.FC<AdminReportsTabProps> = ({
   return (
     <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
       <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4">
-        <span className="material-symbols-outlined text-red-500">flag</span>
+        <Flag className="text-red-500 w-5 h-5" />
         Foydalanuvchilar shikoyatlari (Shikoyatlar) ({reports.length})
       </h2>
 
       {reports.length === 0 ? (
         <div className="py-12 text-center text-on-primary-container space-y-2">
-          <span className="material-symbols-outlined text-4xl opacity-40">flag</span>
+          <Flag className="w-10 h-10 mx-auto opacity-40 text-on-primary-container" />
           <p className="text-sm font-bold">Hech qanday shikoyatlar mavjud emas</p>
           <p className="text-xs">Barcha e'lonlar va kontent toza holatda.</p>
         </div>
@@ -109,17 +110,17 @@ export const AdminReportsTab: React.FC<AdminReportsTabProps> = ({
                         <button
                           onClick={() => handleReportStatusChange(report.id, 'reviewed')}
                           disabled={updatingReportId === report.id || isDeletingReportedItem === report.id}
-                          className="px-3 py-2 bg-success hover:brightness-110 disabled:opacity-50 text-on-secondary font-bold text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-success"
+                          className="px-3 py-2 bg-success hover:brightness-110 disabled:opacity-50 text-on-secondary font-bold text-xs rounded-lg transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-success"
                         >
-                          <span className="material-symbols-outlined text-xs">check</span>
+                          <Check className="w-3.5 h-3.5" />
                           Tasdiqlash (Ko'rib chiqildi)
                         </button>
                         <button
                           onClick={() => handleReportStatusChange(report.id, 'dismissed')}
                           disabled={updatingReportId === report.id || isDeletingReportedItem === report.id}
-                          className="px-3 py-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 disabled:opacity-50 font-bold text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
+                          className="px-3 py-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 disabled:opacity-50 font-bold text-xs rounded-lg transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
                         >
-                          <span className="material-symbols-outlined text-xs">close</span>
+                          <X className="w-3.5 h-3.5" />
                           Inkor etish (Rad etish)
                         </button>
                       </>
@@ -132,18 +133,18 @@ export const AdminReportsTab: React.FC<AdminReportsTabProps> = ({
                         setActiveTab('users');
                         setUsersSearch(report.targetId);
                       }}
-                      className="px-3 py-2 bg-white/5 text-white border border-white/10 hover:bg-white/10 font-black text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
+                      className="px-3 py-2 bg-white/5 text-white border border-white/10 hover:bg-white/10 font-black text-xs rounded-lg transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
                     >
-                      <span className="material-symbols-outlined text-xs">person_search</span>
+                      <Search className="w-3.5 h-3.5" />
                       Foydalanuvchini ko'rish
                     </button>
                   ) : (
                     <button
                       onClick={() => handleDeleteReportedItem(report.id, report.targetType, report.targetId)}
                       disabled={updatingReportId === report.id || isDeletingReportedItem === report.id}
-                      className="px-3 py-2 bg-red-600/20 text-red-400 border border-red-500/30 hover:bg-red-500 hover:text-white disabled:opacity-50 font-black text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-red-500"
+                      className="px-3 py-2 bg-red-600/20 text-red-400 border border-red-500/30 hover:bg-red-500 hover:text-white disabled:opacity-50 font-black text-xs rounded-lg transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-red-500"
                     >
-                      <span className="material-symbols-outlined text-xs">delete</span>
+                      <Trash2 className="w-3.5 h-3.5" />
                       {isDeletingReportedItem === report.id ? "O'chirilmoqda..." : (report.targetType === 'startup' ? "E'lonni o'chirish" : "Izohni o'chirish")}
                     </button>
                   )}

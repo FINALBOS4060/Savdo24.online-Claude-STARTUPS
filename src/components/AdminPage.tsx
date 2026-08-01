@@ -1,5 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { 
+  ChevronLeft, 
+  ChevronRight, 
+  ShieldAlert, 
+  Shield, 
+  AlertTriangle, 
+  LayoutDashboard, 
+  TrendingUp, 
+  ClipboardList, 
+  Users, 
+  FolderTree, 
+  Gavel, 
+  Flag, 
+  Megaphone, 
+  History, 
+  Headphones, 
+  Receipt, 
+  Briefcase, 
+  Settings 
+} from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import { Startup, UserProfileData, Category } from '../types';
 import { apiFetch as fetch } from '../lib/api';
@@ -348,7 +368,7 @@ export default function AdminPage({
           onClick={() => onPageChange(currentPage - 1)}
           className="p-2 bg-white/5 hover:bg-white/10 disabled:opacity-40 text-white rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed"
         >
-          <span className="material-symbols-outlined text-sm block">chevron_left</span>
+          <ChevronLeft className="w-4 h-4 block" />
         </button>
         <span className="text-xs text-on-primary-container font-medium px-2">
           {currentPage} / {totalPages}
@@ -358,7 +378,7 @@ export default function AdminPage({
           onClick={() => onPageChange(currentPage + 1)}
           className="p-2 bg-white/5 hover:bg-white/10 disabled:opacity-40 text-white rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed"
         >
-          <span className="material-symbols-outlined text-sm block">chevron_right</span>
+          <ChevronRight className="w-4 h-4 block" />
         </button>
       </div>
     );
@@ -706,7 +726,7 @@ export default function AdminPage({
   if (!isAdmin) {
     return (
       <div className="max-w-2xl mx-auto p-8 bg-red-500/10 border border-red-500/30 rounded-2xl text-center space-y-4 animate-fade-in text-left">
-        <span className="material-symbols-outlined text-red-500 text-5xl">gpp_bad</span>
+        <ShieldAlert className="text-red-500 w-12 h-12 mx-auto" />
         <h2 className="text-xl font-black text-white">Kirish taqiqlangan</h2>
         <p className="text-sm text-on-primary-container leading-relaxed">
           Kechirasiz, ushbu sahifaga kirish faqat adminlar uchun ruxsat etilgan. Tizimga admin hisobi orqali kiring.
@@ -752,7 +772,7 @@ export default function AdminPage({
     <div className="space-y-8 animate-fade-in text-left">
       <div>
         <h1 className="text-2xl md:text-3xl font-extrabold text-white mb-2 flex items-center gap-2">
-          <span className="material-symbols-outlined text-secondary text-3xl">admin_panel_settings</span>
+          <Shield className="text-secondary w-8 h-8" />
           Admin boshqaruv paneli
         </h1>
         <p className="text-xs md:text-sm text-on-primary-container leading-relaxed">
@@ -764,7 +784,7 @@ export default function AdminPage({
       {stats?.systemStatus?.envWarnings?.length > 0 && (
         <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-2xl animate-pulse">
           <div className="flex items-start gap-3">
-            <span className="material-symbols-outlined text-red-500">warning</span>
+            <AlertTriangle className="text-red-500 w-5 h-5 shrink-0 mt-0.5" />
             <div className="space-y-1">
               <h4 className="text-sm font-bold text-red-400">Tizim xavfsizligi va sozlamalari bo'yicha ogohlantirishlar:</h4>
               <ul className="list-disc list-inside text-xs text-red-300/80">
@@ -802,7 +822,7 @@ export default function AdminPage({
               : 'text-on-primary-container border-transparent hover:text-white'
           }`}
         >
-          <span className="material-symbols-outlined text-sm">dashboard</span>
+          <LayoutDashboard className="w-4 h-4" />
           Dashboard
         </button>
         <button
@@ -813,7 +833,7 @@ export default function AdminPage({
               : 'text-on-primary-container border-transparent hover:text-white'
           }`}
         >
-          <span className="material-symbols-outlined text-sm">analytics</span>
+          <TrendingUp className="w-4 h-4" />
           Analytics
         </button>
         <button
@@ -824,7 +844,7 @@ export default function AdminPage({
               : 'text-on-primary-container border-transparent hover:text-white'
           }`}
         >
-          <span className="material-symbols-outlined text-sm">pending_actions</span>
+          <ClipboardList className="w-4 h-4" />
           Elonlar ({pendingStartups.length})
         </button>
         <button
@@ -835,7 +855,7 @@ export default function AdminPage({
               : 'text-on-primary-container border-transparent hover:text-white'
           }`}
         >
-          <span className="material-symbols-outlined text-sm">group</span>
+          <Users className="w-4 h-4" />
           Foydalanuvchilar
         </button>
         <button
@@ -846,7 +866,7 @@ export default function AdminPage({
               : 'text-on-primary-container border-transparent hover:text-white'
           }`}
         >
-          <span className="material-symbols-outlined text-sm">category</span>
+          <FolderTree className="w-4 h-4" />
           Kategoriyalar
         </button>
         <button
@@ -857,7 +877,7 @@ export default function AdminPage({
               : 'text-on-primary-container border-transparent hover:text-white'
           }`}
         >
-          <span className="material-symbols-outlined text-sm">gavel</span>
+          <Gavel className="w-4 h-4" />
           Nizolar ({disputes.filter(d => d.status === 'open').length + escrowDisputes.length})
         </button>
         <button
@@ -868,7 +888,7 @@ export default function AdminPage({
               : 'text-on-primary-container border-transparent hover:text-white'
           }`}
         >
-          <span className="material-symbols-outlined text-sm">flag</span>
+          <Flag className="w-4 h-4" />
           Shikoyatlar ({reports.filter(r => r.status === 'pending').length})
         </button>
         <button
@@ -879,7 +899,7 @@ export default function AdminPage({
               : 'text-on-primary-container border-transparent hover:text-white'
           }`}
         >
-          <span className="material-symbols-outlined text-sm">campaign</span>
+          <Megaphone className="w-4 h-4" />
           Sponsorlar ({sponsorChannels.length})
         </button>
         <button
@@ -890,7 +910,7 @@ export default function AdminPage({
               : 'text-on-primary-container border-transparent hover:text-white'
           }`}
         >
-          <span className="material-symbols-outlined text-sm">history</span>
+          <History className="w-4 h-4" />
           Audit
         </button>
         
@@ -902,7 +922,7 @@ export default function AdminPage({
               : 'text-on-primary-container border-transparent hover:text-white'
           }`}
         >
-          <span className="material-symbols-outlined text-sm">support_agent</span>
+          <Headphones className="w-4 h-4" />
           Murojaatlar
         </button>
 
@@ -914,7 +934,7 @@ export default function AdminPage({
               : 'text-on-primary-container border-transparent hover:text-white'
           }`}
         >
-          <span className="material-symbols-outlined text-sm">payments</span>
+          <Receipt className="w-4 h-4" />
           Qaytarishlar ({escrowRefunds.length})
         </button>
 
@@ -926,7 +946,7 @@ export default function AdminPage({
               : 'text-on-primary-container border-transparent hover:text-white'
           }`}
         >
-          <span className="material-symbols-outlined text-sm">business_center</span>
+          <Briefcase className="w-4 h-4" />
           B2B So'rovlar
         </button>
 
@@ -938,7 +958,7 @@ export default function AdminPage({
               : 'text-on-primary-container border-transparent hover:text-white'
           }`}
         >
-          <span className="material-symbols-outlined text-sm">settings</span>
+          <Settings className="w-4 h-4" />
           Sozlamalar
         </button>
       </div>

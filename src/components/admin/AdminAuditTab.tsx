@@ -1,4 +1,5 @@
 import React from 'react';
+import { History } from 'lucide-react';
 import { LoadingState } from '../LoadingState';
 import { formatDateTime } from '../../lib/formatDate';
 
@@ -22,7 +23,7 @@ export const AdminAuditTab: React.FC<AdminAuditTabProps> = ({
   return (
     <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
       <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4">
-        <span className="material-symbols-outlined text-secondary">history</span>
+        <History className="text-secondary w-5 h-5" />
         Tizim faoliyat tarixi ({auditLogs.length})
       </h2>
 
@@ -30,7 +31,7 @@ export const AdminAuditTab: React.FC<AdminAuditTabProps> = ({
         <LoadingState variant="block" text="Yuklanmoqda..." />
       ) : auditLogs.length === 0 ? (
         <div className="py-12 text-center text-on-primary-container space-y-2">
-          <span className="material-symbols-outlined text-4xl opacity-40">history</span>
+          <History className="w-10 h-10 mx-auto opacity-40 text-on-primary-container" />
           <p className="text-sm font-bold">Faoliyat tarixi bo'sh</p>
           <p className="text-xs">Hozircha adminlar tomonidan hech qanday amal bajarilmagan.</p>
         </div>

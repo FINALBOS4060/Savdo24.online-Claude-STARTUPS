@@ -1,5 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { 
+  Sparkles, 
+  Lock, 
+  PlusCircle, 
+  Trash2, 
+  RefreshCw, 
+  CheckCircle2, 
+  UploadCloud 
+} from 'lucide-react';
 import { Startup, Category, LoyihaMilestone } from '../types';
 import { CATEGORY_FIELDS } from '../categoryFields';
 import { apiFetch as fetch } from '../lib/api';
@@ -479,7 +488,7 @@ export default function SellPage({
                   }}
                   className="text-xs bg-secondary-container/10 text-secondary-container px-2 py-1 rounded border border-secondary-container/20 font-bold hover:bg-secondary-container/20 transition-all flex items-center gap-1"
                 >
-                  <span className="material-symbols-outlined text-xs">auto_awesome</span>
+                  <Sparkles className="w-3 h-3" />
                   AI Narx Taklifi
                 </button>
               </div>
@@ -608,8 +617,8 @@ export default function SellPage({
 
 
             <div className="col-span-1 md:col-span-2 space-y-2 mt-4 bg-secondary-container/5 p-4 rounded-xl border border-secondary-container/20">
-              <label className="text-xs font-bold text-secondary-container block flex items-center gap-1">
-                <span className="material-symbols-outlined text-sm">lock</span>
+              <label className="text-xs font-bold text-secondary-container block flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5" />
                 Yetkazib berish havolasi (Maxfiy)
               </label>
               <p className="text-xs text-on-primary-container mb-2">
@@ -678,7 +687,7 @@ export default function SellPage({
                 disabled={milestones.length >= 20}
                 className="text-xs font-bold text-secondary-container hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:no-underline"
               >
-                <span className="material-symbols-outlined text-sm">add_circle</span>
+                <PlusCircle className="w-3.5 h-3.5" />
                 Bosqich qo'shish{milestones.length > 0 ? ` (${milestones.length}/20)` : ''}
               </button>
             </div>
@@ -701,9 +710,9 @@ export default function SellPage({
                       <button
                         type="button"
                         onClick={() => setMilestones(milestones.filter((_, i) => i !== idx))}
-                        className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-all cursor-pointer flex-shrink-0"
+                        className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-all cursor-pointer flex-shrink-0 flex items-center justify-center"
                       >
-                        <span className="material-symbols-outlined text-sm">delete</span>
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                     <input
@@ -760,9 +769,7 @@ export default function SellPage({
               />
               {isUploading ? (
                 <div className="flex flex-col items-center justify-center space-y-2">
-                  <span className="material-symbols-outlined text-secondary-container text-4xl animate-spin">
-                    sync
-                  </span>
+                  <RefreshCw className="w-8 h-8 text-secondary-container animate-spin" />
                   <p className="text-xs font-bold text-white">Rasm yuklanmoqda, iltimos kuting...</p>
                 </div>
               ) : imageUrl ? (
@@ -778,7 +785,7 @@ export default function SellPage({
                   />
                   <div className="flex gap-2 items-center">
                     <p className="text-xs text-green-400 font-bold flex items-center gap-1">
-                      <span className="material-symbols-outlined text-xs">check_circle</span>
+                      <CheckCircle2 className="w-3.5 h-3.5" />
                       Muvaffaqiyatli yuklandi
                     </p>
                     <button
@@ -796,9 +803,7 @@ export default function SellPage({
                 </div>
               ) : (
                 <>
-                  <span className="material-symbols-outlined text-secondary-container text-4xl mb-3">
-                    cloud_upload
-                  </span>
+                  <UploadCloud className="w-10 h-10 text-secondary-container mb-3" />
                   <p className="text-xs font-bold text-white mb-1">
                     Faylni tortib olib tashlang yoki ko'rib chiqish uchun bosing
                   </p>

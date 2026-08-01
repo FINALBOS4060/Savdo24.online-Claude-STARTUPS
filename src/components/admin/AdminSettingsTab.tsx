@@ -1,4 +1,5 @@
 import React from 'react';
+import { Settings, EyeOff, Eye } from 'lucide-react';
 
 interface AdminSettingsTabProps {
   isLoadingSettings: boolean;
@@ -27,7 +28,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({
     <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
       <div className="border-b border-white/5 pb-4">
         <h2 className="text-lg font-bold text-white flex items-center gap-2">
-          <span className="material-symbols-outlined text-secondary">settings</span>
+          <Settings className="text-secondary w-5 h-5" />
           Tizim sozlamalari
         </h2>
         <p className="text-xs text-on-primary-container mt-1">
@@ -68,10 +69,10 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({
                     <button
                       type="button"
                       onClick={() => setVisibleSecrets({ ...visibleSecrets, [key]: !isVisible })}
-                      className="p-2.5 bg-white/5 hover:bg-white/10 rounded-xl text-gray-400 hover:text-white transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-secondary-container"
+                      className="p-2.5 bg-white/5 hover:bg-white/10 rounded-xl text-gray-400 hover:text-white transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-secondary-container flex items-center justify-center"
                       aria-label={isVisible ? 'Sozlamani berkitish' : 'Sozlamani ko\'rsatish'}
                     >
-                      <span className="material-symbols-outlined text-sm">{isVisible ? 'visibility_off' : 'visibility'}</span>
+                      {isVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   )}
                   <button

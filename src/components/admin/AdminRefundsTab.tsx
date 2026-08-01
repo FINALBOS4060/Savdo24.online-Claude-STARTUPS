@@ -1,4 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { 
+  Banknotes, 
+  RefreshCw, 
+  CheckCircle, 
+  CheckCircle2, 
+  Gift, 
+  GiftIcon 
+} from 'lucide-react';
 
 interface AdminRefundsTabProps {
   escrowRefunds: any[];
@@ -59,14 +67,14 @@ export const AdminRefundsTab: React.FC<AdminRefundsTabProps> = ({
       <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
         <div className="flex justify-between items-center border-b border-white/5 pb-4">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <span className="material-symbols-outlined text-amber-400">payments</span>
+            <GiftIcon className="text-amber-400 w-5 h-5" />
             Qaytarish talab qilinadigan to'lovlar (Refund Required) ({escrowRefunds.length})
           </h2>
           <button
             onClick={fetchEscrowRefunds}
             className="px-4 py-2 bg-secondary-container/10 text-secondary-container rounded-xl font-bold text-xs hover:bg-secondary-container/20 transition-all flex items-center gap-2 cursor-pointer"
           >
-            <span className="material-symbols-outlined text-sm">refresh</span>
+            <RefreshCw className="w-3.5 h-3.5" />
             Yangilash
           </button>
         </div>
@@ -75,7 +83,7 @@ export const AdminRefundsTab: React.FC<AdminRefundsTabProps> = ({
           <div className="py-12 text-center text-on-primary-container text-sm">Yuklanmoqda...</div>
         ) : escrowRefunds.length === 0 ? (
           <div className="py-12 text-center text-on-primary-container space-y-2">
-            <span className="material-symbols-outlined text-4xl opacity-40">task_alt</span>
+            <CheckCircle className="w-10 h-10 mx-auto opacity-40 text-on-primary-container" />
             <p className="text-sm font-bold">Kutilayotgan qaytarishlar mavjud emas</p>
             <p className="text-xs">Barcha moliyaviy amaliyotlar joyida.</p>
           </div>
@@ -101,9 +109,9 @@ export const AdminRefundsTab: React.FC<AdminRefundsTabProps> = ({
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => handleCompleteRefund(payment.id)}
-                    className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-black font-extrabold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-md"
+                    className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-black font-extrabold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
                   >
-                    <span className="material-symbols-outlined text-xs">done_all</span>
+                    <CheckCircle2 className="w-3.5 h-3.5" />
                     Qaytarish bajarildi (CoinGate)
                   </button>
                 </div>
@@ -117,14 +125,14 @@ export const AdminRefundsTab: React.FC<AdminRefundsTabProps> = ({
       <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
         <div className="flex justify-between items-center border-b border-white/5 pb-4">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <span className="material-symbols-outlined text-cyan-400">card_giftcard</span>
+            <Gift className="text-cyan-400 w-5 h-5" />
             Kutilayotgan Referral Mukofotlari (Earned/Pending Rewards) ({pendingRewards.length})
           </h2>
           <button
             onClick={fetchPendingRewards}
             className="px-4 py-2 bg-secondary-container/10 text-secondary-container rounded-xl font-bold text-xs hover:bg-secondary-container/20 transition-all flex items-center gap-2 cursor-pointer"
           >
-            <span className="material-symbols-outlined text-sm">refresh</span>
+            <RefreshCw className="w-3.5 h-3.5" />
             Yangilash
           </button>
         </div>
@@ -133,7 +141,7 @@ export const AdminRefundsTab: React.FC<AdminRefundsTabProps> = ({
           <div className="py-12 text-center text-on-primary-container text-sm">Yuklanmoqda...</div>
         ) : pendingRewards.length === 0 ? (
           <div className="py-12 text-center text-on-primary-container space-y-2">
-            <span className="material-symbols-outlined text-4xl opacity-40">redeem</span>
+            <Gift className="w-10 h-10 mx-auto opacity-40 text-on-primary-container" />
             <p className="text-sm font-bold">Kutilayotgan referral mukofotlari mavjud emas</p>
             <p className="text-xs">Barcha referral mukofotlari to'lab berilgan.</p>
           </div>
@@ -159,9 +167,9 @@ export const AdminRefundsTab: React.FC<AdminRefundsTabProps> = ({
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => handleCompleteReward(reward.id)}
-                    className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-black font-extrabold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-md"
+                    className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-black font-extrabold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
                   >
-                    <span className="material-symbols-outlined text-xs">check_circle</span>
+                    <CheckCircle className="w-3.5 h-3.5" />
                     To'landi deb belgilash (Paid Out)
                   </button>
                 </div>

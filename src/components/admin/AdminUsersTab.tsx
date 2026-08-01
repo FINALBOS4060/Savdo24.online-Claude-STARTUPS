@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Users, Search, X, Crown, UserCog, CheckCircle, AlertTriangle, KeyRound, Trash2, History, Ban } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Users, Search, X, Crown, UserCog, CheckCircle, AlertTriangle, KeyRound, Trash2, History, Ban, Star } from 'lucide-react';
 import { apiFetch as fetch } from '../../lib/api';
 import { LoadingState } from '../LoadingState';
 import { formatDate, formatDateTime } from '../../lib/formatDate';
@@ -390,8 +390,8 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                     </div>
                     <div className="space-y-1">
                       <p className="text-xs text-on-primary-container font-bold uppercase tracking-wider">Reyting</p>
-                      <p className="text-xl font-black text-white flex items-center gap-1">
-                        ⭐ 
+                      <p className="text-xl font-black text-white flex items-center gap-1.5">
+                        <Star className="w-5 h-5 text-secondary-container fill-secondary-container" />
                         {selectedUserDetail.user.averageRating ? (
                           selectedUserDetail.user.averageRating.toFixed(1)
                         ) : (

@@ -1,4 +1,5 @@
 import { ProfileTab } from '../types';
+import { Home, Trophy, Plus, Bookmark, User } from 'lucide-react';
 
 interface MobileNavProps {
   currentView: string;
@@ -25,6 +26,22 @@ export default function MobileNav({
     { id: 'profile', label: 'Profil', icon: 'person', view: 'profile', fillIcon: true }
   ];
 
+  const renderIcon = (iconName: string, isActive: boolean) => {
+    const props = { className: "w-5 h-5 select-none" };
+    switch (iconName) {
+      case 'home':
+        return <Home {...props} className={`w-5 h-5 select-none ${isActive ? 'fill-current' : ''}`} />;
+      case 'emoji_events':
+        return <Trophy {...props} className={`w-5 h-5 select-none ${isActive ? 'fill-current' : ''}`} />;
+      case 'bookmark':
+        return <Bookmark {...props} className={`w-5 h-5 select-none ${isActive ? 'fill-current' : ''}`} />;
+      case 'person':
+        return <User {...props} className={`w-5 h-5 select-none ${isActive ? 'fill-current' : ''}`} />;
+      default:
+        return null;
+    }
+  };
+
   return (
     <nav className="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center py-2 bg-primary-container border-t border-outline-variant/30 shadow-lg rounded-t-xl transition-colors duration-300">
       {tabs.map((tab) => {
@@ -42,7 +59,7 @@ export default function MobileNav({
               className="flex flex-col items-center justify-center text-secondary-container font-bold scale-90 transition-transform active:scale-75"
             >
               <div className="w-10 h-10 bg-secondary-container rounded-full flex items-center justify-center -mt-6 border-4 border-primary-container text-on-secondary-fixed">
-                <span className="material-symbols-outlined text-xl">add</span>
+                <Plus className="w-5 h-5" />
               </div>
               <span className="text-xs mt-0.5">E'lon</span>
             </button>
@@ -75,14 +92,7 @@ export default function MobileNav({
                 : 'text-on-primary-container hover:text-white'
             }`}
           >
-            <span
-              className="material-symbols-outlined text-xl select-none"
-              style={{
-                fontVariationSettings: isActive && tab.fillIcon ? "'FILL' 1" : "'FILL' 0"
-              }}
-            >
-              {tab.icon}
-            </span>
+            {renderIcon(tab.icon, isActive)}
             <span className="text-xs mt-0.5">{tab.label}</span>
           </button>
         );

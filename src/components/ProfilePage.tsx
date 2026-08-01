@@ -11,6 +11,23 @@ import { ProfileEarningsTab } from './profile/ProfileEarningsTab';
 import { ProfileReviewsTab } from './profile/ProfileReviewsTab';
 import { ProfileSettingsTab } from './profile/ProfileSettingsTab';
 import { ProfileSecurityTab } from './profile/ProfileSecurityTab';
+import { 
+  AlertTriangle, 
+  Camera, 
+  CheckCircle, 
+  Rocket, 
+  Bookmark, 
+  ShoppingCart, 
+  Coins, 
+  MessageSquare, 
+  UserPlus, 
+  Building2, 
+  Settings, 
+  Crown, 
+  Shield, 
+  X, 
+  ArrowUpCircle 
+} from 'lucide-react';
 
 interface ProfilePageProps {
   startups: Startup[];
@@ -450,7 +467,7 @@ export default function ProfilePage({
       {!user.emailVerified && user.id && (
         <div className="bg-secondary-container/10 border border-secondary-container/20 p-4 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-start gap-3">
-            <span className="material-symbols-outlined text-secondary mt-0.5">warning</span>
+            <AlertTriangle className="text-secondary w-5 h-5 mt-0.5 shrink-0" />
             <div>
               <h4 className="text-white font-bold text-sm">Hisobingiz tasdiqlanmagan</h4>
               <p className="text-on-primary-container text-xs mt-1">
@@ -493,7 +510,7 @@ export default function ProfilePage({
             {isUploadingCover ? (
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
             ) : (
-              <span className="material-symbols-outlined text-sm">photo_camera</span>
+              <Camera className="w-4 h-4" />
             )}
             Bannerni tahrirlash
           </button>
@@ -512,7 +529,7 @@ export default function ProfilePage({
               />
             </div>
             <div className="absolute bottom-2 right-2 w-8 h-8 bg-secondary-container rounded-full flex items-center justify-center border-4 border-background shadow-lg">
-              <span className="material-symbols-outlined text-on-secondary-fixed text-sm font-bold">verified</span>
+              <CheckCircle className="text-on-secondary-fixed w-4 h-4" />
             </div>
           </div>
 
@@ -557,7 +574,7 @@ export default function ProfilePage({
               : 'text-on-primary-container border-transparent hover:text-secondary-container'
           }`}
         >
-          <span className="material-symbols-outlined text-lg">rocket_launch</span>
+          <Rocket className="w-4 h-4" />
           Mening loyihalarim va g'oyalarim
         </button>
         <button
@@ -568,7 +585,7 @@ export default function ProfilePage({
               : 'text-on-primary-container border-transparent hover:text-secondary-container'
           }`}
         >
-          <span className="material-symbols-outlined text-lg">bookmark</span>
+          <Bookmark className="w-4 h-4" />
           Saqlanganlar ({savedStartups.length})
         </button>
         <button
@@ -579,7 +596,7 @@ export default function ProfilePage({
               : 'text-on-primary-container border-transparent hover:text-secondary-container'
           }`}
         >
-          <span className="material-symbols-outlined text-lg">shopping_cart</span>
+          <ShoppingCart className="w-4 h-4" />
           Xaridlarim
         </button>
         <button
@@ -590,7 +607,7 @@ export default function ProfilePage({
               : 'text-on-primary-container border-transparent hover:text-secondary-container'
           }`}
         >
-          <span className="material-symbols-outlined text-lg">payments</span>
+          <Coins className="w-4 h-4" />
           Daromadlarim
         </button>
         <button
@@ -601,7 +618,7 @@ export default function ProfilePage({
               : 'text-on-primary-container border-transparent hover:text-secondary-container'
           }`}
         >
-          <span className="material-symbols-outlined text-lg">reviews</span>
+          <MessageSquare className="w-4 h-4" />
           Sharhlarim
         </button>
         <button
@@ -612,7 +629,7 @@ export default function ProfilePage({
               : 'text-on-primary-container border-transparent hover:text-success'
           }`}
         >
-          <span className="material-symbols-outlined text-lg">group_add</span>
+          <UserPlus className="w-4 h-4" />
           Referral
         </button>
         <button
@@ -623,7 +640,7 @@ export default function ProfilePage({
               : 'text-on-primary-container border-transparent hover:text-secondary'
           }`}
         >
-          <span className="material-symbols-outlined text-lg">business</span>
+          <Building2 className="w-4 h-4" />
           B2B Wholesale
         </button>
         <button
@@ -634,7 +651,7 @@ export default function ProfilePage({
               : 'text-on-primary-container border-transparent hover:text-secondary-container'
           }`}
         >
-          <span className="material-symbols-outlined text-lg">settings</span>
+          <Settings className="w-4 h-4" />
           Sozlamalar
         </button>
         <button
@@ -645,7 +662,7 @@ export default function ProfilePage({
               : 'text-on-primary-container border-transparent hover:text-secondary'
           }`}
         >
-          <span className="material-symbols-outlined text-lg">workspace_premium</span>
+          <Crown className="w-4 h-4" />
           VIP a'zolik
         </button>
         <button
@@ -656,7 +673,7 @@ export default function ProfilePage({
               : 'text-on-primary-container border-transparent hover:text-secondary-container'
           }`}
         >
-          <span className="material-symbols-outlined text-lg">shield</span>
+          <Shield className="w-4 h-4" />
           Xavfsizlik
         </button>
       </div>
@@ -708,11 +725,11 @@ export default function ProfilePage({
               className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-all text-white focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
               aria-label="Yopish"
             >
-              <span className="material-symbols-outlined">close</span>
+              <X className="w-5 h-5" />
             </button>
 
             <div className="text-center space-y-2">
-              <span className="material-symbols-outlined text-4xl text-secondary-container">vertical_align_top</span>
+              <ArrowUpCircle className="w-10 h-10 text-secondary-container mx-auto" />
               <h3 className="text-2xl font-black text-white">Elonni TOPga chiqarish</h3>
               <p className="text-xs text-on-primary-container">"{topModal.startupName}"</p>
             </div>

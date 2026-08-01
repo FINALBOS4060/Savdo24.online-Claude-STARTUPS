@@ -1,4 +1,13 @@
 import React from 'react';
+import { 
+  Lightbulb, 
+  RefreshCw, 
+  AtSign, 
+  Flag, 
+  ThumbsUp, 
+  MessageSquarePlus, 
+  Send 
+} from 'lucide-react';
 import { formatDateTime } from '../../lib/formatDate';
 
 interface DetailIdeasSectionProps {
@@ -35,7 +44,7 @@ export const DetailIdeasSection: React.FC<DetailIdeasSectionProps> = ({
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-white/5 pb-4">
         <div>
           <h3 className="text-white font-black text-lg md:text-xl flex items-center gap-2">
-            <span className="material-symbols-outlined text-secondary">lightbulb</span>
+            <Lightbulb className="text-secondary w-5 h-5" />
             Startap uchun g'oyalar va takliflar
           </h3>
           <p className="text-xs text-on-primary-container mt-0.5">
@@ -51,12 +60,12 @@ export const DetailIdeasSection: React.FC<DetailIdeasSectionProps> = ({
       <div className="space-y-4">
         {isLoadingIdeas ? (
           <div className="py-8 text-center text-on-primary-container space-y-2">
-            <span className="material-symbols-outlined text-3xl animate-spin">sync</span>
+            <RefreshCw className="w-8 h-8 animate-spin mx-auto text-secondary" />
             <p className="text-xs">G'oyalar yuklanmoqda...</p>
           </div>
         ) : ideas.length === 0 ? (
           <div className="py-8 text-center text-on-primary-container space-y-2 bg-white/2 border border-dashed border-white/5 rounded-xl">
-            <span className="material-symbols-outlined text-4xl opacity-30">lightbulb_outline</span>
+            <Lightbulb className="w-10 h-10 mx-auto opacity-30 text-secondary" />
             <p className="text-xs font-semibold">Hozircha g'oyalar yo'q</p>
             <p className="text-xs opacity-80">Birinchi bo'lib o'z foydali taklifingizni qo'shing!</p>
           </div>
@@ -91,7 +100,7 @@ export const DetailIdeasSection: React.FC<DetailIdeasSectionProps> = ({
                     </p>
                     <div className="flex items-center gap-2 text-xs text-on-primary-container flex-wrap">
                       <span className="font-extrabold text-secondary flex items-center gap-1">
-                        <span className="material-symbols-outlined text-xs">alternate_email</span>
+                        <AtSign className="w-3.5 h-3.5 text-secondary" />
                         {idea.authorName}
                       </span>
                       <span>•</span>
@@ -109,7 +118,7 @@ export const DetailIdeasSection: React.FC<DetailIdeasSectionProps> = ({
                         onClick={() => handleOpenReportModal('idea', String(idea.id))}
                         className="text-red-400 hover:text-red-300 font-bold hover:underline transition-all cursor-pointer flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-red-500 rounded px-1"
                       >
-                        <span className="material-symbols-outlined text-xs">flag</span>
+                        <Flag className="w-3 h-3 text-red-400" />
                         Shikoyat qilish
                       </button>
                     </div>
@@ -120,9 +129,7 @@ export const DetailIdeasSection: React.FC<DetailIdeasSectionProps> = ({
                     disabled={votingIdeaIds.has(idea.id)}
                     className="flex flex-col items-center justify-center gap-1 bg-white/4 hover:bg-secondary/10 hover:border-secondary/30 border border-white/5 rounded-xl px-3 py-2 transition-all active:scale-95 group shrink-0 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
                   >
-                    <span className="material-symbols-outlined text-secondary text-base group-hover:scale-110 transition-transform">
-                      thumb_up
-                    </span>
+                    <ThumbsUp className="w-4 h-4 text-secondary group-hover:scale-110 transition-transform" />
                     <span className="text-xs font-extrabold text-white font-mono">
                       {idea.upvotes}
                     </span>
@@ -137,7 +144,7 @@ export const DetailIdeasSection: React.FC<DetailIdeasSectionProps> = ({
       {/* Submission Form */}
       <form onSubmit={handleSubmitIdea} className="bg-white/2 border border-white/5 rounded-xl p-4 space-y-3.5">
         <h4 className="text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1">
-          <span className="material-symbols-outlined text-xs">add_comment</span>
+          <MessageSquarePlus className="w-3.5 h-3.5 text-secondary" />
           Yangi g'oya qo'shish
         </h4>
         <textarea
@@ -167,7 +174,7 @@ export const DetailIdeasSection: React.FC<DetailIdeasSectionProps> = ({
             disabled={isSubmittingIdea || !newIdeaContent.trim()}
             className="px-5 py-2.5 bg-secondary hover:brightness-110 text-on-secondary font-extrabold text-xs rounded-xl transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
           >
-            <span className="material-symbols-outlined text-sm">send</span>
+            <Send className="w-3.5 h-3.5" />
             {isSubmittingIdea ? "Yuborilmoqda..." : "G'oyani yuborish"}
           </button>
         </div>

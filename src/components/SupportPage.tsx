@@ -1,4 +1,14 @@
 import React, { useState } from 'react';
+import { 
+  HelpCircle, 
+  ArrowLeft, 
+  MessageSquare, 
+  Mail, 
+  Send, 
+  PenSquare, 
+  CheckCircle, 
+  ChevronDown 
+} from 'lucide-react';
 import { apiFetch as fetch } from '../lib/api';
 
 interface FAQItem {
@@ -78,7 +88,7 @@ export default function SupportPage({ setView, onActionToast }: { setView: (view
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-black text-white flex items-center gap-2">
-            <span className="material-symbols-outlined text-secondary-container text-4xl">help_center</span>
+            <HelpCircle className="text-secondary-container w-9 h-9" />
             Qo'llab-quvvatlash markazi
           </h1>
           <p className="text-xs text-on-primary-container mt-1">
@@ -89,7 +99,7 @@ export default function SupportPage({ setView, onActionToast }: { setView: (view
           onClick={() => setView('browse')}
           className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 border border-outline-variant/20 transition-all"
         >
-          <span className="material-symbols-outlined text-sm">arrow_back</span>
+          <ArrowLeft className="w-4 h-4" />
           Asosiy sahifaga qaytish
         </button>
       </div>
@@ -101,7 +111,7 @@ export default function SupportPage({ setView, onActionToast }: { setView: (view
         <div className="md:col-span-5 space-y-6">
           <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 space-y-6 shadow-xl">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <span className="material-symbols-outlined text-secondary-container text-xl">contact_support</span>
+              <MessageSquare className="text-secondary-container w-5 h-5" />
               To'g'ridan-to'g'ri aloqa
             </h2>
 
@@ -111,7 +121,7 @@ export default function SupportPage({ setView, onActionToast }: { setView: (view
                 className="flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all group"
               >
                 <div className="w-10 h-10 rounded-full bg-secondary-container/10 flex items-center justify-center text-secondary-container">
-                  <span className="material-symbols-outlined">mail</span>
+                  <Mail className="w-5 h-5" />
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wider text-on-primary-container font-extrabold">Elektron pochta</p>
@@ -126,7 +136,7 @@ export default function SupportPage({ setView, onActionToast }: { setView: (view
                 className="flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all group"
               >
                 <div className="w-10 h-10 rounded-full bg-secondary-container/10 flex items-center justify-center text-secondary-container">
-                  <span className="material-symbols-outlined">send</span>
+                  <Send className="w-5 h-5" />
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wider text-on-primary-container font-extrabold">Telegram aloqa</p>
@@ -139,13 +149,13 @@ export default function SupportPage({ setView, onActionToast }: { setView: (view
           {/* Quick Ticket Form */}
           <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 shadow-xl">
             <h2 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
-              <span className="material-symbols-outlined text-secondary-container text-xl">edit_note</span>
+              <PenSquare className="text-secondary-container w-5 h-5" />
               Murojaat qoldirish
             </h2>
 
             {formSubmitted ? (
               <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 text-center space-y-2 animate-scale-up">
-                <span className="material-symbols-outlined text-green-400 text-3xl">check_circle</span>
+                <CheckCircle className="text-green-400 w-8 h-8 mx-auto" />
                 <p className="text-sm font-bold text-white">Murojaatingiz qabul qilindi!</p>
                 <p className="text-xs text-on-primary-container">Tez orada operatorlarimiz siz bilan bog'lanishadi.</p>
                 <button
@@ -198,7 +208,7 @@ export default function SupportPage({ setView, onActionToast }: { setView: (view
                   disabled={submitting}
                   className="w-full py-3 bg-secondary-container text-on-secondary-fixed rounded-xl font-bold text-xs shadow-lg shadow-secondary-container/10 hover:brightness-110 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 transition-all flex items-center justify-center gap-1.5"
                 >
-                  <span className="material-symbols-outlined text-sm">send</span>
+                  <Send className="w-3.5 h-3.5" />
                   {submitting ? 'Yuborilmoqda...' : 'Yuborish'}
                 </button>
               </form>
@@ -210,7 +220,7 @@ export default function SupportPage({ setView, onActionToast }: { setView: (view
         <div className="md:col-span-7 space-y-4">
           <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 shadow-xl">
             <h2 className="text-xl font-black text-white flex items-center gap-2 mb-6 border-b border-outline-variant/15 pb-4">
-              <span className="material-symbols-outlined text-secondary-container">quiz</span>
+              <HelpCircle className="text-secondary-container w-6 h-6" />
               Ko'p beriladigan savollar (FAQ)
             </h2>
 
@@ -227,9 +237,7 @@ export default function SupportPage({ setView, onActionToast }: { setView: (view
                       className="w-full flex justify-between items-center p-4 text-left hover:bg-white/5 transition-all"
                     >
                       <span className="font-bold text-sm text-white pr-4">{faq.question}</span>
-                      <span className={`material-symbols-outlined text-secondary-container transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}>
-                        expand_more
-                      </span>
+                      <ChevronDown className={`w-5 h-5 text-secondary-container transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
                     </button>
                     
                     <div

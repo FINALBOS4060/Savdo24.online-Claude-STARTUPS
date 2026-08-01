@@ -1,7 +1,55 @@
 import React, { useState } from 'react';
+import { 
+  Folder, 
+  Plus, 
+  Trash2, 
+  PlusCircle, 
+  Edit, 
+  X, 
+  RefreshCw, 
+  HelpCircle 
+} from 'lucide-react';
+import * as Icons from 'lucide-react';
 import { Category } from '../../types';
 import { apiFetch as fetch } from '../../lib/api';
 import { ConfirmDialog } from '../ConfirmDialog';
+
+const getLucideIconName = (materialName: string): string => {
+  const map: Record<string, string> = {
+    'rocket_launch': 'Rocket',
+    'rocket': 'Rocket',
+    'category': 'Folder',
+    'shopping_cart': 'ShoppingCart',
+    'payments': 'Coins',
+    'business': 'Building2',
+    'settings': 'Settings',
+    'group': 'Users',
+    'gavel': 'Gavel',
+    'flag': 'Flag',
+    'history': 'History',
+    'campaign': 'Megaphone',
+    'list': 'List',
+    'help_center': 'HelpCircle',
+    'quiz': 'HelpCircle',
+    'support_agent': 'Headphones',
+    'mail': 'Mail',
+    'send': 'Send',
+    'edit_note': 'FileText',
+    'add': 'Plus',
+    'add_circle': 'PlusCircle',
+    'edit_square': 'Edit',
+    'close': 'X',
+    'sync': 'RefreshCw',
+    'delete': 'Trash2',
+  };
+  return map[materialName] || materialName.charAt(0).toUpperCase() + materialName.slice(1);
+};
+
+export function CategoryIcon({ name, className }: { name: string; className?: string }) {
+  const lucideName = getLucideIconName(name);
+  const IconComponent = (Icons as any)[lucideName] || HelpCircle;
+  return <IconComponent className={className} />;
+}
 
 interface AdminCategoriesTabProps {
   categories: Category[];
@@ -99,14 +147,14 @@ export function AdminCategoriesTab({ categories, fetchCategories, onActionToast 
     <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
       <div className="flex justify-between items-center border-b border-white/5 pb-6">
         <h2 className="text-lg font-bold text-white flex items-center gap-2">
-          <span className="material-symbols-outlined text-secondary">category</span>
+          <Folder className="text-secondary w-5 h-5" />
           Kategoriyalarni boshqarish
         </h2>
         <button
           onClick={() => setIsAddingCategory(true)}
           className="px-4 py-2 bg-secondary text-on-secondary rounded-xl font-bold text-xs hover:brightness-110 transition-all flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
         >
-          <span className="material-symbols-outlined text-sm">add</span>
+          <Plus className="w-4 h-4" />
           Yangi qo'shish
         </button>
       </div>
@@ -116,7 +164,7 @@ export function AdminCategoriesTab({ categories, fetchCategories, onActionToast 
           <div key={cat.id} className="bg-surface-container-low border border-white/5 rounded-2xl p-5 space-y-4 hover:border-white/10 transition-all">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-secondary">
-                <span className="material-symbols-outlined text-2xl">{cat.icon}</span>
+                <CategoryIcon name={cat.icon} className="w-6 h-6" />
               </div>
               <div>
                 <h3 className="text-white font-bold text-sm">{cat.name}</h3>
@@ -132,9 +180,9 @@ export function AdminCategoriesTab({ categories, fetchCategories, onActionToast 
               </button>
               <button
                 onClick={() => setDeleteCategoryId(cat.id)}
-                className="py-2 px-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg font-bold text-xs transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-500"
+                className="py-2 px-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg font-bold text-xs transition-all cursor-pointer flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-red-500"
               >
-                <span className="material-symbols-outlined text-sm">delete</span>
+                <Trash2 className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -157,17 +205,19 @@ export function AdminCategoriesTab({ categories, fetchCategories, onActionToast 
           <div className="bg-primary-container border border-outline-variant/30 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-fade-in-up">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-white font-bold flex items-center gap-2">
-                <span className="material-symbols-outlined text-secondary">
-                  {isAddingCategory ? 'add_circle' : 'edit_square'}
-                </span>
+                {isAddingCategory ? (
+                  <PlusCircle className="text-secondary w-5 h-5" />
+                ) : (
+                  <Edit className="text-secondary w-5 h-5" />
+                )}
                 {isAddingCategory ? "Yangi kategoriya qo'shish" : "Kategoriyani tahrirlash"}
               </h3>
               <button 
                 onClick={() => { setIsAddingCategory(false); setEditingCategory(null); }}
-                className="text-on-primary-container hover:text-white focus:outline-none focus:ring-2 focus:ring-white/50 rounded-full p-1"
+                className="text-on-primary-container hover:text-white focus:outline-none focus:ring-2 focus:ring-white/50 rounded-full p-1 flex items-center justify-center"
                 aria-label="Yopish"
               >
-                <span className="material-symbols-outlined">close</span>
+                <X className="w-5 h-5" />
               </button>
             </div>
 
@@ -209,7 +259,7 @@ export function AdminCategoriesTab({ categories, fetchCategories, onActionToast 
                 disabled={isSavingCategory}
                 className="w-full py-3 bg-secondary text-on-secondary rounded-xl font-bold text-sm shadow-lg shadow-secondary/10 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
               >
-                {isSavingCategory && <span className="material-symbols-outlined text-sm animate-spin">sync</span>}
+                {isSavingCategory && <RefreshCw className="w-4 h-4 animate-spin" />}
                 {isAddingCategory ? "Qo'shish" : "Saqlash"}
               </button>
             </form>
