@@ -52,6 +52,7 @@ router.post("/onboard", authenticateToken, async (req: AuthRequest, res: Respons
 
     res.json(b2b);
   } catch (err) {
+    logger.error({ err }, "B2B onboarding error");
     res.status(500).json({ error: "B2B hisob yaratishda xatolik." });
   }
 });
@@ -65,6 +66,7 @@ router.get("/profile", authenticateToken, async (req: AuthRequest, res: Response
     if (!b2b) return res.status(404).json({ error: "B2B hisob topilmadi." });
     res.json(b2b);
   } catch (err) {
+    logger.error({ err }, "Get B2B profile error");
     res.status(500).json({ error: "B2B ma'lumotlarini yuklashda xatolik." });
   }
 });

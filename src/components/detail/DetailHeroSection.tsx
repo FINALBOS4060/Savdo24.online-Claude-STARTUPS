@@ -27,10 +27,10 @@ export const DetailHeroSection: React.FC<DetailHeroSectionProps> = ({
           <span className="px-3 py-1 bg-secondary-container text-on-secondary-fixed text-xs font-bold rounded-full mb-3 inline-block uppercase tracking-wider">
             {startup.slogan}
           </span>
-          <h1 className="text-white font-extrabold text-2xl md:text-4xl mb-2 flex items-center gap-3">
+          <h1 className="text-on-primary-container font-extrabold text-2xl md:text-4xl mb-2 flex items-center gap-3">
             {startup.name}
             {startup.isTop && (
-              <span className="text-xs bg-yellow-400/20 text-yellow-400 px-2 py-0.5 rounded-full font-black flex items-center gap-1">
+              <span className="text-xs bg-secondary/20 text-secondary px-2 py-0.5 rounded-full font-black flex items-center gap-1">
                 <ArrowUpCircle className="w-3.5 h-3.5 text-xs" />
                 TOP
               </span>
@@ -41,7 +41,7 @@ export const DetailHeroSection: React.FC<DetailHeroSectionProps> = ({
           </p>
           <button
             onClick={handleContactSeller}
-            className="mt-4 px-4 py-2 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+            className="mt-4 px-4 py-2 bg-white/10 hover:bg-white/20 text-on-primary-container font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
           >
             💬 Sotuvchi bilan bog'lanish
           </button>

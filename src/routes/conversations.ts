@@ -11,6 +11,7 @@ import {
   prisma,
   authenticateToken,
   createNotification,
+  notifyUserTelegram,
   io,
   AuthRequest
 } from "../lib/context";
@@ -51,7 +52,7 @@ router.post("/", authenticateToken, async (req: AuthRequest, res: Response) => {
       });
     }
     res.json(conversation);
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error({ err }, "Create conversation error");
     res.status(500).json({ error: "Suhbat boshlashda xatolik yuz berdi." });
   }
@@ -71,7 +72,7 @@ router.get("/", authenticateToken, async (req: AuthRequest, res: Response) => {
       orderBy: { lastMessageAt: "desc" }
     });
     res.json(conversations);
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error({ err }, "Get conversations error");
     res.status(500).json({ error: "Suhbatlarni yuklashda xatolik yuz berdi." });
   }
@@ -102,7 +103,7 @@ router.get("/:id/messages", authenticateToken, async (req: AuthRequest, res: Res
       messages: messages.reverse(),
       hasMore: messages.length === 50
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error({ err }, "Get messages error");
     res.status(500).json({ error: "Xabarlarni yuklashda xatolik yuz berdi." });
   }
@@ -150,9 +151,14 @@ router.post("/:id/messages", authenticateToken, rateLimit({ windowMs: 60 * 1000,
       `${senderName} sizga yangi xabar yubordi: "${content.substring(0, 30)}${content.length > 30 ? '...' : ''}"`,
       `/messages`
     );
+    notifyUserTelegram(
+      recipientId,
+      `💬 <b>${senderName}</b> sizga yangi xabar yubordi:\n\n"${content.substring(0, 200)}${content.length > 200 ? '...' : ''}"`,
+      `/messages`
+    );
 
     res.json(message);
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error({ err }, "Post message error");
     res.status(500).json({ error: "Xabar yuborishda xatolik yuz berdi." });
   }
@@ -174,7 +180,7 @@ router.patch("/:id/read", authenticateToken, async (req: AuthRequest, res: Respo
       data: { readAt: new Date() }
     });
     res.json({ success: true });
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error({ err }, "Read messages error");
     res.status(500).json({ error: "Xabarlarni o'qilgan deb belgilashda xatolik yuz berdi." });
   }

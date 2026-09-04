@@ -304,13 +304,24 @@ export default function CheckoutPage({
     return `${mins}:${remainingSecs < 10 ? '0' : ''}${remainingSecs}`;
   };
 
+  // XATO: `isExpired` bu yerda faqat frontend'dagi 15 daqiqalik ko'rsatkich
+  // taymeriga asoslangan edi, lekin haqiqiy to'lov buyurtmasi backend'da
+  // (src/lib/payments.ts) 24 SOATGACHA amal qiladi. Natijada 15 daqiqadan
+  // keyin: (1) "To'lov sahifasiga o'tish" tugmasi noto'g'ri "Vaqt tugadi"
+  // xabari bilan bloklanardi — garchi to'lov havolasi haligacha amal
+  // qilsa ham, va (2) "To'lov holatini tekshirish" tugmasi ham bloklanardi
+  // (garchi fondagi avtomatik 3 soniyalik polling buni bilmasdan davom
+  // etaversa ham). Ya'ni foydalanuvchi to'lovni kechroq (masalan 20-30
+  // daqiqada, kripto pul o'tkazmasi tez-tez shuncha vaqt oladi) yakunlasa
+  // ham, sahifaga qaytib "qayta tekshirish"ni bosolmasdi — faqat fondagi
+  // polling uni tasodifan ushlab olishiga umid qilishga majbur bo'lardi.
+  // Backend haqiqiy amal qilish muddatini bilgani uchun, endi bu yerda
+  // faqat KO'RSATKICH sifatida qoladi (qizil rang/"Vaqt tugadi" matni),
+  // lekin amallarni bloklamaydi — server o'zi (agar rostdan muddati
+  // o'tgan bo'lsa) mos xato/holat qaytaradi.
   const isExpired = timeLeft <= 0 && paymentStep === 'checkout';
 
   const handleCoinGateRedirect = () => {
-    if (isExpired) {
-      onActionToast("To'lov vaqti tugadi. Iltimos, sahifani yangilab qayta urinib ko'ring.");
-      return;
-    }
     if (paymentUrl) {
       window.location.href = paymentUrl;
       onActionToast(gateway === 'stripe' ? "Xavfsiz to'lov sahifasiga yo'naltirilmoqda..." : "CoinGate xavfsiz to'lov sahifasiga yo'naltirilmoqda...");
@@ -394,6 +405,17 @@ export default function CheckoutPage({
                   <ExternalLink className="w-4 h-4 font-bold" />
                   To'lov sahifasiga o'tish
                 </button>
+                {startupId && (
+                  <a
+                    href={`https://t.me/Savdo24_Register_bot?start=buy_${startupId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-6 py-3 bg-[#229ED9] hover:bg-[#1c8bc0] active:scale-95 text-white font-black text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-[#229ED9]/10"
+                  >
+                    <Send className="w-4 h-4 font-bold" />
+                    Telegram orqali to'lash
+                  </a>
+                )}
               </div>
             </div>
 
@@ -401,11 +423,11 @@ export default function CheckoutPage({
             <div className="grid grid-cols-2 gap-6 bg-white/5 p-5 rounded-2xl border border-white/5">
               <div>
                 <p className="text-xs text-on-primary-container font-extrabold uppercase tracking-wider mb-1">Loyha nomi</p>
-                <p className="text-sm font-bold text-white truncate">{startup?.name || "Loyiha xaridi"}</p>
+                <p className="text-sm font-bold text-on-background truncate">{startup?.name || "Loyiha xaridi"}</p>
               </div>
               <div>
                 <p className="text-xs text-on-primary-container font-extrabold uppercase tracking-wider mb-1">Buyurtma ID</p>
-                <p className="text-sm font-bold text-white font-mono">{activeOrderId || "Yaratilmoqda..."}</p>
+                <p className="text-sm font-bold text-on-background font-mono">{activeOrderId || "Yaratilmoqda..."}</p>
               </div>
               <div className="col-span-2 pt-4 border-t border-white/5 flex justify-between items-center">
                 <div>
@@ -434,7 +456,7 @@ export default function CheckoutPage({
                     type="text"
                     value={referralCode}
                     onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-                    className={`flex-1 bg-surface-container-low border border-white/10 rounded-xl px-4 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface ${gateway === 'stripe' ? 'focus:border-indigo-600' : 'focus:border-success'}`}
+                    className={`flex-1 bg-surface-container-low border border-white/10 rounded-xl px-4 py-2 text-xs text-on-surface focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface ${gateway === 'stripe' ? 'focus:border-indigo-600' : 'focus:border-success'}`}
                     placeholder="KODNI KIRITING"
                   />
                   <button 
@@ -450,9 +472,9 @@ export default function CheckoutPage({
 
             {/* API Keys Configuration Banner */}
             {apiKeysMissing && (
-              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-4 text-xs text-yellow-500 leading-relaxed space-y-1">
+              <div className="bg-secondary/10 border border-secondary/30 rounded-2xl p-4 text-xs text-secondary leading-relaxed space-y-1">
                 <p className="font-extrabold uppercase tracking-wide flex items-center gap-1.5">
-                  <AlertTriangle className="w-4 h-4 text-yellow-500" />
+                  <AlertTriangle className="w-4 h-4 text-secondary" />
                   Eslatma: CoinGate API kaliti sozlanmagan
                 </p>
                 <p>
@@ -469,7 +491,7 @@ export default function CheckoutPage({
               {activeOrderId && (
                 <button
                   onClick={handleVerifyPayment}
-                  disabled={isChecking || isExpired}
+                  disabled={isChecking}
                   className={gateway === 'stripe'
                     ? "px-6 py-3 border border-indigo-600/30 hover:bg-indigo-600/5 active:scale-95 text-indigo-400 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                     : "px-6 py-3 border border-success/30 hover:bg-success/5 active:scale-95 text-success font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"}
@@ -494,7 +516,7 @@ export default function CheckoutPage({
             </div>
           </div>
           <div className="space-y-2 max-w-sm">
-            <h2 className="text-xl font-black text-white">Tranzaksiya tasdiqlanmoqda</h2>
+            <h2 className="text-xl font-black text-on-background">Tranzaksiya tasdiqlanmoqda</h2>
             <p className="text-xs text-on-primary-container leading-relaxed">
               {gateway === 'stripe'
                 ? "Karta tranzaksiyasi tasdiqlanmoqda. Iltimos, ushbu oynani yopmang yoki yangilamang."
@@ -512,7 +534,7 @@ export default function CheckoutPage({
               <CheckCircle2 className="w-8 h-8 font-bold" />
             </div>
             <div>
-              <h2 className="text-2xl font-black text-white">Xarid tasdiqlandi!</h2>
+              <h2 className="text-2xl font-black text-on-background">Xarid tasdiqlandi!</h2>
               <p className="text-xs text-on-primary-container mt-1">{activeOrderId} ID raqamli buyurtma xarid kvitansiyasi</p>
             </div>
           </div>
@@ -520,7 +542,7 @@ export default function CheckoutPage({
           <div className="bg-white/5 border border-white/5 rounded-2xl p-6 space-y-4 font-semibold text-sm">
             <div className="flex justify-between">
               <span className="text-on-primary-container">Jami summa</span>
-              <span className="text-white font-mono font-bold">${(discountData ? amount * (1 - discountData.discountPercent / 100) : amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} {gateway === 'stripe' ? 'USD' : 'USDT'}</span>
+              <span className="text-on-background font-mono font-bold">${(discountData ? amount * (1 - discountData.discountPercent / 100) : amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} {gateway === 'stripe' ? 'USD' : 'USDT'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-on-primary-container">Mahsulot</span>
@@ -576,7 +598,7 @@ export default function CheckoutPage({
                 // Hide seller contact - use encrypted/masked display
                 <div className="bg-success/10 border border-success/30 rounded-xl p-4 flex flex-col items-center text-center">
                   <Hourglass className="text-success w-6 h-6 mb-2 text-2xl" />
-                  <p className="text-white text-sm font-bold mb-1">Sotuvchi 24 soat ichida siz bilan bog'lanadi</p>
+                  <p className="text-on-background text-sm font-bold mb-1">Sotuvchi 24 soat ichida siz bilan bog'lanadi</p>
                   <p className="text-success text-xs">
                     Aloqa ma'lumotlari maxfiy: {deliveryData.sellerContact ? '✓ Qabul qilindi' : '⏳ Kutilmoqda'}
                   </p>
@@ -615,7 +637,7 @@ export default function CheckoutPage({
                     Loyiha omboriga / Havolasiga o'tish
                   </a>
                 ) : (
-                  <div className="bg-success/10 border border-success/30 rounded-xl p-4 text-center text-xs text-white">
+                  <div className="bg-success/10 border border-success/30 rounded-xl p-4 text-center text-xs text-on-background">
                     Sotuvchi ushbu loyiha uchun yetkazib berish havolasini kiritmagan. Iltimos, pastdagi aloqa ma'lumotlari orqali sotuvchi bilan bog'laning.
                   </div>
                 )}
@@ -626,7 +648,7 @@ export default function CheckoutPage({
               <p className="text-xs text-on-primary-container">
                 Muammo yuzaga kelsa yoki qo'shimcha savollar bo'lsa, to'g'ridan-to'g'ri sotuvchi bilan bog'lanishingiz mumkin:
               </p>
-              <div className="flex flex-wrap gap-2 text-xs text-white">
+              <div className="flex flex-wrap gap-2 text-xs text-on-background">
                 {startup?.contactTelegram && (
                   <a
                     href={`https://t.me/${startup.contactTelegram.replace('@', '')}`}
@@ -641,7 +663,7 @@ export default function CheckoutPage({
                 {startup?.contactEmail && (
                   <a
                     href={`mailto:${startup.contactEmail}`}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 text-white/80 hover:bg-white/10 rounded-xl transition-all font-bold font-mono"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 text-on-background/80 hover:bg-white/10 rounded-xl transition-all font-bold font-mono"
                   >
                     <Mail className="w-3.5 h-3.5" />
                     {startup.contactEmail}
@@ -650,7 +672,7 @@ export default function CheckoutPage({
                 {startup?.contactPhone && (
                   <a
                     href={`tel:${startup.contactPhone}`}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 text-white/80 hover:bg-white/10 rounded-xl transition-all font-bold font-mono"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 text-on-background/80 hover:bg-white/10 rounded-xl transition-all font-bold font-mono"
                   >
                     <Phone className="w-3.5 h-3.5" />
                     {startup.contactPhone}
@@ -663,7 +685,7 @@ export default function CheckoutPage({
           <div className="flex gap-4">
             <button
               onClick={() => setView('profile')}
-              className="flex-1 py-4 border border-outline-variant/40 hover:bg-white/5 text-white font-bold text-sm rounded-xl transition-all"
+              className="flex-1 py-4 border border-outline-variant/40 hover:bg-white/5 text-on-background font-bold text-sm rounded-xl transition-all"
             >
               Boshqaruv paneliga o'tish
             </button>

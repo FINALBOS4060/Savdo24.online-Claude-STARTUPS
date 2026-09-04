@@ -22,7 +22,7 @@ export const AdminAuditTab: React.FC<AdminAuditTabProps> = ({
 }) => {
   return (
     <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
-      <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4">
+      <h2 className="text-lg font-bold text-on-primary-container flex items-center gap-2 border-b border-white/5 pb-4">
         <History className="text-secondary w-5 h-5" />
         Tizim faoliyat tarixi ({auditLogs.length})
       </h2>
@@ -53,7 +53,7 @@ export const AdminAuditTab: React.FC<AdminAuditTabProps> = ({
                   <td className="py-3.5 px-4 font-mono text-xs whitespace-nowrap">
                     {formatDateTime(log.createdAt)}
                   </td>
-                  <td className="py-3.5 px-4 font-bold text-white">
+                  <td className="py-3.5 px-4 font-bold text-on-primary-container">
                     {log.admin?.name || `Admin (ID: ${log.adminId})`}
                   </td>
                   <td className="py-3.5 px-4">

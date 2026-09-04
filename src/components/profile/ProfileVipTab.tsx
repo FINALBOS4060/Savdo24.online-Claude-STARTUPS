@@ -1,4 +1,5 @@
 import React from 'react';
+import { Award, Check } from 'lucide-react';
 
 interface ProfileVipTabProps {
   vipDays: number;
@@ -21,9 +22,9 @@ export const ProfileVipTab: React.FC<ProfileVipTabProps> = ({
     <section className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="text-center space-y-4">
         <div className="w-20 h-20 bg-secondary/10 border border-secondary/20 rounded-2xl mx-auto flex items-center justify-center text-secondary">
-          <span className="material-symbols-outlined text-4xl">workspace_premium</span>
+          <Award className="w-10 h-10" />
         </div>
-        <h2 className="text-3xl font-black text-white">VIP A'zolik</h2>
+        <h2 className="text-3xl font-black text-on-primary-container">VIP A'zolik</h2>
         <p className="text-on-primary-container text-xs md:text-sm">
           Eksklyuziv imkoniyatlar va chegirmalarga ega bo'ling.
         </p>
@@ -35,21 +36,21 @@ export const ProfileVipTab: React.FC<ProfileVipTabProps> = ({
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <span className="w-6 h-6 rounded-full bg-secondary/20 text-secondary flex items-center justify-center">
-                  <span className="material-symbols-outlined text-sm">done</span>
+                  <Check className="w-4 h-4" />
                 </span>
-                <p className="text-sm text-white">Ismingiz yonida 👑 VIP belgisi</p>
+                <p className="text-sm text-on-primary-container">Ismingiz yonida 👑 VIP belgisi</p>
               </div>
               <div className="flex items-center gap-3">
                 <span className="w-6 h-6 rounded-full bg-secondary/20 text-secondary flex items-center justify-center">
-                  <span className="material-symbols-outlined text-sm">done</span>
+                  <Check className="w-4 h-4" />
                 </span>
-                <p className="text-sm text-white">Rasmlarni yuklashda 6MB gacha limit (oddiyda 2MB)</p>
+                <p className="text-sm text-on-primary-container">Rasmlarni yuklashda 6MB gacha limit (oddiyda 2MB)</p>
               </div>
               <div className="flex items-center gap-3">
                 <span className="w-6 h-6 rounded-full bg-secondary/20 text-secondary flex items-center justify-center">
-                  <span className="material-symbols-outlined text-sm">done</span>
+                  <Check className="w-4 h-4" />
                 </span>
-                <p className="text-sm text-white">Yangi loyihalarni birinchi bo'lib ko'rish imkoniyati</p>
+                <p className="text-sm text-on-primary-container">Yangi loyihalarni birinchi bo'lib ko'rish imkoniyati</p>
               </div>
             </div>
 
@@ -61,7 +62,7 @@ export const ProfileVipTab: React.FC<ProfileVipTabProps> = ({
                     type="number" 
                     value={vipDays} 
                     onChange={(e) => setVipDays(Math.min(365, Math.max(1, parseInt(e.target.value) || 1)))}
-                    className="w-24 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white font-mono font-bold outline-none focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
+                    className="w-24 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-on-primary-container font-mono font-bold outline-none focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
                   />
                 </div>
                 <div className="text-right">

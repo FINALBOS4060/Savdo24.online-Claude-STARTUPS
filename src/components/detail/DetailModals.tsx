@@ -66,13 +66,13 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
           <div className="w-full max-w-md bg-surface-container border border-outline-variant/30 rounded-2xl shadow-2xl p-6 space-y-6 relative animate-in fade-in zoom-in-95 duration-200">
             <button
               onClick={() => setIsReviewModalOpen(false)}
-              className="absolute top-4 right-4 text-on-primary-container hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface rounded-full p-1 cursor-pointer flex items-center justify-center"
+              className="absolute top-4 right-4 text-on-primary-container hover:text-on-primary-container transition-colors focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface rounded-full p-1 cursor-pointer flex items-center justify-center"
               aria-label="Yopish"
             >
               <X className="w-5 h-5" />
             </button>
             <div className="text-center space-y-1">
-              <h3 className="text-white font-black text-lg">Loyiha va Sotuvchi haqida sharh</h3>
+              <h3 className="text-on-primary-container font-black text-lg">Loyiha va Sotuvchi haqida sharh</h3>
               <p className="text-xs text-on-primary-container">Ushbu loyiha haqidagi fikr-mulohazalaringizni bildiring.</p>
             </div>
             <form onSubmit={handleReviewSubmit} className="space-y-4">
@@ -103,7 +103,8 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
                   onChange={(e) => setReviewComment(e.target.value)}
                   placeholder="Loyihaning sifati, kod tozaligi va sotuvchining muloqoti haqida yozing..."
                   rows={4}
-                  className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white text-xs placeholder-on-primary-container/60 transition-all focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
+                  maxLength={1000}
+                  className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-on-primary-container text-xs placeholder-on-primary-container/60 transition-all focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
                 />
               </div>
 
@@ -111,7 +112,7 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsReviewModalOpen(false)}
-                  className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer"
+                  className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-on-primary-container font-bold text-xs rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer"
                 >
                   Bekor qilish
                 </button>
@@ -134,7 +135,7 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
           <div className="w-full max-w-md bg-surface-container border border-outline-variant/30 rounded-2xl shadow-2xl p-6 space-y-6 relative animate-in fade-in zoom-in-95 duration-200">
             <button
               onClick={() => setIsDisputeModalOpen(false)}
-              className="absolute top-4 right-4 text-on-primary-container hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface rounded-full p-1 cursor-pointer flex items-center justify-center"
+              className="absolute top-4 right-4 text-on-primary-container hover:text-on-primary-container transition-colors focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface rounded-full p-1 cursor-pointer flex items-center justify-center"
               aria-label="Yopish"
             >
               <X className="w-5 h-5" />
@@ -154,7 +155,7 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
                   value={disputeReason}
                   onChange={(e) => setDisputeReason(e.target.value)}
                   placeholder="Masalan: Fayllar to'liq emas, Sotuvchi Telegramda javob bermayapti"
-                  className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white text-xs placeholder-on-primary-container/60 transition-all focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-surface"
+                  className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-on-primary-container text-xs placeholder-on-primary-container/60 transition-all focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-surface"
                 />
               </div>
 
@@ -165,7 +166,7 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
                   onChange={(e) => setDisputeDescription(e.target.value)}
                   placeholder="Muammo haqida barcha tafsilotlarni qoldiring. Loyiha topshirilmadi yoki va'da qilingan texnik standartga mos kelmasligi sabablarini tushuntirib bering..."
                   rows={4}
-                  className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white text-xs placeholder-on-primary-container/60 transition-all focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-surface"
+                  className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-on-primary-container text-xs placeholder-on-primary-container/60 transition-all focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-surface"
                 />
               </div>
 
@@ -173,7 +174,7 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsDisputeModalOpen(false)}
-                  className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer"
+                  className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-on-primary-container font-bold text-xs rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer"
                 >
                   Bekor qilish
                 </button>
@@ -196,7 +197,7 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
           <div className="w-full max-w-md bg-surface-container border border-outline-variant/30 rounded-2xl shadow-2xl p-6 space-y-6 relative animate-in fade-in zoom-in-95 duration-200">
             <button
               onClick={() => setReportModalOpen(false)}
-              className="absolute top-4 right-4 text-on-primary-container hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface rounded-full p-1 cursor-pointer flex items-center justify-center"
+              className="absolute top-4 right-4 text-on-primary-container hover:text-on-primary-container transition-colors focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface rounded-full p-1 cursor-pointer flex items-center justify-center"
               aria-label="Yopish"
             >
               <X className="w-5 h-5" />
@@ -214,7 +215,7 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
                 <select
                   value={reportReason}
                   onChange={(e) => setReportReason(e.target.value)}
-                  className="w-full p-3 bg-surface-container-low border border-white/10 rounded-xl text-white text-xs transition-all font-semibold focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-surface"
+                  className="w-full p-3 bg-surface-container-low border border-white/10 rounded-xl text-on-primary-container text-xs transition-all font-semibold focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-surface"
                 >
                   <option value="Firibgar elon">Firibgar elon</option>
                   <option value="Zararli havola">Zararli havola</option>
@@ -230,7 +231,7 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
                   onChange={(e) => setReportDescription(e.target.value)}
                   placeholder="Shikoyatingizni asoslovchi qo'shimcha tafsilotlarni yozing..."
                   rows={4}
-                  className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white text-xs placeholder-on-primary-container/60 transition-all font-medium focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-surface"
+                  className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-on-primary-container text-xs placeholder-on-primary-container/60 transition-all font-medium focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-surface"
                 />
               </div>
 
@@ -238,7 +239,7 @@ export const DetailModals: React.FC<DetailModalsProps> = ({
                 <button
                   type="button"
                   onClick={() => setReportModalOpen(false)}
-                  className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer"
+                  className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-on-primary-container font-bold text-xs rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer"
                 >
                   Bekor qilish
                 </button>

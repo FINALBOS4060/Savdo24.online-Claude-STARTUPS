@@ -29,7 +29,7 @@ before(async () => {
       name: 'Referrer User',
       role: 'Xaridor',
       emailVerified: true,
-      joinDate: '2026',
+      joinDate: new Date('2026-01-01'),
       avatarUrl: 'https://example.com/avatar.png'
     }
   });
@@ -41,7 +41,7 @@ before(async () => {
       name: 'Referee User',
       role: 'Xaridor',
       emailVerified: true,
-      joinDate: '2026',
+      joinDate: new Date('2026-01-01'),
       avatarUrl: 'https://example.com/avatar.png'
     }
   });
@@ -53,7 +53,7 @@ before(async () => {
       name: 'Seller User',
       role: 'Sotuvchi',
       emailVerified: true,
-      joinDate: '2026',
+      joinDate: new Date('2026-01-01'),
       avatarUrl: 'https://example.com/avatar.png'
     }
   });

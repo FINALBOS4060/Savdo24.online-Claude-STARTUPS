@@ -10,6 +10,7 @@ import {
   prisma,
   authenticateToken,
   createNotification,
+  notifyUserTelegram,
   sendEmail,
   AuthRequest
 } from "../lib/context";
@@ -87,6 +88,11 @@ router.post("/reviews", authenticateToken, financialActionLimiter, async (req: A
       `"${startup.name}" loyihangiz uchun yangi ${ratingInt} yulduzli sharh qoldirildi.`,
       `/profile?tab=earnings`
     );
+    notifyUserTelegram(
+      startup.userId,
+      `⭐ "<b>${escapeHtml(startup.name)}</b>" loyihangiz uchun yangi ${ratingInt} yulduzli sharh qoldirildi.`,
+      `/profile?tab=earnings`
+    );
 
     const seller = await prisma.user.findUnique({ where: { id: startup.userId } });
     if (seller) {
@@ -115,7 +121,14 @@ router.post("/reviews", authenticateToken, financialActionLimiter, async (req: A
     });
 
     res.status(201).json(review);
-  } catch (err: any) {
+  } catch (err: unknown) {
+    // 132-bosqich: Review(startupId, buyerId) endi @@unique — agar ikkita so'rov
+    // AYNAN bir vaqtda kelib, yuqoridagi existingReview tekshiruvidan ikkalasi
+    // ham o'tib ketsa (poyga holati), Prisma shu yerda P2002 tashlaydi. Buni
+    // umumiy "Serverda xatolik" (500) o'rniga tushunarli xabar bilan qaytaramiz.
+    if (err && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "P2002") {
+      return res.status(409).json({ error: "Siz ushbu loyiha uchun allaqachon sharh qoldirgansiz." });
+    }
     logger.error({ err }, "Create review error");
     res.status(500).json({ error: "Sharh yozishda xatolik yuz berdi." });
   }
@@ -165,7 +178,7 @@ router.get("/users/:id/reviews", async (req: Request, res: Response) => {
       totalReviews: user?.totalReviews || 0,
       sellerName: user?.name || "Noma'lum"
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error({ err }, "Get reviews error");
     res.status(500).json({ error: "Sharhlarni olishda xatolik yuz berdi." });
   }

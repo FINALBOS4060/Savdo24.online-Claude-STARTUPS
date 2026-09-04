@@ -50,6 +50,7 @@ export const DetailSidebar: React.FC<DetailSidebarProps> = ({
           <div className="text-3xl md:text-4xl font-black font-mono text-secondary tracking-tight">
             ${startup.price ? startup.price.toLocaleString() : "Kelishilgan holda"}
           </div>
+          <span className="trust-seal mt-3">Escrow bilan himoyalangan</span>
         </div>
 
         <div className="space-y-3">
@@ -57,7 +58,7 @@ export const DetailSidebar: React.FC<DetailSidebarProps> = ({
           <button
             onClick={handlePurchaseClick}
             disabled={startup.soldStatus === 'sotildi' || isOwnListing}
-            className="w-full py-4 bg-secondary hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100 text-on-secondary font-black text-sm rounded-xl active:scale-95 transition-all shadow-lg shadow-yellow-500/10 uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full py-4 bg-secondary hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100 text-on-secondary font-black text-sm rounded-xl active:scale-95 transition-all shadow-lg shadow-secondary/10 uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
           >
             <ShoppingCart className="w-4 h-4 text-on-secondary" />
             {startup.soldStatus === 'sotildi' ? "Sotilgan (Band qilingan)" : isOwnListing ? "Bu sizning e'loningiz" : "Loyihani sotib olish"}
@@ -79,7 +80,7 @@ export const DetailSidebar: React.FC<DetailSidebarProps> = ({
                   e.preventDefault();
                 }
               }}
-              className="w-full py-3 bg-white/5 hover:bg-white/10 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 border border-white/10 transition-all active:scale-95 text-center uppercase tracking-wider"
+              className="w-full py-3 bg-white/5 hover:bg-white/10 text-on-primary-container font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 border border-white/10 transition-all active:scale-95 text-center uppercase tracking-wider"
             >
               <ExternalLink className="w-4 h-4" />
               Demoni ko'rish
@@ -102,7 +103,7 @@ export const DetailSidebar: React.FC<DetailSidebarProps> = ({
                   e.preventDefault();
                 }
               }}
-              className="w-full py-3 bg-white/5 hover:bg-white/10 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 border border-white/10 transition-all active:scale-95 text-center uppercase tracking-wider"
+              className="w-full py-3 bg-white/5 hover:bg-white/10 text-on-primary-container font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 border border-white/10 transition-all active:scale-95 text-center uppercase tracking-wider"
             >
               <Code className="w-4 h-4" />
               Repozitoriyani ko'rish
@@ -119,9 +120,9 @@ export const DetailSidebar: React.FC<DetailSidebarProps> = ({
                   : `${startup.name} xatcho'plarga qo'shildi!`
               );
             }}
-            className="w-full py-3 border border-white/10 hover:bg-white/5 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase tracking-wider cursor-pointer"
+            className="w-full py-3 border border-white/10 hover:bg-white/5 text-on-primary-container font-bold text-xs rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-all uppercase tracking-wider cursor-pointer"
           >
-            <Bookmark className={`w-4 h-4 ${isBookmarked ? 'fill-secondary text-secondary' : 'text-white'}`} />
+            <Bookmark className={`w-4 h-4 ${isBookmarked ? 'fill-secondary text-secondary' : 'text-on-primary-container'}`} />
             <span>{isBookmarked ? "Saqlab qo'yilgan" : "Saqlab qo'yish"}</span>
           </button>
 
@@ -139,15 +140,15 @@ export const DetailSidebar: React.FC<DetailSidebarProps> = ({
         <div className="border-t border-white/5 pt-4 space-y-3 text-xs">
           <div className="flex justify-between items-center">
             <span className="text-on-primary-container font-medium">Kategoriya</span>
-            <span className="text-white font-semibold">{categories.find(c => c.id === startup.category)?.name || startup.category}</span>
+            <span className="text-on-primary-container font-semibold">{categories.find(c => c.id === startup.category)?.name || startup.category}</span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-on-primary-container font-medium">E'lon turi</span>
-            <span className="text-white font-semibold">{startup.listingType || "To'liq loyiha (manba kodi bilan)"}</span>
+            <span className="text-on-primary-container font-semibold">{startup.listingType || "To'liq loyiha (manba kodi bilan)"}</span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-on-primary-container font-medium">Manba kodi (Repo)</span>
-            <span className="text-white font-semibold">{startup.repoIncluded ? "Kiritilgan ✅" : "Mavjud emas ❌"}</span>
+            <span className="text-on-primary-container font-semibold">{startup.repoIncluded ? "Kiritilgan ✅" : "Mavjud emas ❌"}</span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-on-primary-container font-medium">Sotuv holati</span>
@@ -199,12 +200,12 @@ export const DetailSidebar: React.FC<DetailSidebarProps> = ({
               {sellerReviewsData?.sellerName ? sellerReviewsData.sellerName[0].toUpperCase() : "S"}
             </div>
             <div>
-              <h4 className="text-white font-extrabold text-sm">
+              <h4 className="text-on-primary-container font-extrabold text-sm">
                 {sellerReviewsData?.sellerName || "Sotuvchi"}
               </h4>
               <div className="flex items-center gap-1.5 mt-1">
                 <Star className="w-3.5 h-3.5 text-secondary fill-secondary" />
-                <span className="text-white text-xs font-bold font-mono">
+                <span className="text-on-primary-container text-xs font-bold font-mono">
                   {sellerReviewsData?.averageRating || "0.0"}
                 </span>
                 <span className="text-on-primary-container text-xs">

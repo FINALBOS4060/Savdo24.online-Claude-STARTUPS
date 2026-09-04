@@ -21,7 +21,7 @@ export default function Sidebar({
   const menuItems: Array<{ id: string; label: string; icon: React.ComponentType<{ className?: string }>; view?: string; toast?: string }> = [
     { id: 'profile', label: 'Boshqaruv paneli', icon: LayoutDashboard, view: 'profile' },
     { id: 'browse', label: 'Faol e\'lonlar', icon: List, view: 'browse' },
-    { id: 'ideas-rating', label: 'G\'oyalar reytingi', icon: Trophy, view: 'ideas-rating' },
+    { id: 'ideas-rating', label: 'Loyihalar reytingi', icon: Trophy, view: 'ideas-rating' },
     { id: 'settings', label: 'Sozlamalar', icon: Settings },
     { id: 'support', label: 'Qo\'llab-quvvatlash', icon: HelpCircle, view: 'support' },
   ];
@@ -34,7 +34,19 @@ export default function Sidebar({
   return (
     <aside className="hidden lg:flex flex-col fixed left-0 top-16 h-[calc(100vh-64px)] p-4 bg-surface-container-lowest dark:bg-primary-container border-r border-outline-variant/30 w-64 transition-colors duration-300 z-40">
       <div className="flex flex-col items-center mb-8 pt-4">
-        <div className="w-16 h-16 rounded-full overflow-hidden mb-3 border-2 border-secondary-container relative group cursor-pointer" onClick={() => { if (setProfileTab) setProfileTab('startups'); setView('profile'); }}>
+        <div
+          role="button"
+          tabIndex={0}
+          className="w-16 h-16 rounded-full overflow-hidden mb-3 border-2 border-secondary-container relative group cursor-pointer focus:outline-none focus:ring-2 focus:ring-secondary-container focus:ring-offset-2"
+          onClick={() => { if (setProfileTab) setProfileTab('startups'); setView('profile'); }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              if (setProfileTab) setProfileTab('startups');
+              setView('profile');
+            }
+          }}
+        >
           <img
             className="w-full h-full object-cover transition-transform group-hover:scale-105"
             src={user.avatarUrl}
@@ -42,6 +54,17 @@ export default function Sidebar({
             loading="lazy"
             width={64}
             height={64}
+            onError={(e) => {
+              // Eski/buzilgan avatar manzili (masalan bazada saqlanib qolgan
+              // eski standart yo'l) yuklanmasa, doira ichida cho'zilib
+              // qolgan matn o'rniga standart rasmga muloyimlik bilan
+              // qaytamiz — cheksiz qayta urinishning oldini olish uchun
+              // faqat bir marta almashtiramiz.
+              const img = e.currentTarget;
+              if (img.dataset.fallback) return;
+              img.dataset.fallback = '1';
+              img.src = '/default-avatar.svg';
+            }}
           />
         </div>
         <h3 className="font-bold text-sm text-on-surface dark:text-white">{user.name}</h3>

@@ -31,7 +31,7 @@ before(async () => {
       name: 'Escrow Buyer',
       role: 'Xaridor',
       emailVerified: true,
-      joinDate: '2026',
+      joinDate: new Date('2026-01-01'),
       avatarUrl: 'https://example.com/avatar.png'
     }
   });
@@ -43,7 +43,7 @@ before(async () => {
       name: 'Escrow Seller',
       role: 'Sotuvchi',
       emailVerified: true,
-      joinDate: '2026',
+      joinDate: new Date('2026-01-01'),
       avatarUrl: 'https://example.com/avatar.png'
     }
   });
@@ -55,7 +55,7 @@ before(async () => {
       name: 'Escrow Stranger',
       role: 'Xaridor',
       emailVerified: true,
-      joinDate: '2026',
+      joinDate: new Date('2026-01-01'),
       avatarUrl: 'https://example.com/avatar.png'
     }
   });
@@ -67,7 +67,7 @@ before(async () => {
       name: 'Escrow Admin',
       role: 'Admin',
       emailVerified: true,
-      joinDate: '2026',
+      joinDate: new Date('2026-01-01'),
       avatarUrl: 'https://example.com/avatar.png'
     }
   });

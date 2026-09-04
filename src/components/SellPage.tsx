@@ -7,7 +7,8 @@ import {
   Trash2, 
   RefreshCw, 
   CheckCircle2, 
-  UploadCloud 
+  UploadCloud,
+  X,
 } from 'lucide-react';
 import { Startup, Category, LoyihaMilestone } from '../types';
 import { CATEGORY_FIELDS } from '../categoryFields';
@@ -39,6 +40,9 @@ export default function SellPage({
   
   const [name, setName] = useState('');
   const [category, setCategory] = useState(categories[0]?.id || 'startups');
+  const [isProposeCategoryOpen, setIsProposeCategoryOpen] = useState(false);
+  const [proposedCategoryName, setProposedCategoryName] = useState('');
+  const [isProposingCategory, setIsProposingCategory] = useState(false);
   const [slogan, setSlogan] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
@@ -48,6 +52,27 @@ export default function SellPage({
   const [demoUrl, setDemoUrl] = useState('');
   const [githubUrl, setGithubUrl] = useState('');
   const [milestones, setMilestones] = useState<LoyihaMilestone[]>([]);
+  // BUG: pastda bosqichlar (milestones) ro'yxati `key={idx}` (massiv indeksi)
+  // bilan render qilinardi. Bu massivga elementlar qo'shilib/o'chirilib
+  // turadigan holatlarda odatiy React xatosi: masalan 3 ta bosqich bo'lib,
+  // foydalanuvchi 2-bosqichni tahrirlab turgan (input fokusda) paytda
+  // 1-bosqichni o'chirsa — React DOM elementlarini indeks bo'yicha qayta
+  // ishlatgani uchun fokus boshqa (noto'g'ri) qatorga "sakrab" qolardi va
+  // ba'zi brauzerlarda kursor joyi ham chalkashardi. Qiymatlarning o'zi
+  // (controlled input bo'lgani uchun) noto'g'ri ko'rinmasdi, lekin
+  // tahrirlash tajribasi buzilardi. Har bir bosqichga massivdan mustaqil,
+  // barqaror kalit biriktirish uchun alohida hisoblagich qo'shildi.
+  const milestoneKeyCounter = useRef(0);
+  const [milestoneKeys, setMilestoneKeys] = useState<number[]>([]);
+  // BUG FIX: quyidagi useEffect `startups` massivi o'zgarganda qayta ishga
+  // tushadi (masalan, boshqa joyda fetchStartups() chaqirilsa — to'lov
+  // yakunlanganda yoki yangi e'lon qo'shilganda ham global `startups` array
+  // yangi reference bilan qayta keladi). Bu holatda effekt formani QAYTA
+  // to'ldirib, foydalanuvchi hali saqlamagan tahrirlarini (masalan, endigina
+  // yozgan tavsif yoki narx o'zgarishi) jimgina yo'qotib qo'yardi. Shu
+  // muammoning oldini olish uchun har bir `id` uchun formani faqat BIR
+  // marta to'ldiramiz.
+  const loadedEditIdRef = useRef<string | null>(null);
   const [deliveryUrl, setDeliveryUrl] = useState('');
   const [dynamicAttributes, setDynamicAttributes] = useState<Record<string, any>>({});
   const [imageUrl, setImageUrl] = useState('');
@@ -58,7 +83,11 @@ export default function SellPage({
 
   // Load existing data if editing
   useEffect(() => {
-    if (isEditing && id && startups.length > 0) {
+    if (!isEditing) {
+      loadedEditIdRef.current = null;
+      return;
+    }
+    if (isEditing && id && startups.length > 0 && loadedEditIdRef.current !== id) {
       const s = startups.find(item => item.id === id);
       if (s) {
         setName(s.name);
@@ -76,9 +105,12 @@ export default function SellPage({
         
         setDemoUrl(s.demoUrl || '');
         setGithubUrl(s.githubUrl || '');
-        setMilestones(Array.isArray(s.milestones) ? s.milestones : []);
+        const loadedMilestones = Array.isArray(s.milestones) ? s.milestones : [];
+        setMilestones(loadedMilestones);
+        setMilestoneKeys(loadedMilestones.map(() => ++milestoneKeyCounter.current));
         setDeliveryUrl(s.deliveryUrl || '');
         setImageUrl(s.image || '');
+        setGalleryUrls(Array.isArray(s.gallery) ? s.gallery : []);
         setEmail(s.contactEmail || '');
         setPhone(s.contactPhone || '');
         setTelegram(s.contactTelegram || '');
@@ -88,6 +120,8 @@ export default function SellPage({
             setDynamicAttributes(JSON.parse(s.attributes));
           } catch (e) { console.error("Error parsing attributes:", e); }
         }
+
+        loadedEditIdRef.current = id;
       }
     }
   }, [isEditing, id, startups]);
@@ -99,6 +133,16 @@ export default function SellPage({
   const [dragActive, setDragActive] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Gallery (qo'shimcha rasmlar) states — backend (startups.ts, createStartupSchema)
+  // "gallery" maydonini ko'pi bilan 10 ta URL sifatida qabul qiladi, DetailPage'ning
+  // "Gallery Bento Grid" bo'limi (DetailHeroSection.tsx) buni ko'rsatishga tayyor edi,
+  // lekin bu yerda uni to'ldirish uchun hech qanday UI yo'q edi — shu sabab e'lon
+  // qo'yilganda galereya doim bo'sh qolardi.
+  const MAX_GALLERY_IMAGES = 10;
+  const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
+  const [isUploadingGallery, setIsUploadingGallery] = useState(false);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   // Handle Dynamic Image Uploading to Backend
   const uploadImageFile = async (file: File) => {
@@ -119,9 +163,15 @@ export default function SellPage({
     }
 
     // File type validation
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'];
+    // Backend (multer fileFilter, server.ts) faqat jpeg/png/webp/gif'ga ruxsat
+    // beradi — SVG ataylab man qilingan (SVG ichiga JS joylashtirish mumkin,
+    // ya'ni XSS xavfi). Ilgari bu yerda SVG ruxsat etilgan, GIF esa yo'q edi —
+    // frontend backend bilan mos qilib qo'yildi (foydalanuvchi GIF tanlasa
+    // noto'g'ri rad etilmasin, SVG tanlasa esa keyin serverda chalkash xato
+    // bilan rad etilmasin).
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
     if (!allowedTypes.includes(file.type)) {
-      onActionToast("Faqat JPG, PNG, WebP, yoki SVG formatini qo'llab-quvvatlaydi.");
+      onActionToast("Faqat JPG, PNG, WebP, yoki GIF formatini qo'llab-quvvatlaydi.");
       return;
     }
 
@@ -145,7 +195,7 @@ export default function SellPage({
         const err = await res.json();
         onActionToast(err.error || "Rasm yuklashda xatolik.");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       onActionToast("Rasm yuklashda xatolik.");
     } finally {
@@ -183,6 +233,105 @@ export default function SellPage({
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       uploadImageFile(file);
+    }
+  };
+
+  // Galereya rasmlarini bittalab yuklash — bir nechta fayl bir vaqtda tanlansa
+  // ham, har birini ketma-ket /api/upload'ga yuboradi va URL'ni ro'yxatga
+  // qo'shadi. Muqova rasmi bilan bir xil hajm/format tekshiruvi qo'llaniladi.
+  const uploadGalleryFile = async (file: File): Promise<string | null> => {
+    const MAX_FILE_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      onActionToast(`"${file.name}": fayl hajmi 10MB dan kam bo'lishi kerak.`);
+      return null;
+    }
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+      onActionToast(`"${file.name}": faqat JPG, PNG, WebP, yoki GIF formatini qo'llab-quvvatlaydi.`);
+      return null;
+    }
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      if (res.ok) {
+        const data = await res.json();
+        return data.url as string;
+      }
+      const err = await res.json();
+      onActionToast(err.error || `"${file.name}" yuklashda xatolik.`);
+      return null;
+    } catch (err) {
+      console.error(err);
+      onActionToast(`"${file.name}" yuklashda xatolik.`);
+      return null;
+    }
+  };
+
+  const handleGalleryFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const remainingSlots = MAX_GALLERY_IMAGES - galleryUrls.length;
+    if (remainingSlots <= 0) {
+      onActionToast(`Galereyaga ko'pi bilan ${MAX_GALLERY_IMAGES} ta rasm qo'shish mumkin.`);
+      e.target.value = '';
+      return;
+    }
+
+    const filesToUpload = Array.from(files).slice(0, remainingSlots);
+    if (files.length > remainingSlots) {
+      onActionToast(`Faqat ${remainingSlots} ta rasm qabul qilindi (galereya chegarasi ${MAX_GALLERY_IMAGES} ta).`);
+    }
+
+    setIsUploadingGallery(true);
+    try {
+      // Ketma-ket yuklaymiz (parallel emas) — /api/upload endpointiga bir
+      // vaqtning o'zida ko'p so'rov yuborilib, rate-limit'ga uchramasligi uchun.
+      const uploadedUrls: string[] = [];
+      for (const file of filesToUpload) {
+        const url = await uploadGalleryFile(file);
+        if (url) uploadedUrls.push(url);
+      }
+      if (uploadedUrls.length > 0) {
+        setGalleryUrls((prev) => [...prev, ...uploadedUrls].slice(0, MAX_GALLERY_IMAGES));
+        onActionToast(`${uploadedUrls.length} ta rasm galereyaga qo'shildi.`);
+      }
+    } finally {
+      setIsUploadingGallery(false);
+      e.target.value = '';
+    }
+  };
+
+  const removeGalleryImage = (index: number) => {
+    setGalleryUrls((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleProposeCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!proposedCategoryName.trim()) {
+      onActionToast("Kategoriya nomini kiriting.");
+      return;
+    }
+    setIsProposingCategory(true);
+    try {
+      const res = await fetch('/api/categories/propose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: proposedCategoryName.trim(), name: proposedCategoryName.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        onActionToast(data.message || "Taklifingiz qabul qilindi. Admin tasdiqlagach kategoriya ro'yxatda ko'rinadi.");
+        setIsProposeCategoryOpen(false);
+        setProposedCategoryName('');
+      } else {
+        onActionToast(data.error || "Kategoriya taklif qilishda xatolik yuz berdi.");
+      }
+    } catch (err) {
+      onActionToast("Serverga ulanib bo'lmadi.");
+    } finally {
+      setIsProposingCategory(false);
     }
   };
 
@@ -246,6 +395,7 @@ export default function SellPage({
       deliveryUrl: deliveryUrl || undefined,
       repoIncluded,
       image: finalImage,
+      gallery: galleryUrls,
       contactEmail: email,
       contactPhone: phone,
       contactTelegram: telegram,
@@ -268,10 +418,12 @@ export default function SellPage({
           setPrice('');
           setImageUrl('');
           setImageFile(null);
+          setGalleryUrls([]);
           setSelectedTechs(['React', 'TypeScript', 'Node.js']);
           setDemoUrl('');
           setGithubUrl('');
           setMilestones([]);
+          setMilestoneKeys([]);
           setDeliveryUrl('');
           setEmail('');
           setPhone('');
@@ -296,7 +448,7 @@ export default function SellPage({
           soldStatus: 'sotuvda',
           status: 'pending',
           proposalsCount: 0,
-          gallery: [],
+          gallery: galleryUrls,
           team: [{ name: 'Siz', role: 'Asoschi', imgUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=You' }],
           techStack: payload.techStack,
         };
@@ -314,7 +466,7 @@ export default function SellPage({
     <div className="max-w-3xl mx-auto animate-fade-in text-left">
       <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-10 shadow-2xl space-y-8">
         <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-white mb-2">
+          <h1 className="text-2xl md:text-3xl font-extrabold text-on-primary-container mb-2">
             Yangi g'oya yoki loyihani e'lon qilish
           </h1>
           <p className="text-xs md:text-sm text-on-primary-container leading-relaxed">
@@ -329,7 +481,8 @@ export default function SellPage({
               <input
                 type="text"
                 required
-                className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
+                maxLength={150}
+                className="w-full bg-background border border-outline-variant/30 text-on-background rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
                 placeholder="Masalan: Safia Systems"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -339,7 +492,7 @@ export default function SellPage({
             <div className="space-y-2">
               <label className="text-xs font-bold text-on-primary-container block">Kategoriya</label>
               <select
-                className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
+                className="w-full bg-background border border-outline-variant/30 text-on-background rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
                 value={category}
                 onChange={(e) => {
                   setCategory(e.target.value);
@@ -352,6 +505,13 @@ export default function SellPage({
                   </option>
                 ))}
               </select>
+              <button
+                type="button"
+                onClick={() => setIsProposeCategoryOpen(true)}
+                className="text-xs font-bold text-secondary-container hover:underline mt-1"
+              >
+                Kerakli kategoriya topilmadimi? Yangisini taklif qiling
+              </button>
             </div>
           </div>
 
@@ -383,7 +543,7 @@ export default function SellPage({
                     <div key={field.key} className="space-y-1">
                       <label className="text-xs font-semibold text-gray-300 block">{field.label}</label>
                       <select
-                        className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-2.5 text-xs focus:outline-none focus:border-secondary-container transition-all"
+                        className="w-full bg-background border border-outline-variant/30 text-on-background rounded-xl p-2.5 text-xs focus:outline-none focus:border-secondary-container transition-all"
                         value={dynamicAttributes[field.key] || ''}
                         onChange={(e) => setDynamicAttributes({ ...dynamicAttributes, [field.key]: e.target.value })}
                       >
@@ -402,9 +562,15 @@ export default function SellPage({
                       <label className="text-xs font-semibold text-gray-300 block">{field.label}</label>
                       <input
                         type={field.type}
-                        className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-2.5 text-xs focus:outline-none focus:border-secondary-container transition-all"
+                        className="w-full bg-background border border-outline-variant/30 text-on-background rounded-xl p-2.5 text-xs focus:outline-none focus:border-secondary-container transition-all"
                         placeholder={field.placeholder}
-                        value={dynamicAttributes[field.key] || ''}
+                        // XATO TUZATILDI: avval `dynamicAttributes[field.key] || ''`
+                        // ishlatilardi. JS'da `0 || ''` natijasi `''` bo'lgani uchun,
+                        // "raqam" turidagi maydonga (masalan Jamoa hajmi, Promptlar
+                        // soni) foydalanuvchi 0 kiritsa, holat ichida 0 saqlanib
+                        // turgani holda input darhol bo'sh ko'rinib qolardi. Endi
+                        // faqat undefined/null holatlarda bo'sh satr ishlatiladi.
+                        value={dynamicAttributes[field.key] ?? ''}
                         onChange={(e) => setDynamicAttributes({
                           ...dynamicAttributes,
                           [field.key]: field.type === 'number'
@@ -424,7 +590,8 @@ export default function SellPage({
             <input
               type="text"
               required
-              className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
+              maxLength={200}
+              className="w-full bg-background border border-outline-variant/30 text-on-background rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
               placeholder="Masalan: Logistika uchun sun'iy intellekt va marshrutlash boshqaruvi"
               value={slogan}
               onChange={(e) => setSlogan(e.target.value)}
@@ -436,7 +603,8 @@ export default function SellPage({
             <textarea
               required
               rows={5}
-              className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all resize-none leading-relaxed"
+              maxLength={500}
+              className="w-full bg-background border border-outline-variant/30 text-on-background rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all resize-none leading-relaxed"
               placeholder="Texnologiyangiz, bozor talabi, biznes modelingiz va kelajakdagi rejalaringiz haqida batafsil ma'lumot bering..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -495,9 +663,10 @@ export default function SellPage({
               <input
                 type="number"
                 required
-                min="1"
+                min="0.01"
+                max="1000000"
                 step="0.01"
-                className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
+                className="w-full bg-background border border-outline-variant/30 text-on-background rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
                 placeholder="Masalan: 250 (faqat raqam kiriting)"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
@@ -507,7 +676,7 @@ export default function SellPage({
             <div className="space-y-2">
               <label className="text-xs font-bold text-on-primary-container block">Nima sotiladi?</label>
               <select
-                className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
+                className="w-full bg-background border border-outline-variant/30 text-on-background rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
                 value={listingType}
                 onChange={(e) => setListingType(e.target.value)}
               >
@@ -550,7 +719,7 @@ export default function SellPage({
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
                         isSelected
                           ? 'bg-secondary text-on-secondary border-secondary'
-                          : 'bg-white/5 text-white/70 border-white/5 hover:bg-white/10'
+                          : 'bg-white/5 text-on-primary-container/70 border-white/5 hover:bg-white/10'
                       }`}
                     >
                       {tech}
@@ -626,7 +795,7 @@ export default function SellPage({
               </p>
               <input
                 type="url"
-                className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
+                className="w-full bg-background border border-outline-variant/30 text-on-background rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
                 placeholder="Masalan: https://github.com/loyiha/manba-kodi yoki Google Drive linki"
                 value={deliveryUrl}
                 onChange={(e) => {
@@ -648,7 +817,7 @@ export default function SellPage({
               <label className="text-xs font-bold text-on-primary-container block">Demo havola (ixtiyoriy)</label>
               <input
                 type="url"
-                className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
+                className="w-full bg-background border border-outline-variant/30 text-on-background rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
                 placeholder="Masalan: https://demo.loyiha.uz"
                 value={demoUrl}
                 onChange={(e) => setDemoUrl(e.target.value)}
@@ -659,7 +828,7 @@ export default function SellPage({
               <label className="text-xs font-bold text-on-primary-container block">GitHub repozitoriyasi (ixtiyoriy, ommaviy ko'rinadi)</label>
               <input
                 type="url"
-                className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
+                className="w-full bg-background border border-outline-variant/30 text-on-background rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
                 placeholder="Masalan: https://github.com/foydalanuvchi/repo"
                 value={githubUrl}
                 onChange={(e) => setGithubUrl(e.target.value)}
@@ -683,6 +852,7 @@ export default function SellPage({
                     return;
                   }
                   setMilestones([...milestones, { date: '', title: '', desc: '' }]);
+                  setMilestoneKeys([...milestoneKeys, ++milestoneKeyCounter.current]);
                 }}
                 disabled={milestones.length >= 20}
                 className="text-xs font-bold text-secondary-container hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:no-underline"
@@ -694,11 +864,11 @@ export default function SellPage({
             {milestones.length > 0 && (
               <div className="space-y-3">
                 {milestones.map((m, idx) => (
-                  <div key={idx} className="bg-background border border-outline-variant/30 rounded-xl p-4 space-y-2">
+                  <div key={milestoneKeys[idx] ?? idx} className="bg-background border border-outline-variant/30 rounded-xl p-4 space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <input
                         type="text"
-                        className="flex-1 bg-transparent border border-outline-variant/30 text-white rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-secondary-container transition-all"
+                        className="flex-1 bg-transparent border border-outline-variant/30 text-on-background rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-secondary-container transition-all"
                         placeholder="Sana (masalan: 2026-Yanvar)"
                         value={m.date}
                         onChange={(e) => {
@@ -709,7 +879,10 @@ export default function SellPage({
                       />
                       <button
                         type="button"
-                        onClick={() => setMilestones(milestones.filter((_, i) => i !== idx))}
+                        onClick={() => {
+                          setMilestones(milestones.filter((_, i) => i !== idx));
+                          setMilestoneKeys(milestoneKeys.filter((_, i) => i !== idx));
+                        }}
                         className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-all cursor-pointer flex-shrink-0 flex items-center justify-center"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -717,7 +890,7 @@ export default function SellPage({
                     </div>
                     <input
                       type="text"
-                      className="w-full bg-transparent border border-outline-variant/30 text-white rounded-lg px-3 py-2 text-xs font-bold focus:outline-none focus:border-secondary-container transition-all"
+                      className="w-full bg-transparent border border-outline-variant/30 text-on-background rounded-lg px-3 py-2 text-xs font-bold focus:outline-none focus:border-secondary-container transition-all"
                       placeholder="Bosqich sarlavhasi"
                       value={m.title}
                       onChange={(e) => {
@@ -727,7 +900,7 @@ export default function SellPage({
                       }}
                     />
                     <textarea
-                      className="w-full bg-transparent border border-outline-variant/30 text-white rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-secondary-container transition-all resize-none"
+                      className="w-full bg-transparent border border-outline-variant/30 text-on-background rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-secondary-container transition-all resize-none"
                       placeholder="Qisqacha tavsif"
                       rows={2}
                       value={m.desc}
@@ -770,7 +943,7 @@ export default function SellPage({
               {isUploading ? (
                 <div className="flex flex-col items-center justify-center space-y-2">
                   <RefreshCw className="w-8 h-8 text-secondary-container animate-spin" />
-                  <p className="text-xs font-bold text-white">Rasm yuklanmoqda, iltimos kuting...</p>
+                  <p className="text-xs font-bold text-on-background">Rasm yuklanmoqda, iltimos kuting...</p>
                 </div>
               ) : imageUrl ? (
                 <div className="flex flex-col items-center justify-center space-y-2 w-full">
@@ -804,11 +977,11 @@ export default function SellPage({
               ) : (
                 <>
                   <UploadCloud className="w-10 h-10 text-secondary-container mb-3" />
-                  <p className="text-xs font-bold text-white mb-1">
+                  <p className="text-xs font-bold text-on-background mb-1">
                     Faylni tortib olib tashlang yoki ko'rib chiqish uchun bosing
                   </p>
                   <p className="text-xs text-on-primary-container">
-                    PNG, JPG yoki SVG formatlarini qo'llab-quvvatlaydi (oddiy: 2MB, VIP: 6MB gacha)
+                    PNG, JPG yoki GIF formatlarini qo'llab-quvvatlaydi (oddiy: 2MB, VIP: 6MB gacha)
                   </p>
                 </>
               )}
@@ -824,7 +997,7 @@ export default function SellPage({
 
             <input
               type="url"
-              className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
+              className="w-full bg-background border border-outline-variant/30 text-on-background rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
               placeholder="Rasmning onlayn URL havolasini kiriting..."
               value={imageUrl}
               onChange={(e) => {
@@ -834,9 +1007,85 @@ export default function SellPage({
             />
           </div>
 
+          {/* Gallery (qo'shimcha rasmlar) — DetailPage'dagi bento-grid galereyasini to'ldiradi */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-on-primary-container block">
+              Qo'shimcha galereya rasmlari ({galleryUrls.length}/{MAX_GALLERY_IMAGES})
+            </label>
+            <p className="text-xs text-on-primary-container/70">
+              Loyiha sahifasida muqova rasmi yonida ko'rsatiladigan qo'shimcha skrinshot yoki suratlar (ixtiyoriy).
+            </p>
+
+            {galleryUrls.length > 0 && (
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                {galleryUrls.map((url, idx) => (
+                  <div key={url + idx} className="relative group aspect-square rounded-xl overflow-hidden border border-white/10">
+                    <img
+                      src={url}
+                      alt={`Galereya rasmi ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeGalleryImage(idx)}
+                      className="absolute top-1 right-1 bg-black/70 hover:bg-red-500/90 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                      aria-label="Galereyadan o'chirish"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div
+              className={`border-2 border-dashed rounded-2xl p-4 text-center transition-all flex flex-col items-center justify-center min-h-[100px] ${
+                galleryUrls.length >= MAX_GALLERY_IMAGES
+                  ? 'border-outline-variant/20 bg-background/50 cursor-not-allowed opacity-60'
+                  : 'border-outline-variant/30 bg-background hover:border-secondary-container/50 cursor-pointer'
+              }`}
+              onClick={() => {
+                if (!isUploadingGallery && galleryUrls.length < MAX_GALLERY_IMAGES) {
+                  galleryInputRef.current?.click();
+                }
+              }}
+            >
+              <input
+                type="file"
+                ref={galleryInputRef}
+                className="hidden"
+                accept="image/*"
+                multiple
+                onChange={handleGalleryFilesChange}
+                disabled={isUploadingGallery || galleryUrls.length >= MAX_GALLERY_IMAGES}
+              />
+              {isUploadingGallery ? (
+                <div className="flex items-center gap-2">
+                  <RefreshCw className="w-5 h-5 text-secondary-container animate-spin" />
+                  <p className="text-xs font-bold text-on-background">Rasmlar yuklanmoqda...</p>
+                </div>
+              ) : galleryUrls.length >= MAX_GALLERY_IMAGES ? (
+                <p className="text-xs font-bold text-on-primary-container">
+                  Galereya to'liq ({MAX_GALLERY_IMAGES}/{MAX_GALLERY_IMAGES})
+                </p>
+              ) : (
+                <>
+                  <UploadCloud className="w-6 h-6 text-secondary-container mb-1" />
+                  <p className="text-xs font-bold text-on-background">
+                    Rasm(lar) qo'shish uchun bosing
+                  </p>
+                  <p className="text-xs text-on-primary-container/70">
+                    JPG, PNG, WebP yoki GIF — bir nechtasini birdan tanlashingiz mumkin
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+
           {/* Founder Contact Information */}
           <div className="pt-6 border-t border-outline-variant/10 space-y-4">
-            <h3 className="text-white font-bold text-sm tracking-wide uppercase">
+            <h3 className="text-on-primary-container font-bold text-sm tracking-wide uppercase">
               Asoschi bilan bog'lanish ma'lumotlari
             </h3>
             
@@ -845,7 +1094,7 @@ export default function SellPage({
                 <label className="text-xs font-bold text-on-primary-container block">Elektron pochta manzili</label>
                 <input
                   type="email"
-                  className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
+                  className="w-full bg-background border border-outline-variant/30 text-on-background rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
                   placeholder="contact@safia.uz"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -856,7 +1105,7 @@ export default function SellPage({
                 <label className="text-xs font-bold text-on-primary-container block">Telefon raqami</label>
                 <input
                   type="tel"
-                  className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
+                  className="w-full bg-background border border-outline-variant/30 text-on-background rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
                   placeholder="+998 90 123 45 67"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
@@ -867,7 +1116,7 @@ export default function SellPage({
                 <label className="text-xs font-bold text-on-primary-container block">Telegram foydalanuvchi nomi</label>
                 <input
                   type="text"
-                  className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
+                  className="w-full bg-background border border-outline-variant/30 text-on-background rounded-xl p-3 font-semibold text-sm focus:outline-none focus:border-secondary-container transition-all"
                   placeholder="safia_founder"
                   value={telegram}
                   onChange={(e) => setTelegram(e.target.value)}
@@ -885,6 +1134,53 @@ export default function SellPage({
           </button>
         </form>
       </div>
+
+      {isProposeCategoryOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-primary-container border border-outline-variant/30 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-fade-in-up">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-on-primary-container font-bold flex items-center gap-2">
+                <PlusCircle className="text-secondary w-5 h-5" />
+                Yangi kategoriya taklif qilish
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsProposeCategoryOpen(false)}
+                className="text-on-primary-container hover:text-on-primary-container focus:outline-none focus:ring-2 focus:ring-white/50 rounded-full p-1 flex items-center justify-center"
+                aria-label="Yopish"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleProposeCategory} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs uppercase font-bold text-on-primary-container">Kategoriya nomi</label>
+                <input
+                  type="text"
+                  value={proposedCategoryName}
+                  onChange={(e) => setProposedCategoryName(e.target.value)}
+                  className="w-full bg-surface-container-low border border-white/10 rounded-xl p-3 text-sm text-on-primary-container focus:border-secondary outline-none focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
+                  placeholder="masalan: Mobil ilovalar"
+                  autoFocus
+                />
+                <p className="text-xs text-on-primary-container leading-relaxed">
+                  Taklifingiz admin tomonidan ko'rib chiqiladi va tasdiqlangandan so'ng barcha foydalanuvchilar uchun kategoriyalar ro'yxatida paydo bo'ladi.
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isProposingCategory}
+                className="w-full py-3 bg-secondary text-on-secondary rounded-xl font-bold text-sm shadow-lg shadow-secondary/10 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
+              >
+                {isProposingCategory && <RefreshCw className="w-4 h-4 animate-spin" />}
+                Taklif yuborish
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

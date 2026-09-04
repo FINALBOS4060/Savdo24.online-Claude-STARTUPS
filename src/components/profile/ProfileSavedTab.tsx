@@ -1,4 +1,5 @@
 import React from 'react';
+import { Bookmark } from 'lucide-react';
 import { Startup, Category } from '../../types';
 
 interface ProfileSavedTabProps {
@@ -18,7 +19,7 @@ export const ProfileSavedTab: React.FC<ProfileSavedTabProps> = ({
     <section className="space-y-6">
       {savedStartups.length === 0 ? (
         <div className="text-center py-16 border border-dashed border-outline-variant/20 rounded-2xl bg-white/5">
-          <span className="material-symbols-outlined text-4xl text-on-primary-container mb-3">bookmark_border</span>
+          <Bookmark className="w-10 h-10 text-on-primary-container mb-3" />
           <p className="text-on-primary-container font-semibold">Hozircha saqlangan e'lonlar yo'q.</p>
           <button
             onClick={() => setView('browse')}
@@ -43,7 +44,7 @@ export const ProfileSavedTab: React.FC<ProfileSavedTabProps> = ({
                   width={320}
                   height={160}
                 />
-                <div className="absolute top-4 left-4 bg-primary-container/95 text-white border border-white/10 px-3 py-1 rounded-lg text-xs font-bold uppercase">
+                <div className="absolute top-4 left-4 bg-primary-container/95 text-on-primary-container border border-white/10 px-3 py-1 rounded-lg text-xs font-bold uppercase">
                   {categories.find(c => c.id === startup.category)?.name || startup.category}
                 </div>
               </div>
@@ -52,7 +53,7 @@ export const ProfileSavedTab: React.FC<ProfileSavedTabProps> = ({
                 <div>
                   <h4
                     onClick={() => handleCardClick(startup.id)}
-                    className="font-extrabold text-white text-base hover:text-secondary-container transition-colors cursor-pointer"
+                    className="font-extrabold text-on-primary-container text-base hover:text-secondary-container transition-colors cursor-pointer"
                   >
                     {startup.name}
                   </h4>
@@ -70,7 +71,7 @@ export const ProfileSavedTab: React.FC<ProfileSavedTabProps> = ({
                   </div>
                   <button
                     onClick={() => handleCardClick(startup.id)}
-                    className="px-4 py-2 bg-white/5 hover:bg-secondary-container hover:text-on-secondary-fixed text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                    className="px-4 py-2 bg-white/5 hover:bg-secondary-container hover:text-on-secondary-fixed text-on-primary-container font-bold text-xs rounded-lg transition-colors cursor-pointer"
                   >
                     Ko'rish
                   </button>

@@ -65,7 +65,7 @@ router.get("/", authenticateToken, requireAdmin, async (req: AuthRequest, res: R
       total,
       pages: Math.ceil(total / Number(limit))
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error({ err }, "Get admin users error");
     res.status(500).json({ error: "Foydalanuvchilarni yuklashda xatolik yuz berdi." });
   }
@@ -108,7 +108,7 @@ router.patch("/:id/ban", authenticateToken, requireAdmin, async (req: AuthReques
     });
 
     res.json({ success: true, isBanned: user.isBanned });
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error({ err }, "Ban user error");
     res.status(500).json({ error: "Amalni bajarishda xatolik yuz berdi." });
   }
@@ -205,6 +205,7 @@ router.patch("/:id/vip", authenticateToken, requireAdmin, async (req: AuthReques
     });
     res.json({ success: true, user });
   } catch (err) {
+    logger.error({ err }, "Update user VIP status error");
     res.status(500).json({ error: "VIP yangilashda xatolik." });
   }
 });
@@ -239,6 +240,7 @@ router.patch("/:id/role", authenticateToken, requireAdmin, async (req: AuthReque
     });
     res.json({ success: true, user });
   } catch (err) {
+    logger.error({ err }, "Change user role error");
     res.status(500).json({ error: "Rolni o'zgartirishda xatolik." });
   }
 });

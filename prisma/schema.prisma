@@ -16,9 +16,11 @@ model User {
   googleId        String?   @unique
   authProvider    String    @default("email") // "email" | "google"
   verified        Boolean   @default(false)
-  joinDate        String
+  joinDate        DateTime  @default(now())
   avatarUrl       String
   coverUrl        String?
+  phone           String?
+  signupReferralCode String?
   walletConnected Boolean   @default(false)
   walletAddress   String?
   emailVerified   Boolean   @default(false)
@@ -30,6 +32,14 @@ model User {
   isBanned        Boolean   @default(false)
   isVip           Boolean   @default(false)
   vipExpiresAt    DateTime?
+  vipExpiryNotifiedAt DateTime? // VIP tugashiga 1-2 kun qolgani haqida eslatma yuborilgan payt (takroriy yubormaslik uchun)
+  vipExpiredNotifiedAt DateTime? // VIP muddati tugagani haqida xabar yuborilgan payt (takroriy yubormaslik uchun)
+  telegramBroadcastOptOut Boolean @default(false) // true bo'lsa, admin broadcast/reklama xabarlarini olmaydi (xarid/nizo kabi muhim xabarlar bunga bog'liq emas)
+  telegramBotBlockedAt DateTime? // Telegram 403 ("bot was blocked by the user") qaytarganda shu vaqt yoziladi.
+                                 // null = bloklamagan. Muvaffaqiyatli xabar yetkazilganda avtomatik
+                                 // tozalanadi (foydalanuvchi botni qayta ochgan bo'lsa). Broadcast so'rovlari
+                                 // shu maydon bo'yicha filtrlanadi — bloklagan foydalanuvchilarga qayta-qayta
+                                 // urinilmaydi.
   telegramUserId  String?   @unique
   telegramLinkCode String?   @unique
   telegramLinkCodeExpires DateTime?
@@ -46,17 +56,26 @@ model User {
   referredBy         Referral[] @relation("RefereeReferrals")
   b2bAccount         B2BAccount?
   auditLogs          AuditLog[]
+  broadcastMessages  BroadcastMessage[]
+  proposedCategories Category[]
 
   @@index([role])
   @@index([isBanned])
   @@index([joinDate])
+  @@index([telegramBotBlockedAt])
 }
 
 model Category {
-  id       String    @id
-  name     String
-  icon     String
-  fields   String?
+  id                String    @id
+  name              String
+  icon              String
+  fields            String?
+  status            String    @default("active") // "active" | "pending" — foydalanuvchi taklif qilgan kategoriyalar admin tasdiqlaguncha "pending" bo'ladi
+  proposedByUserId  Int?
+  proposedByUser    User?     @relation(fields: [proposedByUserId], references: [id])
+  createdAt         DateTime  @default(now())
+
+  @@index([status])
 }
 
 model Startup {
@@ -89,6 +108,8 @@ model Startup {
   user            User?     @relation(fields: [userId], references: [id])
   isTop           Boolean   @default(false)
   topExpiresAt    DateTime?
+  topExpiryNotifiedAt DateTime? // TOP tugashiga 1-2 kun qolgani haqida eslatma yuborilgan payt
+  topExpiredNotifiedAt DateTime? // TOP muddati tugagani haqida xabar (qayta faollashtirish taklifi) yuborilgan payt
   ideas           Idea[]
   payments        Payment[]
   reviews         Review[]
@@ -111,6 +132,13 @@ model Payment {
   status             String    // "pending" | "completed" | "failed"
   currency           String    @default("USDT")
   createdAt          DateTime  @default(now())
+  // TUZATISH: server.ts'dagi checkPendingRefunds() (har kuni 08:00 cron)
+  // "refund_required" holatida 3 kundan ortiq turgan to'lovlarni topish
+  // uchun Payment.updatedAt maydonidan foydalanardi, lekin bu maydon
+  // sxemada UMUMAN mavjud emas edi — natijada Prisma har safar xato
+  // tashlab, butun eslatma funksiyasi (adminlarga kechiktirilgan
+  // qaytarishlar haqida ogohlantirish) har kuni jimgina ishlamay qolardi.
+  updatedAt          DateTime  @updatedAt
   callbackToken      String?
   platformFeeAmount  Decimal?    @default(0) @db.Decimal(12, 2)
   sellerPayoutAmount Decimal?    @default(0) @db.Decimal(12, 2)
@@ -168,7 +196,7 @@ model Review {
   sellerId    Int      // sotuvchini alohida ko'rsatish uchun
   createdAt   DateTime @default(now())
 
-  @@index([startupId])
+  @@unique([startupId, buyerId])
   @@index([sellerId])
 }
 
@@ -185,7 +213,7 @@ model Dispute {
   createdAt   DateTime @default(now())
   resolvedAt  DateTime?
 
-  @@index([paymentId])
+  @@unique([paymentId])
   @@index([status])
 }
 
@@ -236,6 +264,33 @@ model AuditLog {
   @@index([adminId])
 }
 
+// YANGI: ommaviy (broadcast) xabarlar tarixi. Ilgari natija (jami/
+// yuborilgan/xato) faqat frontend local state'da turardi va sahifa
+// yangilansa yo'qolardi, audit logda esa faqat statistika saqlanib,
+// xabarning O'ZI (matni) hech qayerda saqlanmasdi — bu degani admin
+// oldin nima yozganini keyinroq ko'ra olmasdi. Endi har bir broadcast
+// so'rov boshlanishi bilanoq shu jadvalga "running" holatida yoziladi
+// (shu bilan server qayta ishga tushsa ham — masalan deploy paytida —
+// "running" holatida "yarim qolgan" job tarixda ko'rinadi, xotiradagi
+// Map'dagidek butunlay yo'qolib qolmaydi), so'ng fonda progress
+// yangilanadi va yakunda "done" qilinadi.
+model BroadcastMessage {
+  id          Int      @id @default(autoincrement())
+  message     String
+  adminId     Int?
+  adminEmail  String?
+  admin       User?    @relation(fields: [adminId], references: [id], onDelete: SetNull)
+  total       Int      @default(0)
+  sent        Int      @default(0)
+  failed      Int      @default(0)
+  status      String   @default("running") // "running" | "done"
+  startedAt   DateTime @default(now())
+  finishedAt  DateTime?
+
+  @@index([adminId])
+  @@index([startedAt])
+}
+
 model Setting {
   key         String   @id
   value       String   // AES-256-GCM bilan shifrlangan
@@ -265,6 +320,215 @@ model SponsorChannel {
   startDate         DateTime?
   endDate           DateTime?
   createdAt         DateTime @default(now())
+}
+
+// Foydalanuvchilar o'zaro obunachi almashadigan tizim ("obuna almashish
+// bozori"). Bu SponsorChannel'dan farqli — u yerda FAQAT admin kanal
+// qo'shadi (majburiy obuna), bu yerda esa ODDIY FOYDALANUVCHILAR o'z
+// kanalini qo'shadi va navbat asosida bir-birlariga ko'rsatiladi.
+// Qoida: agar odam boshqa birovning kanaliga obuna bo'lgandan keyin
+// undan chiqib ketsa (obunani "qaytarib olsa"), UNING O'Z kanali(lari)
+// navbatdan vaqtincha chiqarib qo'yiladi (isActive=false,
+// suspendedDueToLapse=true) — qayta obuna bo'lganda avtomatik tiklanadi.
+model ExchangeChannel {
+  id                   Int      @id @default(autoincrement())
+  ownerTelegramId      String   // kanal egasining Telegram user ID'si
+  ownerUsername        String?
+  channelId            String   // Telegram kanal ID (masalan -1001234567890)
+  channelUsername      String?  // @kanalnomi (agar public bo'lsa)
+  title                String
+  isActive             Boolean  @default(true)  // false bo'lsa navbatda ko'rsatilmaydi
+  suspendedReason      String?
+  suspendedDueToLapse  Boolean  @default(false) // true = qoidabuzarlik tufayli to'xtatilgan (avtomatik tiklanadi)
+  blockedByAdmin       Boolean  @default(false) // true = admin tomonidan qo'lda bloklangan (avtomatik tiklanmaydi)
+  // YANGI (foydalanuvchi talabi): kanalga KAMIDA 2 TA TURLI foydalanuvchi
+  // shikoyat qilsa, kanal ODAMLARGA vaqtinchalik ko'rsatilmay qo'yiladi
+  // (isActive=false) — bu blockedByAdmin'dan FARQLI: admin hali qo'lda
+  // ko'rib chiqmagan, shu sabab avtomatik tiklanmaydi (suspendedDueToLapse
+  // kabi emas) lekin admin buni "bloklash" emas, "shikoyat tufayli
+  // ko'rib chiqilmoqda" deb ajrata olishi uchun alohida bayroq. Admin
+  // panelida ko'rinadi va admin uni tekshirib, kerak bo'lsa qayta
+  // faollashtiradi (/unblock) yoki butunlay bloklaydi (/block).
+  suspendedDueToReports Boolean @default(false)
+  // YANGI (foydalanuvchi talabi — "kredit oldi-yu, navbatga qaytmay
+  // qoldi" bugi tuzatildi): avval kanal boshqa kanalga obuna bo'lib
+  // (yoki referal orqali) kredit olganda isActive=false qilinardi-yu,
+  // suspendedDueToLapse HAM false qo'yilardi — natijada bu kanal
+  // report-check'dagi "suspendedDueToLapse=true bo'lsa avtomatik
+  // tikla" mantig'iga UMUMAN kirmasdi va FAQAT admin panelidan qo'lda
+  // "Qayta ishga tushirish" bosilgandagina navbatga qaytardi. Endi bu
+  // holat suspendedDueToLapse'dan ALOHIDA shu bayroq bilan belgilanadi
+  // va cron-jobs.ts'dagi yangi davriy vazifa (reactivateCreditSuspendedChannels)
+  // buni har 3 soatda avtomatik navbatga qaytaradi — admin qo'lda hech
+  // narsa qilishi shart emas.
+  suspendedDueToCreditEarned Boolean @default(false)
+  lastOfferedAt        DateTime? // navbat aylanishi uchun — eng kam ko'rsatilgan birinchi taklif qilinadi
+  // YANGI (foydalanuvchi talabi, "adolatli ko'rinish" tuzatishi): kanal
+  // /browse orqali BOSHQALARGA nechi marta taklif qilingani. Avvalgi
+  // mantiqda, egasi biror kanalga obuna bo'lishi bilanoq kredit tushib,
+  // kanal DARHOL navbatdan chiqib ketardi — hatto atigi 1 marta (yoki
+  // hech qachon) ko'rsatilgan bo'lsa ham, ya'ni real obunachi olishga
+  // deyarli imkoni bo'lmasdan. Endi kanal kamida EXCHANGE_MIN_OFFERS_
+  // BEFORE_DEACTIVATE (admin sozlamasi) marta taklif qilinguncha navbatda
+  // qoladi — shundan keyingina, egasi kredit olganda, navbatdan chiqadi.
+  timesOffered         Int      @default(0)
+  // 🆕 YANGI (foydalanuvchi talabi — "sponsor kanal" navbat tizimi):
+  // avval sponsor (reklama/targ'ibot) kanallari BUTUNLAY alohida jadval
+  // (SponsorChannel) orqali, majburiy-obuna darvozasi sifatida
+  // boshqarilardi. Endi bunday kanal ODDIY foydalanuvchi kanali kabi —
+  // xuddi shu ExchangeChannel jadvaliga, xuddi shu "Kanalimni qo'shish"
+  // oqimi orqali — qo'shiladi, lekin isSponsor=true bo'lsa: (1) /browse
+  // natijalarida DOIM navbatning eng boshida chiqadi (qarang:
+  // exchange-channels.ts browse endpoint'idagi orderBy), (2) hech qachon
+  // "kredit olib navbatdan chiqarilish", "lapse" yoki sog'liq-tekshiruvi
+  // orqali avtomatik isActive=false qilinmaydi — faqat admin qo'lda
+  // /block qilsagina o'chadi. isSponsor FAQAT admin panelidan
+  // (adminRouter, "sponsor qilib belgilash" tugmasi) yoqiladi/o'chiriladi.
+  isSponsor            Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  // YANGI (push-eslatma, foydalanuvchi talabi): kanal qo'shgan-u, lekin
+  // O'ZI hech kimning kanaliga obuna bo'lmagan foydalanuvchilarga 24
+  // soatdan keyin yumshoq eslatma yuborish uchun kursor — oxirgi marta
+  // shu tekshiruv qachon o'tkazilgani. null bo'lsa createdAt'dan beri
+  // hisoblanadi. Har cron ishga tushishida (faol/nofaol bo'lishidan
+  // qat'iy nazar) shu maydon "hozir"ga yangilanadi — bu 24 soatlik
+  // oynani navbatdagi tekshiruv uchun oldinga suradi (lastJoinNotifiedAt
+  // bilan bir xil naqsh).
+  lastInactivityReminderAt DateTime?
+
+  // TUZATILDI (foydalanuvchi talabi): obunachi krediti KANAL EGASIGA
+  // emas, balki OBUNA BO'LGAN ODAMNING O'Z kanaliga hisoblanadi. Ya'ni
+  // Erik Alex kanaliga obuna bo'lsa — 2 ta krediti Erikning kanaliga
+  // yoziladi (Alexning kanaliga emas). Shu sabab bu son endi haqiqiy
+  // ExchangeSubscription sonidan HISOBLAB chiqarilmaydi — to'g'ridan-to'g'ri
+  // shu ustunda saqlanadi va kredit tushgan zahoti kanal navbatdan
+  // (isActive=false) olib tashlanadi.
+  earnedSubscribers    Int      @default(0)
+
+  // YANGI (foydalanuvchi talabi): kanal egasiga har soatda "kanalingizga
+  // N ta odam qo'shildi" bildirishnomasi yuborish uchun kursor — oxirgi
+  // marta bildirishnoma yuborilgan vaqt. null bo'lsa createdAt'dan beri
+  // hisoblanadi (ya'ni kanal qo'shilgandan buyon barcha yangi obunalar).
+  lastJoinNotifiedAt   DateTime?
+
+  // YANGI (foydalanuvchi talabi — "yangi foydalanuvchi qo'shildi"
+  // bildirishnomasi): kanal navbatga qo'shilgach, boshqa (hali unga
+  // obuna bo'lmagan) faol ishtirokchilarga BIR MARTA "yangi kanal
+  // qo'shildi, obuna bo'lib ball oling" bildirishnomasi yuborilgani-
+  // yuborilmaganini belgilaydi — takroriy spam yubormaslik uchun.
+  newChannelAnnouncedAt DateTime?
+
+  subscriptions        ExchangeSubscription[]
+  reports              ExchangeChannelReport[]
+
+  @@unique([ownerTelegramId, channelId])
+}
+
+// YANGI (foydalanuvchi talabi): "Obunachi yig'ish" bo'limida taklif
+// qilinayotgan kanallardan (masalan spam, nomaqbul kontent, firibgarlik)
+// shikoyat qilish uchun. Admin bu haqda darhol Telegram orqali
+// xabardor qilinadi (notifyAdminTelegram) — yozuv esa keyinchalik
+// ko'rib chiqish/hisobot uchun bazada saqlanadi.
+model ExchangeChannelReport {
+  id                    Int             @id @default(autoincrement())
+  channelId             Int
+  channel               ExchangeChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  reporterTelegramId    String
+  reason                String
+  createdAt             DateTime        @default(now())
+
+  @@index([channelId])
+}
+
+model ExchangeSubscription {
+  id                    Int             @id @default(autoincrement())
+  subscriberTelegramId  String
+  channelId             Int
+  channel               ExchangeChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  isCurrentMember       Boolean         @default(true)
+  subscribedAt          DateTime        @default(now())
+  lastCheckedAt         DateTime        @default(now())
+  // YANGI (tuzatish, foydalanuvchi talabi): "kredit qaytarib olinmaydi"
+  // muammosi. Avval, obunachi biror kanalga obuna bo'lib kredit olgach
+  // (o'zining kanaliga +N obunachi qo'shilgach) SHU KANALDAN DARHOL
+  // chiqib ketsa ham, olingan kredit hech qachon qaytarilmasdi — bu
+  // "obuna bo'l → kredit ol → darhol chiq" orqali soxta obunachi
+  // yig'ishga imkon berardi. Endi har bir HAQIQIY-kredit-bergan obuna
+  // uchun qancha kredit berilgani (creditGrantedAmount) va u allaqachon
+  // qaytarib olinganmi (creditClawedBack) shu yerda saqlanadi. Foydalanuvchi
+  // shu kanaldan chiqib ketgani aniqlansa (report-check), berilgan kredit
+  // uning HOZIRGI kanallaridan avtomatik ayiriladi (bir marta, keyin flag
+  // qo'yiladi — qayta obuna bo'lib qaytadan kredit olsa, flag qayta
+  // false'ga tushadi va kelajakda yana qaytarib olinishi mumkin bo'ladi).
+  creditGrantedAmount   Int             @default(0)
+  creditClawedBack      Boolean         @default(false)
+
+  @@unique([subscriberTelegramId, channelId])
+}
+
+// Obuna almashish tizimidagi REFERAL: kim kimni taklif qilganini
+// saqlaydi. Bir kishi faqat BIR marta (birinchi taklif qiluvchi bilan)
+// bog'lanadi (refereeTelegramId @unique) — shu bilan bir necha havola
+// orqali bir xil odam uchun bir necha marta mukofot olishning oldi
+// olinadi. `rewarded` faqat taklif qilingan odam O'ZINING kanalini
+// (birinchi marta) qo'shganda true qilinadi — shu sabab "faqat taklif
+// qilish" yetarli emas, chaqirilgan odam albatta o'z kanalini qo'shishi
+// SHART (foydalanuvchi talabi).
+model ExchangeReferral {
+  id                 Int      @id @default(autoincrement())
+  referrerTelegramId String
+  refereeTelegramId  String   @unique
+  rewarded           Boolean  @default(false)
+  createdAt          DateTime @default(now())
+
+  @@index([referrerTelegramId])
+}
+
+// Referal orqali kelgan BONUS obunachilar soni (haqiqiy
+// ExchangeSubscription yozuvi EMAS — chunki bular haqiqiy Telegram
+// a'zoligi bilan bog'liq emas). ownerTelegramId bo'yicha bitta umumiy
+// hisob — foydalanuvchining barcha kanallariga emas, jami sifatida
+// ko'rsatiladi (sayt profilida alohida bandda).
+model ExchangeReferralCredit {
+  ownerTelegramId  String   @id
+  bonusSubscribers Int      @default(0)
+  updatedAt        DateTime @updatedAt
+}
+
+// "Xush kelibsiz bonusi": foydalanuvchi botga ILK MARTA o'z kanalini
+// ulaganda beriladigan bir martalik 5 ta obunachi mukofoti. Bu yozuv
+// ownerTelegramId bo'yicha DOIMIY belgi sifatida saqlanadi — kanal
+// keyinchalik o'chirilib qayta qo'shilsa ham (ExchangeChannel qatori
+// yo'q qilinsa ham), shu jadvaldagi yozuv qolganligi sabab bonus
+// ikkinchi marta berilmaydi.
+model ExchangeWelcomeBonus {
+  ownerTelegramId String   @id
+  createdAt       DateTime @default(now())
+}
+
+// Telegram bot foydalanuvchisining til tanlovi (uz/en). Website User
+// hisobidan MUSTAQIL — chunki ko'p bot foydalanuvchisi hech qachon
+// saytdagi hisobini ulamasligi mumkin, shu sabab bu alohida, faqat
+// telegramUserId bo'yicha kalitlangan jadval.
+model TelegramBotUser {
+  telegramUserId String   @id
+  language       String   @default("uz") // "uz" | "en"
+  updatedAt      DateTime @updatedAt
+}
+
+// Bot foydalanuvchisining grammy session holatini (awaitingSearch,
+// awaitingExchangeChannel, lastList va h.k.) DOIMIY saqlaydi. Ilgari bu
+// faqat jarayon xotirasida (in-memory) saqlanardi — bot har safar PM2
+// orqali qayta ishga tushirilganda (masalan har bir avtomatik deploy'da)
+// BARCHA foydalanuvchilarning "yarim yo'ldagi" holati (masalan "kanal
+// qo'shish" oqimida kanal nomini kutayotgan holat) jimgina yo'qolib
+// qolardi. `data` maydonida butun sessiya obyekti JSON string sifatida
+// saqlanadi — grammy session shaklini bevosita Prisma sxemasiga
+// bog'lamaslik uchun (shakl kelajakda o'zgarishi mumkin).
+model TelegramBotSession {
+  telegramUserId String   @id
+  data           String
+  updatedAt      DateTime @updatedAt
 }
 
 model TopBoost {
@@ -446,6 +710,8 @@ model SupportTicket {
   subject     String
   message     String
   status      String   @default("pending") // pending, reviewing, resolved, closed
+  adminReply  String?
+  repliedAt   DateTime?
   createdAt   DateTime @default(now())
 }
 

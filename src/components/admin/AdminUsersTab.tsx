@@ -31,6 +31,21 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
 
   const usersSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestUsersRequestIdRef = useRef(0);
+  // TUZATISH: avval input onChange'da HAM setUsersSearch(val) darhol
+  // chaqirilardi (bu quyidagi useEffect'ni [usersSearch] ustida zudlik
+  // bilan ishga tushirib, debounce'siz so'rov yuborardi), HAM 500ms'dan
+  // keyin fetchAdminUsers yana alohida chaqirilardi — natijada har bir
+  // harf terilganda ikkita (bittasi darhol, bittasi 500ms'dan keyin)
+  // ortiqcha so'rov yuborilardi va debounce amalda ishlamasdi. Endi
+  // parent'ga (usersSearch) faqat debounce tugagach uzatiladi, matn
+  // maydoni esa mahalliy holatda saqlanadi.
+  const [searchInput, setSearchInput] = useState(usersSearch);
+
+  // usersSearch tashqaridan (masalan, Shikoyatlar tabidan "foydalanuvchini
+  // qidirish"ga sakrash orqali) o'zgarsa, matn maydonini ham sinxronlash
+  useEffect(() => {
+    setSearchInput(usersSearch);
+  }, [usersSearch]);
 
   const fetchAdminUsers = async (page = 1, search = '') => {
     const requestId = ++latestUsersRequestIdRef.current;
@@ -200,7 +215,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
         <button
           disabled={currentPage <= 1}
           onClick={() => onPageChange(currentPage - 1)}
-          className="p-2 bg-white/5 hover:bg-white/10 disabled:opacity-40 text-white rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-secondary-container"
+          className="p-2 bg-white/5 hover:bg-white/10 disabled:opacity-40 text-on-primary-container rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-secondary-container"
           aria-label="Oldingi sahifa"
         >
           <ChevronLeft className="w-4 h-4 block" />
@@ -211,7 +226,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
         <button
           disabled={currentPage >= totalPages}
           onClick={() => onPageChange(currentPage + 1)}
-          className="p-2 bg-white/5 hover:bg-white/10 disabled:opacity-40 text-white rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-secondary-container"
+          className="p-2 bg-white/5 hover:bg-white/10 disabled:opacity-40 text-on-primary-container rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-secondary-container"
           aria-label="Keyingi sahifa"
         >
           <ChevronRight className="w-4 h-4 block" />
@@ -224,7 +239,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
     <>
       <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-white/5 pb-6">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+          <h2 className="text-lg font-bold text-on-primary-container flex items-center gap-2">
             <Users className="w-5 h-5 text-secondary" />
             Foydalanuvchilar ({totalAdminUsers})
           </h2>
@@ -233,16 +248,16 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
             <input
               type="text"
               placeholder="Qidirish (ism, email)..."
-              value={usersSearch}
+              value={searchInput}
               onChange={(e) => {
                 const val = e.target.value;
-                setUsersSearch(val);
+                setSearchInput(val);
                 if (usersSearchDebounceRef.current) clearTimeout(usersSearchDebounceRef.current);
                 usersSearchDebounceRef.current = setTimeout(() => {
-                  fetchAdminUsers(1, val);
+                  setUsersSearch(val);
                 }, 500);
               }}
-              className="w-full pl-9 pr-4 py-2 bg-surface-container border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:ring-2 focus:ring-secondary"
+              className="w-full pl-9 pr-4 py-2 bg-surface-container border border-white/10 rounded-xl text-xs text-on-primary-container focus:outline-none focus:ring-2 focus:ring-secondary"
             />
           </div>
         </div>
@@ -274,17 +289,23 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                   <td className="py-4 px-4">
                     <div className="flex items-center gap-3">
                       <img 
-                        src={u.avatarUrl || '/default-avatar.jpg'} 
+                        src={u.avatarUrl || '/default-avatar.svg'} 
                         className="w-8 h-8 rounded-full border border-white/10" 
                         alt={`${u.name || 'Foydalanuvchi'} profil avatari`}
                         loading="lazy"
                         width={32}
                         height={32}
+                        onError={(e) => {
+                          const img = e.currentTarget;
+                          if (img.dataset.fallback) return;
+                          img.dataset.fallback = '1';
+                          img.src = '/default-avatar.svg';
+                        }}
                       />
                       <div>
-                        <div className="font-bold text-white group-hover:text-secondary-container transition-colors flex items-center gap-1.5 text-xs">
+                        <div className="font-bold text-on-primary-container group-hover:text-secondary-container transition-colors flex items-center gap-1.5 text-xs">
                           {u.name}
-                          {u.isVip && <span className="text-yellow-400 text-xs">👑</span>}
+                          {u.isVip && <span className="text-secondary text-xs">👑</span>}
                         </div>
                         <div className="text-xs text-on-primary-container">{u.email}</div>
                       </div>
@@ -295,8 +316,8 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                       {u.role}
                     </span>
                   </td>
-                  <td className="py-4 px-4 text-on-primary-container text-xs">{u.joinDate}</td>
-                  <td className="py-4 px-4 text-center text-white font-mono font-bold text-xs">{u.totalPayments}</td>
+                  <td className="py-4 px-4 text-on-primary-container text-xs">{formatDate(u.joinDate)}</td>
+                  <td className="py-4 px-4 text-center text-on-primary-container font-mono font-bold text-xs">{u.totalPayments}</td>
                   <td className="py-4 px-4 text-right">
                     <button
                       onClick={(e) => {
@@ -327,7 +348,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
           <div className="glass-card w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 md:p-10 rounded-2xl border border-white/5 shadow-2xl relative custom-scrollbar">
             <button 
               onClick={() => setSelectedUserDetail(null)}
-              className="absolute top-6 right-6 w-12 h-12 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-all text-white border border-white/10 focus:outline-none focus:ring-2 focus:ring-secondary-container"
+              className="absolute top-6 right-6 w-12 h-12 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-all text-on-primary-container border border-white/10 focus:outline-none focus:ring-2 focus:ring-secondary-container"
               aria-label="Yopish"
             >
               <X className="w-5 h-5" />
@@ -339,21 +360,27 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                 <div className="bg-surface-container-low border border-white/5 rounded-2xl p-6 text-center space-y-4">
                   <div className="relative inline-block">
                     <img 
-                      src={selectedUserDetail.user.avatarUrl || '/default-avatar.jpg'} 
+                      src={selectedUserDetail.user.avatarUrl || '/default-avatar.svg'} 
                       className="w-24 h-24 rounded-full border-4 border-secondary-container/20 mx-auto object-cover" 
                       alt={`${selectedUserDetail.user.name || 'Foydalanuvchi'} batafsil profil avatari`} 
                       loading="lazy"
                       width={96}
                       height={96}
+                      onError={(e) => {
+                        const img = e.currentTarget;
+                        if (img.dataset.fallback) return;
+                        img.dataset.fallback = '1';
+                        img.src = '/default-avatar.svg';
+                      }}
                     />
                     {selectedUserDetail.user.isVip && (
-                      <div className="absolute -top-1 -right-1 w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center text-black border-4 border-background">
+                      <div className="absolute -top-1 -right-1 w-8 h-8 bg-secondary rounded-full flex items-center justify-center text-black border-4 border-background">
                         <Crown className="w-4 h-4 fill-current" />
                       </div>
                     )}
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-white">{selectedUserDetail.user.name}</h3>
+                    <h3 className="text-xl font-black text-on-primary-container">{selectedUserDetail.user.name}</h3>
                     <p className="text-xs text-on-primary-container">{selectedUserDetail.user.email}</p>
                   </div>
                   <div className="flex flex-wrap justify-center gap-2">
@@ -374,15 +401,15 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                 </div>
 
                 <div className="bg-secondary-container/5 border border-secondary-container/10 rounded-2xl p-5 space-y-4">
-                  <h4 className="text-xs font-black text-white uppercase tracking-widest border-b border-white/5 pb-2">Statistika</h4>
+                  <h4 className="text-xs font-black text-on-primary-container uppercase tracking-widest border-b border-white/5 pb-2">Statistika</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <p className="text-xs text-on-primary-container font-bold uppercase tracking-wider">E'lonlar</p>
-                      <p className="text-xl font-black text-white">{selectedUserDetail.user.totalStartups}</p>
+                      <p className="text-xl font-black text-on-primary-container">{selectedUserDetail.user.totalStartups}</p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-xs text-on-primary-container font-bold uppercase tracking-wider">Xaridlar</p>
-                      <p className="text-xl font-black text-white">{selectedUserDetail.user.totalPurchases}</p>
+                      <p className="text-xl font-black text-on-primary-container">{selectedUserDetail.user.totalPurchases}</p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-xs text-on-primary-container font-bold uppercase tracking-wider">Sotilgan</p>
@@ -390,7 +417,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                     </div>
                     <div className="space-y-1">
                       <p className="text-xs text-on-primary-container font-bold uppercase tracking-wider">Reyting</p>
-                      <p className="text-xl font-black text-white flex items-center gap-1.5">
+                      <p className="text-xl font-black text-on-primary-container flex items-center gap-1.5">
                         <Star className="w-5 h-5 text-secondary-container fill-secondary-container" />
                         {selectedUserDetail.user.averageRating ? (
                           selectedUserDetail.user.averageRating.toFixed(1)
@@ -407,15 +434,15 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
               <div className="lg:col-span-2 space-y-8">
                 {/* VIP Status Settings */}
                 <div className="bg-background border border-white/5 rounded-2xl p-6 md:p-8 space-y-4">
-                  <h4 className="text-sm font-black text-white flex items-center gap-2">
-                    <Crown className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                  <h4 className="text-sm font-black text-on-primary-container flex items-center gap-2">
+                    <Crown className="w-4 h-4 text-secondary fill-secondary" />
                     VIP A'zolik Sozlamalari
                   </h4>
                   <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pt-2">
                     <div>
                       {selectedUserDetail.user.isVip ? (
                         <div className="space-y-1">
-                          <p className="text-xs text-white font-bold flex items-center gap-1.5">
+                          <p className="text-xs text-on-primary-container font-bold flex items-center gap-1.5">
                             <span className="w-2 h-2 bg-success rounded-full animate-pulse"></span>
                             VIP faol (tugash: {formatDate(selectedUserDetail.user.vipExpiresAt)})
                           </p>
@@ -438,7 +465,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                             key={days}
                             onClick={() => handleUpdateUserVip(selectedUserDetail.user.id, true, days)}
                             disabled={isUpdatingUser}
-                            className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-lg text-xs font-bold transition-all disabled:opacity-40 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-secondary-container"
+                            className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-on-primary-container border border-white/10 rounded-lg text-xs font-bold transition-all disabled:opacity-40 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-secondary-container"
                           >
                             +{days} kun VIP
                           </button>
@@ -452,7 +479,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Rol o'zgartirish */}
                   <div className="bg-background border border-white/5 rounded-2xl p-6 md:p-8 space-y-4">
-                    <h4 className="text-sm font-black text-white flex items-center gap-2">
+                    <h4 className="text-sm font-black text-on-primary-container flex items-center gap-2">
                       <UserCog className="w-4 h-4 text-blue-400" />
                       Tizimdagi Roli
                     </h4>
@@ -465,7 +492,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                           className={`w-full px-4 py-2.5 rounded-xl font-bold text-xs flex justify-between items-center transition-all disabled:opacity-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-secondary-container ${
                             selectedUserDetail.user.role === role 
                               ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
-                              : 'bg-white/5 text-white border border-white/5 hover:bg-white/10'
+                              : 'bg-white/5 text-on-primary-container border border-white/5 hover:bg-white/10'
                           }`}
                         >
                           <span>{role}</span>
@@ -487,7 +514,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                       <button
                         onClick={() => handleSendResetLink(selectedUserDetail.user.email)}
                         disabled={isUpdatingUser}
-                        className="w-full px-4 py-2.5 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 border border-yellow-500/20 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                        className="w-full px-4 py-2.5 bg-secondary/10 hover:bg-secondary/20 text-secondary border border-secondary/20 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-secondary"
                       >
                         <KeyRound className="w-4 h-4" />
                         Parolni tiklash havolasi
@@ -522,7 +549,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                             <button
                               onClick={() => setShowDeleteConfirm(false)}
                               disabled={isUpdatingUser}
-                              className="flex-1 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-xs font-bold cursor-pointer focus:outline-none focus:ring-2 focus:ring-white/50"
+                              className="flex-1 py-2 bg-white/5 hover:bg-white/10 text-on-primary-container rounded-lg text-xs font-bold cursor-pointer focus:outline-none focus:ring-2 focus:ring-white/50"
                             >
                               Bekor qilish
                             </button>
@@ -544,7 +571,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
 
                 {/* Audit Logs */}
                 <div className="space-y-4">
-                  <h4 className="text-sm font-black text-white flex items-center gap-2">
+                  <h4 className="text-sm font-black text-on-primary-container flex items-center gap-2">
                     <History className="w-4 h-4 text-secondary-container" />
                     Oxirgi AuditLog yozuvlari
                   </h4>
@@ -559,8 +586,8 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                               <span className="text-xs font-black text-secondary-container uppercase tracking-widest">{log.action}</span>
                               <span className="text-xs text-on-primary-container font-mono">{formatDateTime(log.createdAt)}</span>
                             </div>
-                            <p className="text-xs text-white font-medium leading-relaxed mb-1">{log.details}</p>
-                            <p className="text-xs text-on-primary-container">Admin: <span className="text-white font-bold">{log.admin?.name || "Tizim"}</span></p>
+                            <p className="text-xs text-on-primary-container font-medium leading-relaxed mb-1">{log.details}</p>
+                            <p className="text-xs text-on-primary-container">Admin: <span className="text-on-primary-container font-bold">{log.admin?.name || "Tizim"}</span></p>
                           </div>
                         ))}
                       </div>

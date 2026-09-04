@@ -42,7 +42,7 @@ export const AdminDisputesTab: React.FC<AdminDisputesTabProps> = ({
     <div className="space-y-8">
       {/* General Disputes */}
       <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
-        <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4">
+        <h2 className="text-lg font-bold text-on-primary-container flex items-center gap-2 border-b border-white/5 pb-4">
           <Gavel className="text-red-400 w-5 h-5" />
           Sotib oluvchilar arizalari va Nizolar ({disputes.length})
         </h2>
@@ -63,7 +63,7 @@ export const AdminDisputesTab: React.FC<AdminDisputesTabProps> = ({
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-3">
                   <div>
                     <span className="text-xs uppercase font-bold text-on-primary-container block">Buyurtma va Loyiha</span>
-                    <span className="text-white font-black text-sm">{disp.payment?.startup?.name || "Noma'lum loyiha"}</span>
+                    <span className="text-on-primary-container font-black text-sm">{disp.payment?.startup?.name || "Noma'lum loyiha"}</span>
                     <span className="text-xs text-on-primary-container block mt-0.5">ID: {disp.paymentId} • Narxi: ${disp.payment?.startup?.price?.toLocaleString()}</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -82,14 +82,14 @@ export const AdminDisputesTab: React.FC<AdminDisputesTabProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                   <div className="space-y-1 bg-surface-container p-3.5 rounded-xl border border-white/5">
                     <span className="text-secondary/80 font-bold uppercase text-xs tracking-wider block">Nizo ochuvchi xaridor</span>
-                    <p className="text-white font-extrabold">{disp.buyer?.name}</p>
+                    <p className="text-on-primary-container font-extrabold">{disp.buyer?.name}</p>
                     <p className="text-on-primary-container text-xs">{disp.buyer?.email}</p>
                     <p className="text-on-primary-container text-xs mt-1.5">{formatDateTime(disp.createdAt)}</p>
                   </div>
 
                   <div className="space-y-1 bg-surface-container p-3.5 rounded-xl border border-white/5">
                     <span className="text-red-400/80 font-bold uppercase text-xs tracking-wider block">Muammo va Sababi</span>
-                    <p className="text-white font-extrabold">"{disp.reason}"</p>
+                    <p className="text-on-primary-container font-extrabold">"{disp.reason}"</p>
                     <p className="text-on-primary-container text-xs leading-relaxed mt-1">"{disp.description}"</p>
                   </div>
                 </div>
@@ -103,7 +103,7 @@ export const AdminDisputesTab: React.FC<AdminDisputesTabProps> = ({
                         placeholder="Nizoni yopish yoki rad etish sababini batafsil yozing..."
                         value={adminNotes[disp.id] || ""}
                         onChange={(e) => setAdminNotes({ ...adminNotes, [disp.id]: e.target.value })}
-                        className="w-full p-2.5 bg-surface-container border border-white/10 rounded-xl text-white text-xs placeholder-on-primary-container/50 focus:outline-none focus:ring-2 focus:ring-secondary-container transition-all"
+                        className="w-full p-2.5 bg-surface-container border border-white/10 rounded-xl text-on-primary-container text-xs placeholder-on-primary-container/50 focus:outline-none focus:ring-2 focus:ring-secondary-container transition-all"
                       />
                     </div>
                     <div className="flex items-center gap-2 justify-end">
@@ -142,7 +142,7 @@ export const AdminDisputesTab: React.FC<AdminDisputesTabProps> = ({
 
       {/* Escrow Disputes */}
       <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
-        <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4">
+        <h2 className="text-lg font-bold text-on-primary-container flex items-center gap-2 border-b border-white/5 pb-4">
           <Scale className="text-red-400 w-5 h-5" />
           Escrow (kafolatlangan to'lov) nizolari ({escrowDisputes.length})
         </h2>
@@ -165,7 +165,7 @@ export const AdminDisputesTab: React.FC<AdminDisputesTabProps> = ({
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-3">
                   <div>
                     <span className="text-xs uppercase font-bold text-on-primary-container block">Loyiha</span>
-                    <span className="text-white font-black text-sm">{ed.escrow?.payment?.startup?.name || "Noma'lum loyiha"}</span>
+                    <span className="text-on-primary-container font-black text-sm">{ed.escrow?.payment?.startup?.name || "Noma'lum loyiha"}</span>
                     <span className="text-xs text-on-primary-container block mt-0.5">To'lov ID: {ed.escrow?.paymentId} • Narxi: ${ed.escrow?.payment?.startup?.price?.toLocaleString()}</span>
                   </div>
                   <span className="text-xs font-extrabold uppercase px-2.5 py-1 rounded-lg border bg-red-500/10 text-red-400 border-red-500/20">
@@ -176,14 +176,14 @@ export const AdminDisputesTab: React.FC<AdminDisputesTabProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                   <div className="space-y-1 bg-surface-container p-3.5 rounded-xl border border-white/5">
                     <span className="text-secondary/80 font-bold uppercase text-xs tracking-wider block">Nizo ochuvchi xaridor</span>
-                    <p className="text-white font-extrabold">{ed.escrow?.payment?.user?.name}</p>
+                    <p className="text-on-primary-container font-extrabold">{ed.escrow?.payment?.user?.name}</p>
                     <p className="text-on-primary-container text-xs">{ed.escrow?.payment?.user?.email}</p>
                     <p className="text-on-primary-container text-xs mt-1.5">{formatDateTime(ed.createdAt)}</p>
                   </div>
 
                   <div className="space-y-1 bg-surface-container p-3.5 rounded-xl border border-white/5">
                     <span className="text-red-400/80 font-bold uppercase text-xs tracking-wider block">Nizo sababi</span>
-                    <p className="text-white font-extrabold">"{ed.reason}"</p>
+                    <p className="text-on-primary-container font-extrabold">"{ed.reason}"</p>
                   </div>
                 </div>
 
@@ -195,7 +195,7 @@ export const AdminDisputesTab: React.FC<AdminDisputesTabProps> = ({
                       placeholder="Qarorni asoslab yozing (masalan: dalillar tekshirildi, xaridorning haqi ...)"
                       value={escrowAdminNotes[ed.id] || ""}
                       onChange={(e) => setEscrowAdminNotes({ ...escrowAdminNotes, [ed.id]: e.target.value })}
-                      className="w-full p-2.5 bg-surface-container border border-white/10 rounded-xl text-white text-xs placeholder-on-primary-container/50 focus:outline-none focus:ring-2 focus:ring-secondary-container transition-all"
+                      className="w-full p-2.5 bg-surface-container border border-white/10 rounded-xl text-on-primary-container text-xs placeholder-on-primary-container/50 focus:outline-none focus:ring-2 focus:ring-secondary-container transition-all"
                     />
                   </div>
                   <div className="flex items-center gap-2 justify-end">

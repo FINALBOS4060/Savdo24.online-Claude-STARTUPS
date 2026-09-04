@@ -7,11 +7,19 @@ import { decryptSecret } from '../src/lib/crypto';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { S3Client, ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/client-s3';
+import { listBackupsFromGoogleDrive, downloadFromGoogleDrive } from '../src/lib/googleDrive';
 
 dotenv.config();
 
 const prismaClient = new PrismaClient();
 
+// TUZATILDI (XAVFLI FALLBACK — bir xil xato scripts/backup-db.ts,
+// scripts/export-to-github.ts va src/routes/admin-backup.ts'da ham
+// topilgan): deshifrlash muvaffaqiyatsiz bo'lsa, endi xom shifr matni
+// emas, `null` qaytariladi — aks holda pastda S3/Google Drive/Telegram
+// tiklash (restore) chaqiruvlarida noma'lum, ishlatib bo'lmaydigan
+// qiymat haqiqiy kalit/token sifatida ishlatilib, tushunarsiz xatoga
+// olib kelishi mumkin edi.
 async function getSetting(key: string): Promise<string | null> {
   try {
     const dbSetting = await prismaClient.setting.findUnique({ where: { key } });
@@ -20,7 +28,8 @@ async function getSetting(key: string): Promise<string | null> {
         const decrypted = decryptSecret(dbSetting.value);
         return decrypted;
       } catch (decryptErr) {
-        return dbSetting.value; // Fallback if not encrypted
+        console.error(`[Settings] "${key}" sozlamasini deshifrlab bo'lmadi (ENCRYPTION_KEY mos kelmasligi mumkin) — Admin panel → Sozlamalar orqali qayta kiriting.`);
+        return null;
       }
     }
   } catch (err) {
@@ -91,8 +100,10 @@ async function decryptBackup(encryptedContent: string, encryptionKey: string): P
 // last_backup.json'ga qarardi, ikkalasi ham faqat Telegram muvaffaqiyatli
 // bo'lgandagina yoziladi). Ya'ni faqat S3 sozlangan loyihalarda zaxira
 // "bir tomonlama" edi — yuklanadi, lekin hech qachon qaytarib olinmaydi.
-// Endi Telegram manbasi topilmasa, eng so'nggi S3 obyekti qidirib topiladi.
-async function downloadLatestFromS3(): Promise<Buffer | null> {
+// Endi shu funksiya S3'dagi ENG SO'NGGI obyektni SANASI bilan birga topadi
+// (hali yuklab olmasdan) — shunda uni boshqa manbalar (Telegram, Google
+// Drive) bilan sana bo'yicha solishtirish mumkin bo'ladi.
+async function findLatestS3Backup(): Promise<{ date: Date; download: () => Promise<Buffer | null> } | null> {
   const endpoint = await getSetting("CONTABO_S3_ENDPOINT");
   const accessKeyId = await getSetting("CONTABO_ACCESS_KEY");
   const secretAccessKey = await getSetting("CONTABO_SECRET_KEY");
@@ -118,16 +129,61 @@ async function downloadLatestFromS3(): Promise<Buffer | null> {
     }
 
     const latest = objects.reduce((a, b) => ((a.LastModified?.getTime() || 0) >= (b.LastModified?.getTime() || 0) ? a : b));
-    console.log(`[S3] Eng so'nggi zaxira topildi: ${latest.Key}`);
+    console.log(`[S3] Eng so'nggi zaxira topildi: ${latest.Key} (${latest.LastModified?.toISOString()})`);
 
-    const obj = await s3.send(new GetObjectCommand({ Bucket: bucketName, Key: latest.Key! }));
-    const chunks: Buffer[] = [];
-    for await (const chunk of obj.Body as any) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    }
-    return Buffer.concat(chunks);
+    return {
+      date: latest.LastModified || new Date(0),
+      download: async () => {
+        try {
+          const obj = await s3.send(new GetObjectCommand({ Bucket: bucketName, Key: latest.Key! }));
+          const chunks: Buffer[] = [];
+          for await (const chunk of obj.Body as any) {
+            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+          }
+          return Buffer.concat(chunks);
+        } catch (err: any) {
+          console.error("[S3] Zaxirani yuklab olishda xatolik:", err.message);
+          return null;
+        }
+      }
+    };
   } catch (err: any) {
-    console.error("[S3] Zaxirani yuklab olishda xatolik:", err.message);
+    console.error("[S3] Zaxiralarni ro'yxatlashda xatolik:", err.message);
+    return null;
+  }
+}
+
+// Google Drive'dagi eng so'nggi zaxirani (sanasi bilan birga) topadi. Avval
+// bu manba backup-db.ts orqali yuklanardi, lekin restore-db.ts uni umuman
+// ko'rmasdi — ya'ni Google Drive'ga yuklangan zaxiralar ham hech qachon
+// qaytarib olinmasdi (S3 bilan bir xil muammo).
+async function findLatestGoogleDriveBackup(): Promise<{ date: Date; download: () => Promise<Buffer | null> } | null> {
+  const clientEmail = await getSetting("GOOGLE_DRIVE_CLIENT_EMAIL");
+  const privateKey = await getSetting("GOOGLE_DRIVE_PRIVATE_KEY");
+  const folderId = await getSetting("GOOGLE_DRIVE_FOLDER_ID");
+
+  if (!clientEmail || !privateKey) {
+    return null;
+  }
+
+  try {
+    const files = await listBackupsFromGoogleDrive({ clientEmail, privateKey, folderId });
+    if (files.length === 0) {
+      console.log("[Google Drive] Papkada hech qanday zaxira fayli topilmadi.");
+      return null;
+    }
+
+    // listBackupsFromGoogleDrive natijasi createdTime bo'yicha kamayish
+    // tartibida keladi, shuning uchun birinchisi eng so'nggisi.
+    const latest = files[0];
+    console.log(`[Google Drive] Eng so'nggi zaxira topildi: ${latest.name} (${latest.createdTime})`);
+
+    return {
+      date: latest.createdTime ? new Date(latest.createdTime) : new Date(0),
+      download: () => downloadFromGoogleDrive(latest.id, { clientEmail, privateKey, folderId })
+    };
+  } catch (err: any) {
+    console.error("[Google Drive] Zaxiralarni ro'yxatlashda xatolik:", err.message);
     return null;
   }
 }
@@ -136,7 +192,6 @@ export async function restoreFromLatestBackup(manualFileId?: string) {
   console.log("=== Savdo24 Database Restore Process ===");
   
   const botToken = await getSetting("TELEGRAM_BOT_TOKEN");
-  const chatId = await getSetting("TELEGRAM_BACKUP_CHAT_ID");
   const encryptionKey = process.env.ENCRYPTION_KEY;
   const dbUrl = process.env.DATABASE_URL;
 
@@ -146,42 +201,84 @@ export async function restoreFromLatestBackup(manualFileId?: string) {
     return;
   }
 
+  // MUHIM (server butunlay tozalanganda): Telegram orqali tiklash faqat
+  // avvalgi backup'ning file_id'sini "bilsak" ishlaydi — bu esa DB'dagi
+  // Settings jadvalida yoki serverning lokal diskidagi last_backup.json
+  // faylida saqlanadi. Agar ma'lumotlar bazasi VA server diski BIRDANIGA
+  // tozalansa (masalan konteyner butunlay qayta yaratilsa), bu ikkalasi
+  // ham yo'qoladi va Telegram fileId'ni hech qanday tarzda topib bo'lmaydi
+  // — Bot API orqali kanaldagi eski xabarlarni "ro'yxatlash" imkoni yo'q.
+  // Shu sabab endi tizim Telegram bilan bir qatorda Contabo S3 va Google
+  // Drive'ni ham HAR DOIM (fileId'ga bog'liq bo'lmagan holda) tekshiradi —
+  // bu ikkalasi o'zining fayllar ro'yxatini har safar qayta so'rab oladi,
+  // shuning uchun disk/DB tozalanishidan mutlaqo ta'sirlanmaydi (faqat
+  // ularning kirish kalitlari .env'da muhit o'zgaruvchisi sifatida ham
+  // saqlangan bo'lishi kerak — DB Settings'dan tashqari).
   let fileId = manualFileId;
+  let telegramBackupDate: Date | null = null;
 
   if (!fileId && botToken) {
-    // Try to get from settings
     const savedFileId = await getSetting("last_backup_file_id");
     if (savedFileId) {
       fileId = savedFileId;
+      const savedDate = await getSetting("last_backup_date");
+      telegramBackupDate = savedDate ? new Date(savedDate) : null;
     } else {
-      // Try local fallback file
       const fallbackPath = path.join(process.cwd(), 'last_backup.json');
       if (fs.existsSync(fallbackPath)) {
         const fallbackData = JSON.parse(fs.readFileSync(fallbackPath, 'utf8'));
         fileId = fallbackData.fileId;
+        telegramBackupDate = fallbackData.date ? new Date(fallbackData.date) : null;
         console.log(`[Restore] Found backup fileId from local fallback: ${fileId}`);
       }
     }
   }
 
-  // 69-MUAMMO: Telegram manbasi topilmasa (yoki umuman sozlanmagan bo'lsa),
-  // avvalgi kod shu yerda to'xtab qolardi — S3'dagi zaxira umuman
-  // ko'rilmasdi. Endi shu holatda Contabo S3'dan eng so'nggi zaxira izlanadi.
-  let encryptedBuffer: Buffer | null = null;
+  type Candidate = { source: string; date: Date; download: () => Promise<Buffer | null> };
+  const candidates: Candidate[] = [];
+
   if (fileId && botToken) {
-    encryptedBuffer = await downloadFromTelegram(botToken, fileId);
-    if (!encryptedBuffer) {
-      console.error("[Restore] Failed to download backup file from Telegram.");
+    candidates.push({
+      source: 'Telegram',
+      // Sana noma'lum bo'lsa ham kandidat sifatida qo'shamiz — lekin uni
+      // eng past ustuvorlikka qo'yish uchun juda eski sana beramiz, shunda
+      // sanasi ma'lum S3/Google Drive zaxiralari birinchi o'ringa chiqadi
+      // (chunki ularning "yo'q bo'lib qolishi" ehtimoli kamroq).
+      date: telegramBackupDate || new Date(0),
+      download: () => downloadFromTelegram(botToken, fileId!)
+    });
+  }
+
+  const s3Candidate = await findLatestS3Backup();
+  if (s3Candidate) candidates.push({ source: 'Contabo S3', ...s3Candidate });
+
+  const gdCandidate = await findLatestGoogleDriveBackup();
+  if (gdCandidate) candidates.push({ source: 'Google Drive', ...gdCandidate });
+
+  if (candidates.length === 0) {
+    console.error("[Restore] Hech qanday manbada (Telegram, Contabo S3, Google Drive) zaxira topilmadi. Auto-restore bekor qilindi.");
+    await prismaClient.$disconnect();
+    return;
+  }
+
+  // Eng so'nggi (sanasi eng katta) kandidatdan boshlab, muvaffaqiyatli
+  // yuklab bo'lguncha navbatma-navbat sinab ko'ramiz.
+  candidates.sort((a, b) => b.date.getTime() - a.date.getTime());
+  console.log(`[Restore] Topilgan manbalar (ustuvorlik bo'yicha): ${candidates.map((c) => `${c.source} (${c.date.toISOString()})`).join(', ')}`);
+
+  let encryptedBuffer: Buffer | null = null;
+  for (const candidate of candidates) {
+    console.log(`[Restore] "${candidate.source}" manbasidan yuklab olinmoqda...`);
+    encryptedBuffer = await candidate.download();
+    if (encryptedBuffer) {
+      console.log(`✅ [Restore] "${candidate.source}" manbasidan muvaffaqiyatli yuklandi.`);
+      break;
     }
+    console.warn(`[Restore] "${candidate.source}" manbasidan yuklab bo'lmadi, keyingi manba sinaladi...`);
   }
 
   if (!encryptedBuffer) {
-    console.log("[Restore] Telegram manbasi mavjud emas, Contabo S3 tekshirilmoqda...");
-    encryptedBuffer = await downloadLatestFromS3();
-  }
-
-  if (!encryptedBuffer) {
-    console.error("[Restore] No backup found via Telegram or Contabo S3. Auto-restore aborted.");
+    console.error("[Restore] Barcha topilgan manbalardan yuklashga urinildi, lekin hech biri muvaffaqiyatli bo'lmadi. Auto-restore bekor qilindi.");
     await prismaClient.$disconnect();
     return;
   }
@@ -210,6 +307,7 @@ export async function restoreFromLatestBackup(manualFileId?: string) {
     }
   } else {
     console.log("[Restore] Detected JSON format. Importing via Prisma...");
+    const failedTables: string[] = [];
     try {
       const data = JSON.parse(decryptedBuffer.toString());
       
@@ -254,14 +352,53 @@ export async function restoreFromLatestBackup(manualFileId?: string) {
       for (const table of tables) {
         if (table.data && table.data.length > 0) {
           console.log(`[Restore] Importing ${table.data.length} records into ${table.name}...`);
-          // @ts-ignore
-          await prismaClient[table.name].createMany({
-            data: table.data,
-            skipDuplicates: true
-          });
+          try {
+            // @ts-ignore
+            await prismaClient[table.name].createMany({
+              data: table.data,
+              skipDuplicates: true
+            });
+          } catch (tableErr: any) {
+            // MUHIM: avval bitta jadval xato bersa (masalan FK maqsadi hali
+            // tiklanmagan, yoki noyob cheklov to'qnashuvi) BUTUN import
+            // to'xtab qolardi va shu jadvaldan keyingi HAMMA jadvallar
+            // (masalan referral, listingSubscription, notification va h.k.)
+            // sukut bilan tiklanmay qolardi. Endi har bir jadval mustaqil —
+            // bittasi muvaffaqiyatsiz bo'lsa ham, xatolik log qilinadi va
+            // qolgan jadvallar tiklashda davom etadi.
+            failedTables.push(table.name);
+            console.error(`[Restore] Failed to import table "${table.name}":`, tableErr.message || tableErr);
+          }
         }
       }
-      console.log("✅ [Restore] JSON import completed successfully.");
+
+      // MUHIM: JSON fallback orqali tiklashda ba'zi jadvallarning (User, Idea,
+      // Review, Message, Notification va h.k.) autoincrement Int ID'lari
+      // to'g'ridan-to'g'ri saqlab qo'yiladi, lekin Postgres'ning ichki
+      // ketma-ketlik hisoblagichi (sequence) bu haqda xabardor bo'lmaydi.
+      // Natijada tiklashdan keyin yaratilgan YANGI yozuvlar eski (tiklangan)
+      // ID bilan to'qnashib, "duplicate key" xatosiga olib kelishi mumkin edi.
+      console.log("[Restore] Autoincrement ketma-ketliklari (sequences) sinxronlanmoqda...");
+      const autoIncrementTables = [
+        'User', 'Idea', 'Subscriber', 'IdeaVote', 'Review', 'Dispute',
+        'RefreshToken', 'Report', 'AuditLog', 'SponsorChannel', 'Message',
+        'AnalyticsEvent', 'Notification'
+      ];
+      for (const tableName of autoIncrementTables) {
+        try {
+          await prismaClient.$executeRawUnsafe(
+            `SELECT setval(pg_get_serial_sequence('"${tableName}"', 'id'), COALESCE((SELECT MAX(id) FROM "${tableName}"), 1), (SELECT MAX(id) FROM "${tableName}") IS NOT NULL)`
+          );
+        } catch (seqErr: any) {
+          console.warn(`[Restore] "${tableName}" uchun sequence sinxronlashda xatolik:`, seqErr.message || seqErr);
+        }
+      }
+
+      if (failedTables.length > 0) {
+        console.error(`⚠️ [Restore] JSON import yakunlandi, LEKIN quyidagi jadvallar tiklanmadi: ${failedTables.join(', ')}. Sabablarini yuqoridagi loglardan tekshiring.`);
+      } else {
+        console.log("✅ [Restore] JSON import completed successfully.");
+      }
     } catch (err) {
       console.error("[Restore] JSON import failed:", err);
     }

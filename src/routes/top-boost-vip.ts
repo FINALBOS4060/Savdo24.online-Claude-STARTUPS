@@ -13,6 +13,8 @@ import {
   getSetting,
   AuthRequest
 } from "../lib/context";
+import { getErrorMessage } from "../lib/pure-helpers";
+import { financialActionLimiter } from "../lib/rateLimiters";
 
 const router = Router();
 
@@ -48,12 +50,19 @@ router.get("/top-boost/price", async (req: Request, res: Response) => {
     return res.status(400).json({ error: "Kunlar soni 1 dan 365 gacha butun son bo'lishi kerak." });
   }
 
-  const price = await calculateTopPrice(daysNum);
-  res.json({ price });
+  try {
+    const price = await calculateTopPrice(daysNum);
+    res.json({ price });
+  } catch (err: unknown) {
+    logger.error({ err }, "TOP boost price calculation error");
+    res.status(400).json({ error: getErrorMessage(err) || "Narxni hisoblashda xatolik." });
+  }
 });
 
 // POST /api/top-boost/create
-router.post("/top-boost/create", authenticateToken, async (req: AuthRequest, res: Response) => {
+// financialActionLimiter: to'lov buyurtmasi yaratadigan moliyaviy amal — /payments/create
+// va /escrow/* bilan bir xil himoya (ilgari limitersiz edi).
+router.post("/top-boost/create", authenticateToken, financialActionLimiter, async (req: AuthRequest, res: Response) => {
   const { startupId, days } = req.body;
   if (!startupId || !days) return res.status(400).json({ error: "StartupId va kunlar soni ko'rsatilmadi." });
 
@@ -171,13 +180,16 @@ router.get("/vip/price", async (req: Request, res: Response) => {
     const price = await calculateVipPrice(daysNum);
     const discountPercent = parseFloat(await getSetting("VIP_DISCOUNT_PERCENT") || "40");
     res.json({ price, discountPercent });
-  } catch (err: any) {
-    res.status(400).json({ error: err.message || "Narxni hisoblashda xatolik." });
+  } catch (err: unknown) {
+    logger.error({ err }, "VIP price calculation error");
+    res.status(400).json({ error: getErrorMessage(err) || "Narxni hisoblashda xatolik." });
   }
 });
 
 // POST /api/vip/create
-router.post("/vip/create", authenticateToken, async (req: AuthRequest, res: Response) => {
+// financialActionLimiter: to'lov buyurtmasi yaratadigan moliyaviy amal — /payments/create
+// va /escrow/* bilan bir xil himoya (ilgari limitersiz edi).
+router.post("/vip/create", authenticateToken, financialActionLimiter, async (req: AuthRequest, res: Response) => {
   const { days } = req.body;
   if (!days) return res.status(400).json({ error: "Kunlar soni ko'rsatilmadi." });
 

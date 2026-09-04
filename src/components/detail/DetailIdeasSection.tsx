@@ -43,7 +43,7 @@ export const DetailIdeasSection: React.FC<DetailIdeasSectionProps> = ({
     <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-xl space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-white/5 pb-4">
         <div>
-          <h3 className="text-white font-black text-lg md:text-xl flex items-center gap-2">
+          <h3 className="text-on-primary-container font-black text-lg md:text-xl flex items-center gap-2">
             <Lightbulb className="text-secondary w-5 h-5" />
             Startap uchun g'oyalar va takliflar
           </h3>
@@ -51,7 +51,7 @@ export const DetailIdeasSection: React.FC<DetailIdeasSectionProps> = ({
             Startap rivojlanishi uchun g'oyalar yuboring yoki eng yaxshilariga ovoz bering.
           </p>
         </div>
-        <span className="bg-yellow-500/10 text-secondary text-xs font-extrabold uppercase px-2.5 py-1 rounded-lg border border-yellow-500/20 text-center self-start sm:self-auto">
+        <span className="bg-secondary/10 text-secondary text-xs font-extrabold uppercase px-2.5 py-1 rounded-lg border border-secondary/20 text-center self-start sm:self-auto">
           {ideas.length} ta g'oya
         </span>
       </div>
@@ -73,10 +73,10 @@ export const DetailIdeasSection: React.FC<DetailIdeasSectionProps> = ({
           <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
             {ideas.map((idea, index) => {
               let rankBadge = `${index + 1}`;
-              let rankClass = "bg-white/10 text-white";
+              let rankClass = "bg-white/10 text-on-primary-container";
               if (index === 0) {
                 rankBadge = "🥇";
-                rankClass = "bg-yellow-500/20 text-secondary font-black border border-yellow-500/30";
+                rankClass = "bg-secondary/20 text-secondary font-black border border-secondary/30";
               } else if (index === 1) {
                 rankBadge = "🥈";
                 rankClass = "bg-slate-300/20 text-slate-300 font-bold border border-slate-300/20";
@@ -95,7 +95,7 @@ export const DetailIdeasSection: React.FC<DetailIdeasSectionProps> = ({
                   </div>
 
                   <div className="flex-1 min-w-0 space-y-1">
-                    <p className="text-white text-xs md:text-sm leading-relaxed font-medium break-words">
+                    <p className="text-on-primary-container text-xs md:text-sm leading-relaxed font-medium break-words">
                       {idea.content}
                     </p>
                     <div className="flex items-center gap-2 text-xs text-on-primary-container flex-wrap">
@@ -130,7 +130,7 @@ export const DetailIdeasSection: React.FC<DetailIdeasSectionProps> = ({
                     className="flex flex-col items-center justify-center gap-1 bg-white/4 hover:bg-secondary/10 hover:border-secondary/30 border border-white/5 rounded-xl px-3 py-2 transition-all active:scale-95 group shrink-0 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
                   >
                     <ThumbsUp className="w-4 h-4 text-secondary group-hover:scale-110 transition-transform" />
-                    <span className="text-xs font-extrabold text-white font-mono">
+                    <span className="text-xs font-extrabold text-on-primary-container font-mono">
                       {idea.upvotes}
                     </span>
                   </button>
@@ -143,7 +143,7 @@ export const DetailIdeasSection: React.FC<DetailIdeasSectionProps> = ({
 
       {/* Submission Form */}
       <form onSubmit={handleSubmitIdea} className="bg-white/2 border border-white/5 rounded-xl p-4 space-y-3.5">
-        <h4 className="text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1">
+        <h4 className="text-on-primary-container font-bold text-xs uppercase tracking-wider flex items-center gap-1">
           <MessageSquarePlus className="w-3.5 h-3.5 text-secondary" />
           Yangi g'oya qo'shish
         </h4>
@@ -153,7 +153,7 @@ export const DetailIdeasSection: React.FC<DetailIdeasSectionProps> = ({
           placeholder="Startapni yaxshilash uchun o'z taklifingizni yozing (maksimal 500 belgi)..."
           maxLength={500}
           rows={3}
-          className="w-full bg-surface-container-low border border-white/10 rounded-xl p-3 text-white text-xs transition-all resize-none focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
+          className="w-full bg-surface-container-low border border-white/10 rounded-xl p-3 text-on-primary-container text-xs transition-all resize-none focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
         />
         <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
           {!isLoggedIn ? (
@@ -162,7 +162,7 @@ export const DetailIdeasSection: React.FC<DetailIdeasSectionProps> = ({
               value={newIdeaAuthorName}
               onChange={(e) => setNewIdeaAuthorName(e.target.value)}
               placeholder="Ismingiz (Mehmon)"
-              className="bg-surface-container-low border border-white/10 rounded-xl px-3 py-2 text-white text-xs sm:w-56 focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
+              className="bg-surface-container-low border border-white/10 rounded-xl px-3 py-2 text-on-primary-container text-xs sm:w-56 focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
             />
           ) : (
             <div className="text-xs text-on-primary-container">

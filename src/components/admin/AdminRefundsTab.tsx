@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Banknotes, 
   RefreshCw, 
   CheckCircle, 
   CheckCircle2, 
   Gift, 
   GiftIcon 
 } from 'lucide-react';
+// apiFetch: qolgan admin sahifalar kabi 401-refresh/retry mantig'idan foydalanish uchun.
+import { apiFetch as fetch } from '../../lib/api';
 
 interface AdminRefundsTabProps {
   escrowRefunds: any[];
@@ -66,7 +67,7 @@ export const AdminRefundsTab: React.FC<AdminRefundsTabProps> = ({
       {/* Escrow Refunds Section */}
       <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
         <div className="flex justify-between items-center border-b border-white/5 pb-4">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+          <h2 className="text-lg font-bold text-on-primary-container flex items-center gap-2">
             <GiftIcon className="text-amber-400 w-5 h-5" />
             Qaytarish talab qilinadigan to'lovlar (Refund Required) ({escrowRefunds.length})
           </h2>
@@ -96,12 +97,12 @@ export const AdminRefundsTab: React.FC<AdminRefundsTabProps> = ({
                     <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded font-bold">Qaytarish kutilmoqda</span>
                     <span className="text-xs text-on-primary-container font-mono">ID: {payment.id}</span>
                   </div>
-                  <h4 className="font-bold text-white text-base">{payment.startup?.name || 'Noma\'lum loyiha'}</h4>
+                  <h4 className="font-bold text-on-primary-container text-base">{payment.startup?.name || 'Noma\'lum loyiha'}</h4>
                   <p className="text-sm text-on-primary-container">
-                    Xaridor: <span className="text-white font-medium">{payment.user?.name || payment.user?.email || `User #${payment.userId}`}</span> ({payment.user?.email})
+                    Xaridor: <span className="text-on-primary-container font-medium">{payment.user?.name || payment.user?.email || `User #${payment.userId}`}</span> ({payment.user?.email})
                   </p>
                   <div className="flex items-center gap-4 text-xs text-on-primary-container mt-1">
-                    <span>Summa: <strong className="text-white">{payment.amount} {payment.currency}</strong></span>
+                    <span>Summa: <strong className="text-on-primary-container">{payment.amount} {payment.currency}</strong></span>
                     <span>Sana: {new Date(payment.createdAt).toLocaleString()}</span>
                   </div>
                 </div>
@@ -124,7 +125,7 @@ export const AdminRefundsTab: React.FC<AdminRefundsTabProps> = ({
       {/* Pending Referral Rewards Section (Item 4 requirement) */}
       <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
         <div className="flex justify-between items-center border-b border-white/5 pb-4">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+          <h2 className="text-lg font-bold text-on-primary-container flex items-center gap-2">
             <Gift className="text-cyan-400 w-5 h-5" />
             Kutilayotgan Referral Mukofotlari (Earned/Pending Rewards) ({pendingRewards.length})
           </h2>
@@ -154,9 +155,9 @@ export const AdminRefundsTab: React.FC<AdminRefundsTabProps> = ({
                     <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 text-xs rounded font-bold uppercase">{reward.status}</span>
                     <span className="text-xs text-on-primary-container font-mono">Mukofot ID: {reward.id}</span>
                   </div>
-                  <h4 className="font-bold text-white text-base">Referrer: {reward.referral?.referrer?.name || 'Noma\'lum'} ({reward.referral?.referrer?.email})</h4>
+                  <h4 className="font-bold text-on-primary-container text-base">Referrer: {reward.referral?.referrer?.name || 'Noma\'lum'} ({reward.referral?.referrer?.email})</h4>
                   <p className="text-sm text-on-primary-container">
-                    Referral Kod: <span className="text-white font-mono">{reward.referral?.code}</span>
+                    Referral Kod: <span className="text-on-primary-container font-mono">{reward.referral?.code}</span>
                   </p>
                   <div className="flex items-center gap-4 text-xs text-on-primary-container mt-1">
                     <span>Mukofot summasi: <strong className="text-emerald-400">{reward.rewardAmount}</strong></span>

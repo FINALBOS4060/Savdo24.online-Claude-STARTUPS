@@ -169,7 +169,7 @@ export const DetailTechnicalSpecs: React.FC<DetailTechnicalSpecsProps> = ({
                         Taqdimot hujjati (Pitch deck) ↗
                       </a>
                     ) : (
-                      <span className="text-white font-semibold text-xs md:text-sm break-words block">
+                      <span className="text-on-primary-container font-semibold text-xs md:text-sm break-words block">
                         {displayValue}
                       </span>
                     )}
@@ -183,7 +183,7 @@ export const DetailTechnicalSpecs: React.FC<DetailTechnicalSpecsProps> = ({
 
       {/* Proprietary Technology Stack */}
       <section>
-        <h3 className="text-white font-bold text-xs uppercase tracking-widest mb-6">
+        <h3 className="text-on-primary-container font-bold text-xs uppercase tracking-widest mb-6">
           Xususiy texnologiyalar to'plami
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -195,7 +195,7 @@ export const DetailTechnicalSpecs: React.FC<DetailTechnicalSpecsProps> = ({
               <div className="text-secondary-container mb-3">
                 {getLucideIcon(tech.icon, "w-8 h-8")}
               </div>
-              <h4 className="text-white font-bold text-sm mb-1">{tech.name}</h4>
+              <h4 className="text-on-primary-container font-bold text-sm mb-1">{tech.name}</h4>
               <p className="text-on-primary-container text-xs leading-relaxed">{tech.desc}</p>
             </div>
           ))}

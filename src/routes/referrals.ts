@@ -76,6 +76,7 @@ router.get("/apply", authenticateToken, async (req: AuthRequest, res: Response) 
       referrerName: referral.referrer.name
     });
   } catch (err) {
+    logger.error({ err }, "Apply referral code error");
     res.status(500).json({ error: "Kodni tekshirishda xatolik." });
   }
 });
@@ -108,6 +109,7 @@ router.get("/my-stats", authenticateToken, async (req: AuthRequest, res: Respons
       }))
     });
   } catch (err) {
+    logger.error({ err }, "Get referral stats error");
     res.status(500).json({ error: "Ma'lumotlarni yuklashda xatolik." });
   }
 });
@@ -141,6 +143,7 @@ adminReferralsRouter.get("/", authenticateToken, requireAdmin, async (req: AuthR
       totalPages: Math.ceil(total / limit)
     });
   } catch (err) {
+    logger.error({ err }, "Get admin referrals list error");
     res.status(500).json({ error: "Admin ma'lumotlarini yuklashda xatolik." });
   }
 });
@@ -161,6 +164,7 @@ adminReferralsRouter.get("/rewards-pending", authenticateToken, requireAdmin, as
     });
     res.json(pendingRewards);
   } catch (err) {
+    logger.error({ err }, "Get pending referral rewards error");
     res.status(500).json({ error: "Kutilayotgan mukofotlarni yuklashda xatolik." });
   }
 });
@@ -175,6 +179,7 @@ adminReferralsRouter.post("/rewards/:id/complete", authenticateToken, requireAdm
     });
     res.json({ success: true, reward: updated });
   } catch (err) {
+    logger.error({ err }, "Complete referral reward error");
     res.status(500).json({ error: "Mukofotni to'langan deb belgilashda xatolik." });
   }
 });

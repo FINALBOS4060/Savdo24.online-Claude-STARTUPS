@@ -28,7 +28,7 @@ test('1) to\'g\'ri parol bilan login muvaffaqiyatli bo\'lishi', async () => {
       password: hashedPassword,
       name: 'Login Test User',
       role: 'Xaridor',
-      joinDate: '2026',
+      joinDate: new Date('2026-01-01'),
       avatarUrl: 'https://example.com/avatar.png'
     }
   });
@@ -61,7 +61,7 @@ test('2) noto\'g\'ri parol bilan login rad etilishi (401 yoki 400 qaytishi)', as
       password: hashedPassword,
       name: 'Wrong Password Test',
       role: 'Xaridor',
-      joinDate: '2026',
+      joinDate: new Date('2026-01-01'),
       avatarUrl: 'https://example.com/avatar.png'
     }
   });

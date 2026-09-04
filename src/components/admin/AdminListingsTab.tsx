@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Clock, Search, Loader2, CheckCircle, XCircle, Trash2 } from 'lucide-react';
 import { Startup } from '../../types';
 
@@ -15,7 +15,6 @@ interface AdminListingsTabProps {
   handleDeleteStartup: (id: string, name: string) => void;
   listingsSearch: string;
   setListingsSearch: (val: string) => void;
-  listingsSearchDebounceRef?: any;
   fetchAllListingsAdmin: (page?: number, search?: string) => void;
   totalAllListings?: number;
   allListingsPage: number;
@@ -41,11 +40,24 @@ export const AdminListingsTab: React.FC<AdminListingsTabProps> = ({
   allListingsTotalPages,
   renderPagination,
 }) => {
+  // TUZATISH: listingsSearchDebounceRef tashqi prop sifatida kutilardi, lekin
+  // hech qayerdan uzatilmasdi va destructure ham qilinmagan edi — natijada
+  // onChange ichida `listingsSearchDebounceRef.current = ...` undefined
+  // ustida ishlab, har bir harf kiritilganda ilova xato berardi (qidiruv
+  // butunlay ishlamas edi). Endi komponent debounce'ni o'zi, local useRef
+  // orqali boshqaradi — tashqi propga bog'liqlik yo'q.
+  const [searchInput, setSearchInput] = useState(listingsSearch);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setSearchInput(listingsSearch);
+  }, [listingsSearch]);
+
   return (
     <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-white/5 pb-4">
         <div>
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+          <h2 className="text-lg font-bold text-on-primary-container flex items-center gap-2">
             <Clock className="text-secondary w-5 h-5" />
             Platformadagi e'lonlar va arizalar boshqaruvi
           </h2>
@@ -60,7 +72,7 @@ export const AdminListingsTab: React.FC<AdminListingsTabProps> = ({
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all focus:outline-none focus:ring-2 focus:ring-secondary/50 ${
               listingsView === 'pending'
                 ? 'bg-secondary/20 text-secondary border border-secondary/30'
-                : 'text-on-primary-container hover:text-white'
+                : 'text-on-primary-container hover:text-on-primary-container'
             }`}
           >
             Kutilayotganlar ({pendingStartups.length})
@@ -70,7 +82,7 @@ export const AdminListingsTab: React.FC<AdminListingsTabProps> = ({
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all focus:outline-none focus:ring-2 focus:ring-secondary/50 ${
               listingsView === 'all'
                 ? 'bg-secondary/20 text-secondary border border-secondary/30'
-                : 'text-on-primary-container hover:text-white'
+                : 'text-on-primary-container hover:text-on-primary-container'
             }`}
           >
             Barcha e'lonlar
@@ -84,12 +96,17 @@ export const AdminListingsTab: React.FC<AdminListingsTabProps> = ({
           <input
             type="text"
             placeholder="E'lon nomi yoki ID bo'yicha qidirish..."
-            value={listingsSearch}
+            value={searchInput}
             onChange={(e) => {
-              setListingsSearch(e.target.value);
-              fetchAllListingsAdmin(1, e.target.value);
+              const val = e.target.value;
+              setSearchInput(val);
+              setListingsSearch(val);
+              if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+              searchDebounceRef.current = setTimeout(() => {
+                fetchAllListingsAdmin(1, val);
+              }, 500);
             }}
-            className="w-full pl-10 pr-4 py-2.5 bg-surface-container-low border border-white/10 rounded-xl text-white text-xs placeholder-on-primary-container/60 focus:outline-none focus:ring-2 focus:ring-secondary"
+            className="w-full pl-10 pr-4 py-2.5 bg-surface-container-low border border-white/10 rounded-xl text-on-primary-container text-xs placeholder-on-primary-container/60 focus:outline-none focus:ring-2 focus:ring-secondary"
           />
         </div>
       )}
@@ -124,8 +141,8 @@ export const AdminListingsTab: React.FC<AdminListingsTabProps> = ({
                   />
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-white font-extrabold text-base">{startup.name}</h3>
-                      <span className="bg-yellow-500/10 text-yellow-500 text-xs font-extrabold uppercase px-2 py-0.5 rounded-lg border border-yellow-500/20">
+                      <h3 className="text-on-primary-container font-extrabold text-base">{startup.name}</h3>
+                      <span className="bg-secondary/10 text-secondary text-xs font-extrabold uppercase px-2 py-0.5 rounded-lg border border-secondary/20">
                         {startup.category}
                       </span>
                     </div>
@@ -188,12 +205,12 @@ export const AdminListingsTab: React.FC<AdminListingsTabProps> = ({
                 />
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-white font-extrabold text-sm truncate">{startup.name}</h3>
+                    <h3 className="text-on-primary-container font-extrabold text-sm truncate">{startup.name}</h3>
                     <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded-lg border ${
                       startup.status === 'active'
                         ? 'bg-success-container/10 text-success border-success/20'
                         : startup.status === 'pending'
-                        ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
+                        ? 'bg-secondary/10 text-secondary border-secondary/20'
                         : 'bg-red-500/10 text-red-400 border-red-500/20'
                     }`}>
                       {startup.status}

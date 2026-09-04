@@ -1,4 +1,4 @@
-import { Router, Request, Response } from "express";
+import { Router, Response } from "express";
 import { financialActionLimiter } from "../lib/rateLimiters";
 import { logger } from "../lib/logger";
 // 126-bosqich (server.ts modullashtirish, ARXITEKTURA 3-band): bu fayl
@@ -28,6 +28,7 @@ router.get("/escrow/my-purchases", authenticateToken, async (req: AuthRequest, r
     });
     res.json(escrows);
   } catch (err) {
+    logger.error({ err }, "Get my escrow purchases error");
     res.status(500).json({ error: "Escrow ma'lumotlarini yuklashda xatolik." });
   }
 });
@@ -83,6 +84,7 @@ router.post("/escrow/release", authenticateToken, financialActionLimiter, async 
 
     res.json({ success: true });
   } catch (err) {
+    logger.error({ err }, "Release escrow error");
     res.status(500).json({ error: "Mablag'ni ozod qilishda xatolik." });
   }
 });
@@ -139,6 +141,7 @@ router.post("/escrow/dispute", authenticateToken, financialActionLimiter, async 
 
     res.json({ success: true, message: "Nizo qabul qilindi. Admin ko'rib chiqadi." });
   } catch (err) {
+    logger.error({ err }, "Open escrow dispute error");
     res.status(500).json({ error: "Nizo ochishda xatolik." });
   }
 });

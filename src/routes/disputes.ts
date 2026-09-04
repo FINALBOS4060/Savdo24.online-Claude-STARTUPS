@@ -9,6 +9,8 @@ import {
   authenticateToken,
   requireAdmin,
   createNotification,
+  notifyUserTelegram,
+  notifyAdminTelegram,
   sendEmail,
   AuthRequest
 } from "../lib/context";
@@ -55,8 +57,10 @@ router.post("/", authenticateToken, financialActionLimiter, async (req: AuthRequ
       }
     });
 
+    notifyAdminTelegram(`⚖️ Yangi nizo ochildi (#${dispute.id}). Sabab: ${reason}`);
+
     res.status(201).json(dispute);
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error({ err }, "Create dispute error");
     res.status(500).json({ error: "Nizo ochishda xatolik yuz berdi." });
   }
@@ -105,7 +109,7 @@ router.get("/", authenticateToken, requireAdmin, async (req: AuthRequest, res: R
       page,
       totalPages: Math.ceil(total / safeLimit)
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error({ err }, "Get disputes error");
     res.status(500).json({ error: "Nizolarni olishda xatolik yuz berdi." });
   }
@@ -155,6 +159,8 @@ router.patch("/:id", authenticateToken, requireAdmin, async (req: AuthRequest, r
     const sellerUserId = updated.payment.startup?.userId;
     if (updated.buyerId) await createNotification(updated.buyerId, "SYSTEM", disputeTitle, disputeMsg, `/profile?tab=purchases`);
     if (sellerUserId) await createNotification(sellerUserId, "SYSTEM", disputeTitle, disputeMsg, `/profile?tab=earnings`);
+    if (updated.buyerId) notifyUserTelegram(updated.buyerId, `⚖️ <b>${disputeTitle}</b>\n\n${disputeMsg}`, `/profile?tab=purchases`);
+    if (sellerUserId) notifyUserTelegram(sellerUserId, `⚖️ <b>${disputeTitle}</b>\n\n${disputeMsg}`, `/profile?tab=earnings`);
 
     // Send Emails
     const buyer = await prisma.user.findUnique({ where: { id: updated.buyerId } });
@@ -175,7 +181,7 @@ router.patch("/:id", authenticateToken, requireAdmin, async (req: AuthRequest, r
     }).catch((e: any) => logger.error({ err: e }, "Audit log error"));
 
     res.json(updated);
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error({ err }, "Update dispute error");
     res.status(500).json({ error: "Nizoni yangilashda xatolik yuz berdi." });
   }

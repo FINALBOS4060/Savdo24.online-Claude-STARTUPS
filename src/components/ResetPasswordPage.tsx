@@ -42,11 +42,6 @@ export default function ResetPasswordPage({ onNavigate }: ResetPasswordPageProps
       return;
     }
 
-    if (!/\d/.test(password)) {
-      setError('Parolda kamida bitta raqam bo\'lishi kerak.');
-      return;
-    }
-
     if (password !== confirmPassword) {
       setError('Parollar bir-biriga mos kelmadi.');
       return;
@@ -70,7 +65,7 @@ export default function ResetPasswordPage({ onNavigate }: ResetPasswordPageProps
       } else {
         setError(data.error || 'Parolni yangilashda xatolik yuz berdi.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError('Server bilan bog\'lanishda xatolik yuz berdi.');
     } finally {
       setLoading(false);
@@ -85,7 +80,7 @@ export default function ResetPasswordPage({ onNavigate }: ResetPasswordPageProps
             <KeyRound className="h-8 w-8" />
           </div>
         </div>
-        <h2 className="mt-6 text-center text-3xl font-medium tracking-tight text-white">
+        <h2 className="mt-6 text-center text-3xl font-medium tracking-tight text-on-primary-container">
           Yangi parolni o'rnatish
         </h2>
         <p className="mt-2 text-center text-sm text-on-primary-container">
@@ -133,7 +128,7 @@ export default function ResetPasswordPage({ onNavigate }: ResetPasswordPageProps
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
                     disabled={loading}
-                    className="mt-1.5 block w-full px-4 py-3 bg-surface-container-low border border-outline/20 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm transition-colors duration-200 disabled:opacity-60"
+                    className="mt-1.5 block w-full px-4 py-3 bg-surface-container-low border border-outline/20 rounded-xl text-on-primary-container placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm transition-colors duration-200 disabled:opacity-60"
                     placeholder="Email orqali yuborilgan tokenni kiriting"
                   />
                 </div>
@@ -152,13 +147,13 @@ export default function ResetPasswordPage({ onNavigate }: ResetPasswordPageProps
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={loading}
-                    className="block w-full px-4 py-3 bg-surface-container-low border border-outline/20 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm pr-12 transition-colors duration-200 disabled:opacity-60"
+                    className="block w-full px-4 py-3 bg-surface-container-low border border-outline/20 rounded-xl text-on-primary-container placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm pr-12 transition-colors duration-200 disabled:opacity-60"
                     placeholder="••••••••"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-white"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-on-primary-container"
                   >
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
@@ -177,7 +172,7 @@ export default function ResetPasswordPage({ onNavigate }: ResetPasswordPageProps
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   disabled={loading}
-                  className="mt-1.5 block w-full px-4 py-3 bg-surface-container-low border border-outline/20 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm transition-colors duration-200 disabled:opacity-60"
+                  className="mt-1.5 block w-full px-4 py-3 bg-surface-container-low border border-outline/20 rounded-xl text-on-primary-container placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm transition-colors duration-200 disabled:opacity-60"
                   placeholder="••••••••"
                 />
               </div>

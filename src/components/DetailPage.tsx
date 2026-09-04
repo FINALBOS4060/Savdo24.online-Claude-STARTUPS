@@ -531,7 +531,7 @@ export default function DetailPage({
 
           {/* Executive Team */}
           <section>
-            <h3 className="text-white font-bold text-xs uppercase tracking-widest mb-6">
+            <h3 className="text-on-primary-container font-bold text-xs uppercase tracking-widest mb-6">
               Ijroiya jamoasi
             </h3>
             <div className="flex flex-wrap gap-8">
@@ -546,7 +546,7 @@ export default function DetailPage({
                     height={64}
                   />
                   <div>
-                    <h4 className="text-white font-extrabold text-sm">{member.name}</h4>
+                    <h4 className="text-on-primary-container font-extrabold text-sm">{member.name}</h4>
                     <p className="text-on-primary-container text-xs mt-0.5">{member.role}</p>
                   </div>
                 </div>
@@ -557,7 +557,7 @@ export default function DetailPage({
           {/* Loyiha bosqichlari (Milestones) */}
           {startup.milestones && startup.milestones.length > 0 && (
             <section>
-              <h3 className="text-white font-bold text-xs uppercase tracking-widest mb-6">
+              <h3 className="text-on-primary-container font-bold text-xs uppercase tracking-widest mb-6">
                 Loyiha bosqichlari
               </h3>
               <div className="space-y-4">
@@ -575,7 +575,7 @@ export default function DetailPage({
                           {m.date}
                         </span>
                       )}
-                      <h4 className="text-white font-extrabold text-sm">{m.title}</h4>
+                      <h4 className="text-on-primary-container font-extrabold text-sm">{m.title}</h4>
                       {m.desc && (
                         <p className="text-on-primary-container text-xs mt-1 leading-relaxed">{m.desc}</p>
                       )}
@@ -623,7 +623,7 @@ export default function DetailPage({
                           height={32}
                         />
                         <div>
-                          <span className="text-white font-bold text-xs block">{rev.buyer?.name}</span>
+                          <span className="text-on-primary-container font-bold text-xs block">{rev.buyer?.name}</span>
                           <span className="text-xs text-on-primary-container block">
                             {formatDate(rev.createdAt)}
                           </span>

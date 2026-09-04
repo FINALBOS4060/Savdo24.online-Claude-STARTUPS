@@ -1,4 +1,7 @@
 import React from 'react';
+import { Building2 } from 'lucide-react';
+// apiFetch: qolgan sahifalar kabi 401-refresh/retry mantig'idan foydalanish uchun.
+import { apiFetch as fetch } from '../../lib/api';
 
 interface ProfileB2BTabProps {
   b2bAccount: any;
@@ -18,8 +21,8 @@ export const ProfileB2BTab: React.FC<ProfileB2BTabProps> = ({
   return (
     <section className="space-y-8 animate-fade-in">
       <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-8 text-center space-y-6">
-        <span className="material-symbols-outlined text-6xl text-secondary">corporate_fare</span>
-        <h3 className="text-2xl font-black text-white">Savdo24 B2B — Kompaniyalar uchun maxsus imkoniyatlar</h3>
+        <Building2 className="w-16 h-16 text-secondary" />
+        <h3 className="text-2xl font-black text-on-primary-container">Savdo24 B2B — Kompaniyalar uchun maxsus imkoniyatlar</h3>
         <p className="text-on-primary-container max-w-2xl mx-auto text-sm leading-relaxed">
           B2B hisob orqali siz ulgurji xaridorlar uchun <b>20% gacha chegirma</b>, korporativ hisob-faktura va 
           shaxsiy menejer xizmatlaridan foydalanishingiz mumkin.
@@ -29,7 +32,7 @@ export const ProfileB2BTab: React.FC<ProfileB2BTabProps> = ({
           <div className="bg-surface-container border border-outline-variant/20 rounded-2xl p-6 text-left max-w-xl mx-auto space-y-4">
             <div className="flex justify-between border-b border-white/5 pb-2">
               <span className="text-on-primary-container text-xs font-bold uppercase">Kompaniya:</span>
-              <span className="text-white font-bold">{b2bAccount.companyName}</span>
+              <span className="text-on-primary-container font-bold">{b2bAccount.companyName}</span>
             </div>
             <div className="flex justify-between border-b border-white/5 pb-2">
               <span className="text-on-primary-container text-xs font-bold uppercase">Holati:</span>
@@ -77,11 +80,11 @@ export const ProfileB2BTab: React.FC<ProfileB2BTabProps> = ({
           >
             <div className="space-y-2 text-left">
               <label className="text-xs font-bold text-on-primary-container uppercase">Kompaniya nomi</label>
-              <input name="companyName" required className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface" placeholder="MCHJ ..." />
+              <input name="companyName" required className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-on-primary-container focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface" placeholder="MCHJ ..." />
             </div>
             <div className="space-y-2 text-left">
               <label className="text-xs font-bold text-on-primary-container uppercase">STIR (INN) / Soliq ID</label>
-              <input name="taxId" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface" placeholder="123456789" />
+              <input name="taxId" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-on-primary-container focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface" placeholder="123456789" />
             </div>
             <button
               type="submit"

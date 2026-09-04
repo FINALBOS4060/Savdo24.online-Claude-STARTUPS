@@ -2,10 +2,10 @@ import rateLimit from "express-rate-limit";
 
 export const authLimiter = rateLimit({
   validate: false,
-  windowMs: 15 * 60 * 1000,
+  windowMs: 10 * 1000,
   max: 5,
   keyGenerator: (req: any) => `${req.ip || "unknown"}:${req.body?.email || 'unknown'}`,
-  message: { error: "Juda ko'p so'rov yuborildi. Iltimos, 15 daqiqadan so'ng qayta urinib ko'ring." }
+  message: { error: "Juda ko'p so'rov yuborildi. Iltimos, 10 soniyadan so'ng qayta urinib ko'ring." }
 });
 
 export const authAccountLimiter = rateLimit({
@@ -93,4 +93,15 @@ export const clientErrorLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
   max: 5,
   message: { error: "Too many error reports." }
+});
+
+// Admin panelidagi "Qayta build qilish" / "Serverni qayta ishga tushirish"
+// tugmalari uchun — bular og'ir (CPU/vaqt talab qiladigan) va xavfli
+// amallar, shuning uchun boshqa admin endpointlaridan ko'ra qattiqroq
+// cheklangan (tasodifiy ketma-ket bosishlarning oldini olish uchun).
+export const rebuildLimiter = rateLimit({
+  validate: false,
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: "Juda ko'p build/restart urinishi. Iltimos, biroz kuting." }
 });

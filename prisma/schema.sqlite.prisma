@@ -17,9 +17,11 @@ model User {
   googleId        String?   @unique
   authProvider    String    @default("email") // "email" | "google"
   verified        Boolean   @default(false)
-  joinDate        String
+  joinDate        DateTime  @default(now())
   avatarUrl       String
   coverUrl        String?
+  phone           String?
+  signupReferralCode String?
   walletConnected Boolean   @default(false)
   walletAddress   String?
   emailVerified   Boolean   @default(false)
@@ -31,6 +33,11 @@ model User {
   isBanned        Boolean   @default(false)
   isVip           Boolean   @default(false)
   vipExpiresAt    DateTime?
+  vipExpiryNotifiedAt DateTime?
+  vipExpiredNotifiedAt DateTime?
+  telegramBroadcastOptOut Boolean @default(false)
+  telegramBotBlockedAt DateTime? // Telegram 403 ("bot was blocked by the user") qaytarganda shu vaqt yoziladi.
+                                 // null = bloklamagan. Muvaffaqiyatli xabar yetkazilganda avtomatik tozalanadi.
   telegramUserId  String?   @unique
   telegramLinkCode String?   @unique
   telegramLinkCodeExpires DateTime?
@@ -47,17 +54,26 @@ model User {
   referredBy         Referral[] @relation("RefereeReferrals")
   b2bAccount         B2BAccount?
   auditLogs          AuditLog[]
+  broadcastMessages  BroadcastMessage[]
+  proposedCategories Category[]
 
   @@index([role])
   @@index([isBanned])
   @@index([joinDate])
+  @@index([telegramBotBlockedAt])
 }
 
 model Category {
-  id       String    @id
-  name     String
-  icon     String
-  fields   String?
+  id                String    @id
+  name              String
+  icon              String
+  fields            String?
+  status            String    @default("active") // "active" | "pending" — foydalanuvchi taklif qilgan kategoriyalar admin tasdiqlaguncha "pending" bo'ladi
+  proposedByUserId  Int?
+  proposedByUser    User?     @relation(fields: [proposedByUserId], references: [id])
+  createdAt         DateTime  @default(now())
+
+  @@index([status])
 }
 
 model Startup {
@@ -90,6 +106,8 @@ model Startup {
   user            User?     @relation(fields: [userId], references: [id])
   isTop           Boolean   @default(false)
   topExpiresAt    DateTime?
+  topExpiryNotifiedAt DateTime?
+  topExpiredNotifiedAt DateTime?
   ideas           Idea[]
   payments        Payment[]
   reviews         Review[]
@@ -112,6 +130,7 @@ model Payment {
   status             String    // "pending" | "completed" | "failed"
   currency           String    @default("USDT")
   createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
   callbackToken      String?
   platformFeeAmount  Decimal?    @default(0)
   sellerPayoutAmount Decimal?    @default(0)
@@ -169,7 +188,7 @@ model Review {
   sellerId    Int      // sotuvchini alohida ko'rsatish uchun
   createdAt   DateTime @default(now())
 
-  @@index([startupId])
+  @@unique([startupId, buyerId])
   @@index([sellerId])
 }
 
@@ -186,7 +205,7 @@ model Dispute {
   createdAt   DateTime @default(now())
   resolvedAt  DateTime?
 
-  @@index([paymentId])
+  @@unique([paymentId])
   @@index([status])
 }
 
@@ -233,6 +252,23 @@ model AuditLog {
   @@index([adminId])
 }
 
+model BroadcastMessage {
+  id          Int      @id @default(autoincrement())
+  message     String
+  adminId     Int?
+  adminEmail  String?
+  admin       User?    @relation(fields: [adminId], references: [id], onDelete: SetNull)
+  total       Int      @default(0)
+  sent        Int      @default(0)
+  failed      Int      @default(0)
+  status      String   @default("running")
+  startedAt   DateTime @default(now())
+  finishedAt  DateTime?
+
+  @@index([adminId])
+  @@index([startedAt])
+}
+
 model Setting {
   key         String   @id
   value       String   // AES-256-GCM bilan shifrlangan
@@ -262,6 +298,119 @@ model SponsorChannel {
   startDate         DateTime?
   endDate           DateTime?
   createdAt         DateTime @default(now())
+}
+
+model ExchangeChannel {
+  id                   Int      @id @default(autoincrement())
+  ownerTelegramId      String   // kanal egasining Telegram user ID'si
+  ownerUsername        String?
+  channelId            String   // Telegram kanal ID (masalan -1001234567890)
+  channelUsername      String?  // @kanalnomi (agar public bo'lsa)
+  title                String
+  isActive             Boolean  @default(true)  // false bo'lsa navbatda ko'rsatilmaydi
+  suspendedReason      String?
+  suspendedDueToLapse  Boolean  @default(false) // true = qoidabuzarlik tufayli to'xtatilgan (avtomatik tiklanadi)
+  blockedByAdmin       Boolean  @default(false) // true = admin tomonidan qo'lda bloklangan (avtomatik tiklanmaydi)
+  suspendedDueToReports Boolean @default(false) // true = kamida 2 ta turli foydalanuvchi shikoyat qilgani uchun vaqtinchalik yashirilgan
+  // YANGI: kredit (boshqa kanalga obuna/referal) sababli to'xtatilgan —
+  // suspendedDueToLapse'dan ALOHIDA, cron orqali avtomatik tiklanadi
+  // (qarang: schema.prisma'dagi izoh).
+  suspendedDueToCreditEarned Boolean @default(false)
+  lastOfferedAt        DateTime? // navbat aylanishi uchun — eng kam ko'rsatilgan birinchi taklif qilinadi
+  // YANGI: kanal /browse orqali boshqalarga nechi marta taklif qilingani
+  // (qarang: schema.prisma'dagi izoh — "adolatli ko'rinish" tuzatishi).
+  timesOffered         Int      @default(0)
+  isSponsor            Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  // YANGI (push-eslatma): kanal qo'shgan-u, lekin O'ZI hech kimning
+  // kanaliga obuna bo'lmagan foydalanuvchilarga 24 soatdan keyin
+  // eslatma yuborish uchun kursor (qarang: schema.prisma'dagi izoh).
+  lastInactivityReminderAt DateTime?
+
+  // TUZATILDI: obunachi krediti kanal egasiga emas, obuna bo'lgan
+  // odamning O'Z kanaliga hisoblanadi — shu sabab bevosita saqlanadi.
+  earnedSubscribers    Int      @default(0)
+
+  // YANGI: har soatlik "kanalingizga N ta odam qo'shildi" bildirishnomasi
+  // uchun kursor (soatlik cron shundan keyingi yangi obunalarni sanaydi).
+  lastJoinNotifiedAt   DateTime?
+
+  // YANGI: "yangi foydalanuvchi qo'shildi" bildirishnomasi yuborilgan
+  // vaqt (qarang: schema.prisma'dagi izoh).
+  newChannelAnnouncedAt DateTime?
+
+  subscriptions        ExchangeSubscription[]
+  reports              ExchangeChannelReport[]
+
+  @@unique([ownerTelegramId, channelId])
+}
+
+model ExchangeChannelReport {
+  id                    Int             @id @default(autoincrement())
+  channelId             Int
+  channel               ExchangeChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  reporterTelegramId    String
+  reason                String
+  createdAt             DateTime        @default(now())
+
+  @@index([channelId])
+}
+
+model ExchangeSubscription {
+  id                    Int             @id @default(autoincrement())
+  subscriberTelegramId  String
+  channelId             Int
+  channel               ExchangeChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  isCurrentMember       Boolean         @default(true)
+  subscribedAt          DateTime        @default(now())
+  lastCheckedAt         DateTime        @default(now())
+  // YANGI: "kredit qaytarib olinmaydi" tuzatishi — qarang: schema.prisma
+  creditGrantedAmount   Int             @default(0)
+  creditClawedBack      Boolean         @default(false)
+
+  @@unique([subscriberTelegramId, channelId])
+}
+
+// Obuna almashish tizimidagi REFERAL (Postgres schema.prisma bilan bir
+// xil — izohlar uchun o'sha faylga qarang).
+model ExchangeReferral {
+  id                 Int      @id @default(autoincrement())
+  referrerTelegramId String
+  refereeTelegramId  String   @unique
+  rewarded           Boolean  @default(false)
+  createdAt          DateTime @default(now())
+
+  @@index([referrerTelegramId])
+}
+
+model ExchangeReferralCredit {
+  ownerTelegramId  String   @id
+  bonusSubscribers Int      @default(0)
+  updatedAt        DateTime @updatedAt
+}
+
+// TUZATILDI: bu model (va pastdagi TelegramBotUser) production
+// sxemasida (schema.prisma) bor edi, lekin sqlite dev sxemasidan
+// eskirib qolgan — mahalliy "npm run dev" bilan ishlaganda "Xush
+// kelibsiz bonusi" yozuvi P2021 ("jadval topilmadi") bilan xatolikka
+// uchrardi. Ikkalasi ham endi qo'shildi.
+model ExchangeWelcomeBonus {
+  ownerTelegramId String   @id
+  createdAt       DateTime @default(now())
+}
+
+model TelegramBotUser {
+  telegramUserId String   @id
+  language       String   @default("uz")
+  updatedAt      DateTime @updatedAt
+}
+
+// Bot session holatini doimiy saqlash uchun — pastdagi schema.prisma'dagi
+// izohga qarang.
+model TelegramBotSession {
+  telegramUserId String   @id
+  data           String
+  updatedAt      DateTime @updatedAt
 }
 
 model TopBoost {
@@ -441,6 +590,8 @@ model SupportTicket {
   subject     String
   message     String
   status      String   @default("pending") // pending, reviewing, resolved, closed
+  adminReply  String?
+  repliedAt   DateTime?
   createdAt   DateTime @default(now())
 }
 

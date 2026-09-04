@@ -1,4 +1,5 @@
-import { execSync } from 'child_process';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -12,7 +13,42 @@ import { uploadToGoogleDrive } from '../src/lib/googleDrive';
 dotenv.config();
 
 const prismaClient = new PrismaClient();
+const execFileAsync = promisify(execFile);
 
+// TUZATILDI: `DATABASE_URL` Prisma uchun mo'ljallangan bo'lib, unda odatda
+// `?schema=public` kabi query-parametr bo'ladi. Prisma buni tushunadi, lekin
+// `pg_dump`/`psql` (libpq) buni tanimaydi va "invalid URI query parameter:
+// \"schema\"" xatosi bilan yiqiladi — aynan shu sabab har kuni [Method 1]
+// (haqiqiy SQL dump) muvaffaqiyatsiz bo'lib, JSON fallback'ga tushib
+// ketardi. Bu tuzatish `src/routes/admin-backup.ts`dagi
+// `toPgToolConnectionString()` bilan bir xil — endi `pg_dump`ga `schema`
+// (va boshqa libpq tanimaydigan) query qismisiz, toza connection string
+// uzatiladi.
+function toPgToolConnectionString(databaseUrl: string): string {
+  try {
+    const url = new URL(databaseUrl);
+    url.search = "";
+    return url.toString();
+  } catch {
+    // Agar URL sifatida parse qilib bo'lmasa, qo'lda "?"dan keyingisini kesamiz
+    return databaseUrl.split("?")[0];
+  }
+}
+
+// TUZATILDI (XAVFLI FALLBACK — production loglarida ENCRYPTION_KEY
+// nomuvofiqligi tufayli "Decryption failed" xatolari kuzatilgach): oldin
+// deshifrlash muvaffaqiyatsiz bo'lsa, funksiya bazadagi XOM (hali ham
+// shifrlangan) satrni xuddi haqiqiy qiymatdek qaytarardi ("Fallback if
+// not encrypted" izohi faqat sozlama HAQIQATAN shifrlanmagan bo'lsa
+// to'g'ri edi — shifrlangan-u DESHIFRLAB BO'LMASA emas). Bu ayniqsa shu
+// faylda XAVFLI edi: pastdagi `sendToTelegram()` shu qiymatni to'g'ridan-
+// to'g'ri Telegram Bot API chaqiruviga (bot tokeni sifatida) yuboradi —
+// natijada "sozlanmagan, o'tkazib yuborildi" degan tushunarli xabar
+// o'rniga, tushunarsiz Telegram API xatosi bilan zaxira jarayoni
+// muvaffaqiyatsiz tugardi. Endi deshifrlash muvaffaqiyatsiz bo'lsa xato
+// aniq log qilinadi va `null` qaytariladi — shu bilan `sendToTelegram()`
+// ning yuqoridagi `if (!botToken || !chatId)` tekshiruvi to'g'ri ishlaydi
+// va aniq "Credentials are not configured" xabari chiqadi.
 async function getSetting(key: string): Promise<string | null> {
   try {
     const dbSetting = await prismaClient.setting.findUnique({ where: { key } });
@@ -21,7 +57,8 @@ async function getSetting(key: string): Promise<string | null> {
         const decrypted = decryptSecret(dbSetting.value);
         return decrypted;
       } catch (decryptErr) {
-        return dbSetting.value; // Fallback if not encrypted
+        console.error(`[Settings] "${key}" sozlamasini deshifrlab bo'lmadi (ENCRYPTION_KEY mos kelmasligi mumkin) — Admin panel → Sozlamalar orqali qayta kiriting.`);
+        return null;
       }
     }
   } catch (err) {
@@ -53,6 +90,54 @@ function encryptBackupBuffer(fileBuffer: Buffer, encryptionKey: string): Buffer 
   return Buffer.from(`${iv.toString('hex')}:${encrypted.toString('hex')}:${tag.toString('hex')}`);
 }
 
+// Fayl (dump) shifrlangani sababli kanaldagi xabarning o'zi zaxira ichida
+// aslida NIMA borligini ko'rsatmaydi — muammo yuzaga kelganda buni bilish
+// uchun avval faylni yuklab olib, deshifrlash kerak bo'lardi. Bu funksiya
+// asosiy jadvallar bo'yicha hozirgi yozuvlar sonini hisoblaydi va shu
+// ro'yxat caption'ga qo'shiladi, shunda kanalning o'zidan (faylni ochmasdan)
+// zaxirada nima saqlanganini darhol ko'rish, va muammo bo'lsa qaysi
+// zaxirada nima borligini solishtirib tezroq tuzatish mumkin bo'ladi.
+async function buildBackupSummary(): Promise<string> {
+  try {
+    const [
+      users, startups, payments, ideas, reviews, disputes,
+      conversations, messages, referrals, escrowPayments,
+      supportTickets, notifications,
+    ] = await Promise.all([
+      prismaClient.user.count(),
+      prismaClient.startup.count(),
+      prismaClient.payment.count(),
+      prismaClient.idea.count(),
+      prismaClient.review.count(),
+      prismaClient.dispute.count(),
+      prismaClient.conversation.count(),
+      prismaClient.message.count(),
+      prismaClient.referral.count(),
+      prismaClient.escrowPayment.count(),
+      prismaClient.supportTicket.count(),
+      prismaClient.notification.count(),
+    ]);
+
+    return (
+      `📊 Ma'lumotlar ro'yxati (ushbu zaxiradagi holat):\n` +
+      `👤 Foydalanuvchilar: ${users}\n` +
+      `📦 E'lonlar (startups): ${startups}\n` +
+      `💳 To'lovlar: ${payments}\n` +
+      `💡 G'oyalar: ${ideas}\n` +
+      `⭐ Sharhlar: ${reviews}\n` +
+      `⚠️ Nizolar: ${disputes}\n` +
+      `💬 Suhbatlar: ${conversations} (${messages} ta xabar)\n` +
+      `🔗 Referallar: ${referrals}\n` +
+      `🔒 Escrow to'lovlar: ${escrowPayments}\n` +
+      `🎫 Support tiketlar: ${supportTickets}\n` +
+      `🔔 Bildirishnomalar: ${notifications}`
+    );
+  } catch (err: any) {
+    console.error("[Telegram] Backup summary hisoblashda xatolik:", err.message);
+    return "📊 Ma'lumotlar ro'yxatini hisoblab bo'lmadi (lekin fayl zaxirasi baribir yuborildi).";
+  }
+}
+
 async function sendToTelegram(filePath: string, filename: string) {
   const botToken = await getSetting("TELEGRAM_BOT_TOKEN");
   const chatId = await getSetting("TELEGRAM_BACKUP_CHAT_ID");
@@ -74,10 +159,17 @@ async function sendToTelegram(filePath: string, filename: string) {
     const encryptedContent = encryptBackupBuffer(fileBuffer, encryptionKey);
     const encryptedFilename = `${filename}.enc`;
     
+    const summary = await buildBackupSummary();
+
     const formData = new FormData();
     formData.append("chat_id", chatId);
     formData.append("document", new Blob([encryptedContent]), encryptedFilename);
-    formData.append("caption", `Savdo24 Zaxira nusxasi (SHIFRLANGAN)\nSana: ${new Date().toLocaleString()}\nFayl: ${encryptedFilename}\n\n⚠️ Bu fayl AES-256-GCM bilan shifrlangan. Ochish uchun loyihaning ENCRYPTION_KEY qiymatidan foydalaning.`);
+    formData.append(
+      "caption",
+      `Savdo24 Zaxira nusxasi (SHIFRLANGAN)\nSana: ${new Date().toLocaleString()}\nFayl: ${encryptedFilename}\n\n` +
+      `${summary}\n\n` +
+      `⚠️ Faylning o'zi AES-256-GCM bilan shifrlangan. Ochish uchun loyihaning ENCRYPTION_KEY qiymatidan foydalaning — lekin yuqoridagi ro'yxat orqali faylni ochmasdan ham bu zaxirada nima borligini darhol bilib olishingiz mumkin.`
+    );
 
     const response = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, {
       method: "POST",
@@ -132,14 +224,38 @@ export async function runBackup() {
   let pgDumpSuccess = false;
 
   // Method 1: Try pg_dump (SQL Dump)
+  // TUZATISH (foydalanuvchi so'rovi — production loglarida "[NODE-CRON]
+  // missed execution ... Possible blocking IO or high CPU" ogohlantirishi
+  // kuzatilgach): bu yerda ilgari `execSync` ishlatilardi — bu Node'ning
+  // BUTUN event loop'ini pg_dump tugaguncha (yoki xato tashlaguncha)
+  // TO'XTATIB QO'YARDI. Muhimi: bu skript asosiy "savdo24" serveri bilan
+  // BIR XIL protsessda (server.ts'dagi kunlik cron orqali) ishga
+  // tushadi — ya'ni pg_dump ishlab turgan daqiqalarda butun sayt (HTTP
+  // so'rovlar, boshqa cron ishlar) muzlab qolishi mumkin edi. Endi
+  // `execFile` (asinxron, promisify qilingan) ishlatiladi — bu HECH
+  // QANDAY so'rovni bloklamaydi. Bonus: `execFile` argumentlarni shell
+  // orqali EMAS, to'g'ridan-to'g'ri uzatadi — DATABASE_URL'da maxsus
+  // belgilar bo'lsa ham shell-injection xavfi yo'q (avvalgi
+  // `execSync(\`pg_dump "${dbUrl}" ...\`)` shell orqali ishlagan).
   try {
     console.log(`[Method 1] Attempting pg_dump to file: ${tempFilePath}`);
-    execSync(`pg_dump "${dbUrl}" -f "${tempFilePath}"`, { stdio: 'ignore' });
+    await execFileAsync('pg_dump', [toPgToolConnectionString(dbUrl), '-f', tempFilePath], { timeout: 5 * 60 * 1000 });
     console.log("Local SQL dump completed successfully via pg_dump.");
     uploadContent = fs.readFileSync(tempFilePath);
     pgDumpSuccess = true;
-  } catch (dumpErr) {
-    console.warn("pg_dump was not successful (it may not be installed in the runtime container).");
+  } catch (dumpErr: any) {
+    // TUZATILDI: ilgari bu yerda haqiqiy xato (dumpErr) HECH QACHON log
+    // qilinmasdi — doim bir xil taxminiy xabar ("may not be installed")
+    // chiqarilardi, garchi haqiqiy sabab boshqa narsa (masalan PATH'da yo'q,
+    // ruxsat yo'q, ulanish vaqti tugashi, versiya nomosligi va h.k.) bo'lsa
+    // ham. Bu diagnostika qilishni qiyinlashtirardi. Endi haqiqiy xato
+    // xabari (va uning ENOENT ekan-emasligi) aniq log qilinadi.
+    const isMissingBinary = dumpErr?.code === "ENOENT";
+    console.warn(
+      isMissingBinary
+        ? "pg_dump topilmadi (ENOENT) — 'postgresql-client' paketi serverda o'rnatilmagan bo'lishi mumkin."
+        : `pg_dump muvaffaqiyatsiz tugadi: ${dumpErr?.stderr || dumpErr?.message || dumpErr}`
+    );
     console.log("Switching to [Method 2] - Resilient Prisma Client JSON Export...");
   }
 

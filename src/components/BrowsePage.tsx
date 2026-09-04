@@ -257,7 +257,7 @@ export default function BrowsePage({
             </div>
             <div>
               <p className="text-xs text-on-primary-container uppercase font-bold">Savdolar (24s)</p>
-              <p className="text-lg font-black text-white">{socialProof.sales24h}</p>
+              <p className="text-lg font-black text-on-primary-container">{socialProof.sales24h}</p>
             </div>
           </div>
           <div className="bg-primary-container border border-outline-variant/10 rounded-2xl p-4 flex items-center gap-4">
@@ -266,7 +266,7 @@ export default function BrowsePage({
             </div>
             <div>
               <p className="text-xs text-on-primary-container uppercase font-bold">Yangi a'zolar</p>
-              <p className="text-lg font-black text-white">{socialProof.newUsers24h}</p>
+              <p className="text-lg font-black text-on-primary-container">{socialProof.newUsers24h}</p>
             </div>
           </div>
           <div className="bg-primary-container border border-outline-variant/10 rounded-2xl p-4 flex items-center gap-4">
@@ -275,16 +275,16 @@ export default function BrowsePage({
             </div>
             <div>
               <p className="text-xs text-on-primary-container uppercase font-bold">Yangi e'lonlar</p>
-              <p className="text-lg font-black text-white">{socialProof.newListings24h}</p>
+              <p className="text-lg font-black text-on-primary-container">{socialProof.newListings24h}</p>
             </div>
           </div>
           <div className="bg-primary-container border border-outline-variant/10 rounded-2xl p-4 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center text-yellow-500">
+            <div className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center text-secondary">
               <Star className="w-5 h-5" />
             </div>
             <div>
               <p className="text-xs text-on-primary-container uppercase font-bold">Top Sharh</p>
-              <p className="text-xs font-bold text-white truncate max-w-[100px]">
+              <p className="text-xs font-bold text-on-primary-container truncate max-w-[100px]">
                 {socialProof.topRated ? `"${socialProof.topRated.comment}"` : "Hali yo'q"}
               </p>
             </div>
@@ -302,7 +302,7 @@ export default function BrowsePage({
           <span className="inline-block bg-secondary-container/20 text-secondary-container border border-secondary-container/30 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4">
             G'oyalaringizni ulashing
           </span>
-          <h1 className="text-3xl md:text-5xl font-extrabold text-white mb-6 leading-tight">
+          <h1 className="font-display text-3xl md:text-5xl font-bold text-on-primary-container mb-6 leading-tight">
             Startaplar, AI mahsulotlar va tayyor loyihalarni xarid qiling yoki soting
           </h1>
           <p className="text-sm md:text-base text-on-primary-container mb-8 leading-relaxed max-w-lg">
@@ -320,7 +320,7 @@ export default function BrowsePage({
             </button>
             <button
               onClick={() => setView('sell')}
-              className="border border-outline-variant text-white hover:bg-white/10 active:scale-95 transition-all px-8 py-4 rounded-xl font-bold text-sm"
+              className="border border-outline-variant text-on-primary-container hover:bg-white/10 active:scale-95 transition-all px-8 py-4 rounded-xl font-bold text-sm"
             >
               Elon qo'shish
             </button>
@@ -365,11 +365,20 @@ export default function BrowsePage({
             return (
               <div
                 key={cat.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => {
                   setSelectedCategory(isCatActive ? null : cat.id);
                   setSubFilters({});
                 }}
-                className={`flex flex-col items-center justify-center p-4 rounded-xl border cursor-pointer group transition-all duration-300 ${
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setSelectedCategory(isCatActive ? null : cat.id);
+                    setSubFilters({});
+                  }
+                }}
+                className={`flex flex-col items-center justify-center p-4 rounded-xl border cursor-pointer group transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-secondary-container ${
                   isCatActive
                     ? 'bg-secondary-container/20 border-secondary-container shadow-md'
                     : 'bg-white dark:bg-primary-container/40 border-outline-variant/20 hover:border-secondary-container/50 hover:shadow-sm'
@@ -431,7 +440,7 @@ export default function BrowsePage({
                     <div key={field.key} className="space-y-1">
                       <label className="text-xs text-gray-400 block">{field.label}</label>
                       <select
-                        className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-2 text-xs focus:outline-none focus:border-secondary-container transition-all"
+                        className="w-full bg-background border border-outline-variant/30 text-on-background rounded-xl p-2 text-xs focus:outline-none focus:border-secondary-container transition-all"
                         value={subFilters[field.key] || ''}
                         onChange={(e) => setSubFilters({ ...subFilters, [field.key]: e.target.value })}
                       >
@@ -450,7 +459,7 @@ export default function BrowsePage({
                       <label className="text-xs text-gray-400 block">{field.label}</label>
                       <input
                         type={field.type}
-                        className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-2 text-xs focus:outline-none focus:border-secondary-container transition-all"
+                        className="w-full bg-background border border-outline-variant/30 text-on-background rounded-xl p-2 text-xs focus:outline-none focus:border-secondary-container transition-all"
                         placeholder={field.placeholder || "Izlash..."}
                         value={subFilters[field.key] || ''}
                         onChange={(e) => setSubFilters({ ...subFilters, [field.key]: e.target.value })}
@@ -478,7 +487,7 @@ export default function BrowsePage({
               <select
                 value={listingTypeFilter}
                 onChange={(e) => setListingTypeFilter(e.target.value)}
-                className="bg-background border border-outline-variant/30 text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-secondary-container transition-all"
+                className="bg-background border border-outline-variant/30 text-on-background rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-secondary-container transition-all"
               >
                 <option value="All">Barchasi</option>
                 <option value="To'liq loyiha (manba kodi bilan)">To'liq loyiha (manba kodi bilan)</option>
@@ -592,7 +601,7 @@ export default function BrowsePage({
                           >
                             {startup.name}
                             {startup.isTop && (
-                              <span className="text-xs bg-yellow-400/20 text-yellow-400 px-1.5 py-0.5 rounded font-black flex items-center gap-0.5">
+                              <span className="text-xs bg-secondary/20 text-secondary px-1.5 py-0.5 rounded font-black flex items-center gap-0.5">
                                 <ArrowUpToLine className="w-3 h-3" />
                                 TOP
                               </span>
@@ -617,7 +626,7 @@ export default function BrowsePage({
                     <div className="shrink-0 w-full md:w-auto ml-auto">
                       <button
                         onClick={() => handleCardClick(startup.id)}
-                        className="w-full md:w-auto px-6 py-3 bg-secondary-container hover:brightness-115 text-on-secondary-fixed rounded-xl font-bold text-xs shadow-md shadow-secondary-container/10 transition-all active:scale-95 whitespace-nowrap"
+                        className="w-full md:w-auto px-6 py-3 bg-secondary-container hover:brightness-110 text-on-secondary-fixed rounded-xl font-bold text-xs shadow-md shadow-secondary-container/10 transition-all active:scale-95 whitespace-nowrap"
                       >
                         Batafsil ko'rish
                       </button>
@@ -640,7 +649,7 @@ export default function BrowsePage({
                       width={350}
                       height={192}
                     />
-                    <div className="absolute top-4 left-4 bg-primary-container/90 text-white border border-white/10 px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider">
+                    <div className="absolute top-4 left-4 bg-primary-container/90 text-on-primary-container border border-white/10 px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider">
                       {categories.find(c => c.id === startup.category)?.name || startup.category}
                     </div>
                     {startup.soldStatus === 'sotildi' && (
@@ -658,7 +667,7 @@ export default function BrowsePage({
                       >
                         {startup.name}
                         {startup.isTop && (
-                          <span className="text-xs bg-yellow-400/20 text-yellow-400 px-1.5 py-0.5 rounded font-black flex items-center gap-0.5">
+                          <span className="text-xs bg-secondary/20 text-secondary px-1.5 py-0.5 rounded font-black flex items-center gap-0.5">
                             <ArrowUpToLine className="w-3 h-3" />
                             TOP
                           </span>
@@ -681,7 +690,7 @@ export default function BrowsePage({
 
                       <div className="flex justify-between items-center text-xs">
                         <span className="font-bold text-on-primary-container">E'lon turi</span>
-                        <span className="font-mono text-xs text-white font-semibold leading-tight text-right truncate max-w-[140px]">
+                        <span className="font-mono text-xs text-on-surface dark:text-on-primary-container font-semibold leading-tight text-right truncate max-w-[140px]">
                           {startup.listingType || "To'liq loyiha (manba kodi bilan)"}
                         </span>
                       </div>
@@ -703,7 +712,7 @@ export default function BrowsePage({
 
                     <button
                       onClick={() => handleCardClick(startup.id)}
-                      className="w-full py-3 bg-primary-container dark:bg-white/10 text-white dark:hover:bg-secondary-container dark:hover:text-on-secondary-fixed hover:bg-secondary-container hover:text-on-secondary-fixed rounded-xl font-bold text-sm transition-colors mt-auto shadow-sm"
+                      className="w-full py-3 bg-primary-container dark:bg-white/10 text-on-primary-container dark:text-white dark:hover:bg-secondary-container dark:hover:text-on-secondary-fixed hover:bg-secondary-container hover:text-on-secondary-fixed rounded-xl font-bold text-sm transition-colors mt-auto shadow-sm"
                     >
                       Tafsilotlarni ko'rish
                     </button>
@@ -726,7 +735,7 @@ export default function BrowsePage({
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-white disabled:opacity-40 disabled:hover:bg-white/5 transition-all flex items-center gap-1 cursor-pointer"
+              className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-on-background dark:text-white disabled:opacity-40 disabled:hover:bg-white/5 transition-all flex items-center gap-1 cursor-pointer"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
               Oldingi
@@ -743,7 +752,7 @@ export default function BrowsePage({
                     className={`w-9 h-9 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       isCurrent
                         ? "bg-secondary text-on-secondary"
-                        : "bg-white/5 hover:bg-white/10 border border-white/10 text-white"
+                        : "bg-white/5 hover:bg-white/10 border border-white/10 text-on-background dark:text-white"
                     }`}
                   >
                     {pageNum}
@@ -755,7 +764,7 @@ export default function BrowsePage({
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-white disabled:opacity-40 disabled:hover:bg-white/5 transition-all flex items-center gap-1 cursor-pointer"
+              className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-on-background dark:text-white disabled:opacity-40 disabled:hover:bg-white/5 transition-all flex items-center gap-1 cursor-pointer"
             >
               Keyingi
               <ChevronRight className="w-3.5 h-3.5" />
@@ -792,7 +801,7 @@ export default function BrowsePage({
           <button
             type="submit"
             disabled={isSubscribing}
-            className="bg-primary-container text-white px-8 py-3 rounded-xl font-bold text-sm hover:opacity-90 active:scale-95 transition-all whitespace-nowrap shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-primary-container text-on-primary-container px-8 py-3 rounded-xl font-bold text-sm hover:opacity-90 active:scale-95 transition-all whitespace-nowrap shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubscribing ? 'Yuborilmoqda...' : "Obuna bo'lish"}
           </button>

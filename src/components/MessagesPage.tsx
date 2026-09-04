@@ -120,8 +120,20 @@ export default function MessagesPage({ user, onActionToast }: MessagesPageProps)
     <div className="grid grid-cols-1 md:grid-cols-3 h-[600px] bg-background border border-white/10 rounded-2xl overflow-hidden">
         <div className="col-span-1 border-r border-white/10 overflow-y-auto">
             {conversations.map(conv => (
-                <div key={conv.id} onClick={() => selectConversation(conv)} className={`p-4 border-b border-white/5 cursor-pointer hover:bg-white/5 ${selectedConversation?.id === conv.id ? 'bg-white/10' : ''}`}>
-                    <p className="font-bold text-white text-sm">{conv.buyerId === user.id ? conv.seller.name : conv.buyer.name}</p>
+                <div
+                    key={conv.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => selectConversation(conv)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        selectConversation(conv);
+                      }
+                    }}
+                    className={`p-4 border-b border-white/5 cursor-pointer hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-secondary-container focus:ring-inset ${selectedConversation?.id === conv.id ? 'bg-white/10' : ''}`}
+                  >
+                    <p className="font-bold text-on-primary-container text-sm">{conv.buyerId === user.id ? conv.seller.name : conv.buyer.name}</p>
                     <p className="text-xs text-on-primary-container truncate">{conv.startup.name}</p>
                 </div>
             ))}
@@ -131,19 +143,19 @@ export default function MessagesPage({ user, onActionToast }: MessagesPageProps)
                 <>
                     <div className="flex-grow p-4 overflow-y-auto">
                         {hasMore && (
-                            <button onClick={handleLoadOlder} disabled={loadingOlder} className="w-full text-center text-xs text-on-primary-container p-2 hover:text-white disabled:opacity-50">
+                            <button onClick={handleLoadOlder} disabled={loadingOlder} className="w-full text-center text-xs text-on-primary-container p-2 hover:text-on-primary-container disabled:opacity-50">
                                 {loadingOlder ? 'Yuklanmoqda...' : 'Oldingi xabarlarni yuklash'}
                             </button>
                         )}
                         {messages.map(msg => (
-                            <div key={msg.id} className={`mb-2 p-2 rounded max-w-[70%] ${msg.senderId === user.id ? 'bg-secondary-container text-black ml-auto' : 'bg-white/10 text-white'}`}>
+                            <div key={msg.id} className={`mb-2 p-2 rounded max-w-[70%] ${msg.senderId === user.id ? 'bg-secondary-container text-black ml-auto' : 'bg-white/10 text-on-primary-container'}`}>
                                 {msg.content}
                             </div>
                         ))}
                         <div ref={messagesEndRef} />
                     </div>
                     <form onSubmit={handleSendMessage} className="p-4 border-t border-white/10 flex gap-2">
-                        <input className="flex-grow bg-background border border-white/10 rounded-xl p-2 text-white" value={newMessage} onChange={e => setNewMessage(e.target.value)} disabled={sendingMessage} />
+                        <input className="flex-grow bg-background border border-white/10 rounded-xl p-2 text-on-primary-container" value={newMessage} onChange={e => setNewMessage(e.target.value)} disabled={sendingMessage} />
                         <button type="submit" disabled={sendingMessage} className="bg-secondary-container text-black px-4 py-2 rounded-xl disabled:opacity-60 disabled:cursor-not-allowed">{sendingMessage ? 'Yuborilmoqda...' : 'Yuborish'}</button>
                     </form>
                 </>

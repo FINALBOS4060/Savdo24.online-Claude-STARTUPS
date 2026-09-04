@@ -21,6 +21,17 @@ router.delete("/startups/:id", authenticateToken, requireAdmin, async (req: Auth
       const paymentIds = payments.map((p: any) => p.id);
 
       await tx.dispute.deleteMany({ where: { paymentId: { in: paymentIds } } });
+
+      // TUZATISH: DisputeResolution.escrowId -> EscrowPayment.id ustiga FK
+      // mavjud (onDelete: Cascade YO'Q, schema.prisma'ga qarang). Avval
+      // shu startapga tegishli EscrowPayment'larni topib, ularga bog'liq
+      // DisputeResolution yozuvlarini o'chirmasdan EscrowPayment'ni
+      // o'chirishga urinish FK cheklovini buzardi — bu esa butun
+      // tranzaksiyani (demak, e'lonni o'chirishning o'zini ham) muvaffaqiyatsiz
+      // qilardi har safar o'sha loyihada escrow nizosi bo'lgan bo'lsa.
+      const escrows = await tx.escrowPayment.findMany({ where: { paymentId: { in: paymentIds } } });
+      const escrowIds = escrows.map((e: any) => e.id);
+      await tx.disputeResolution.deleteMany({ where: { escrowId: { in: escrowIds } } });
       await tx.escrowPayment.deleteMany({ where: { paymentId: { in: paymentIds } } });
       await tx.referralReward.deleteMany({ where: { paymentId: { in: paymentIds } } });
 
@@ -48,7 +59,7 @@ router.delete("/startups/:id", authenticateToken, requireAdmin, async (req: Auth
     }).catch((e: any) => logger.error({ err: e }, "Audit log error"));
 
     res.json({ success: true, message: "Loyiha va unga tegishli barcha ma'lumotlar muvaffaqiyatli o'chirildi." });
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error({ err }, "Delete startup error");
     res.status(500).json({ error: "E'lonni o'chirishda xatolik yuz berdi." });
   }

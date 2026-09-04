@@ -87,7 +87,7 @@ export default function SupportPage({ setView, onActionToast }: { setView: (view
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-black text-white flex items-center gap-2">
+          <h1 className="text-3xl font-black text-on-primary-container flex items-center gap-2">
             <HelpCircle className="text-secondary-container w-9 h-9" />
             Qo'llab-quvvatlash markazi
           </h1>
@@ -97,7 +97,7 @@ export default function SupportPage({ setView, onActionToast }: { setView: (view
         </div>
         <button
           onClick={() => setView('browse')}
-          className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 border border-outline-variant/20 transition-all"
+          className="px-4 py-2 bg-white/5 hover:bg-white/10 text-on-primary-container rounded-xl font-bold text-xs flex items-center gap-1.5 border border-outline-variant/20 transition-all"
         >
           <ArrowLeft className="w-4 h-4" />
           Asosiy sahifaga qaytish
@@ -110,7 +110,7 @@ export default function SupportPage({ setView, onActionToast }: { setView: (view
         {/* Contact info and form */}
         <div className="md:col-span-5 space-y-6">
           <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 space-y-6 shadow-xl">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <h2 className="text-lg font-bold text-on-primary-container flex items-center gap-2">
               <MessageSquare className="text-secondary-container w-5 h-5" />
               To'g'ridan-to'g'ri aloqa
             </h2>
@@ -125,7 +125,7 @@ export default function SupportPage({ setView, onActionToast }: { setView: (view
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wider text-on-primary-container font-extrabold">Elektron pochta</p>
-                  <p className="text-sm font-bold text-white group-hover:text-secondary-container transition-colors">support@savdo24.online</p>
+                  <p className="text-sm font-bold text-on-primary-container group-hover:text-secondary-container transition-colors">support@savdo24.online</p>
                 </div>
               </a>
 
@@ -140,7 +140,7 @@ export default function SupportPage({ setView, onActionToast }: { setView: (view
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wider text-on-primary-container font-extrabold">Telegram aloqa</p>
-                  <p className="text-sm font-bold text-white group-hover:text-secondary-container transition-colors">@savdo24_support</p>
+                  <p className="text-sm font-bold text-on-primary-container group-hover:text-secondary-container transition-colors">@savdo24_support</p>
                 </div>
               </a>
             </div>
@@ -148,7 +148,7 @@ export default function SupportPage({ setView, onActionToast }: { setView: (view
 
           {/* Quick Ticket Form */}
           <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 shadow-xl">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
+            <h2 className="text-lg font-bold text-on-primary-container flex items-center gap-2 mb-4">
               <PenSquare className="text-secondary-container w-5 h-5" />
               Murojaat qoldirish
             </h2>
@@ -156,7 +156,7 @@ export default function SupportPage({ setView, onActionToast }: { setView: (view
             {formSubmitted ? (
               <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 text-center space-y-2 animate-scale-up">
                 <CheckCircle className="text-green-400 w-8 h-8 mx-auto" />
-                <p className="text-sm font-bold text-white">Murojaatingiz qabul qilindi!</p>
+                <p className="text-sm font-bold text-on-primary-container">Murojaatingiz qabul qilindi!</p>
                 <p className="text-xs text-on-primary-container">Tez orada operatorlarimiz siz bilan bog'lanishadi.</p>
                 <button
                   onClick={() => setFormSubmitted(false)}
@@ -173,7 +173,7 @@ export default function SupportPage({ setView, onActionToast }: { setView: (view
                     type="email"
                     required
                     placeholder="example@mail.com"
-                    className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 text-sm focus:outline-none focus:border-secondary-container focus:ring-1 focus:ring-secondary-container transition-all"
+                    className="w-full bg-background border border-outline-variant/30 text-on-primary-container rounded-xl p-3 text-sm focus:outline-none focus:border-secondary-container focus:ring-1 focus:ring-secondary-container transition-all"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                   />
@@ -185,7 +185,7 @@ export default function SupportPage({ setView, onActionToast }: { setView: (view
                     type="text"
                     required
                     placeholder="Murojaat mavzusi"
-                    className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 text-sm focus:outline-none focus:border-secondary-container focus:ring-1 focus:ring-secondary-container transition-all"
+                    className="w-full bg-background border border-outline-variant/30 text-on-primary-container rounded-xl p-3 text-sm focus:outline-none focus:border-secondary-container focus:ring-1 focus:ring-secondary-container transition-all"
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
                   />
@@ -197,7 +197,7 @@ export default function SupportPage({ setView, onActionToast }: { setView: (view
                     required
                     rows={4}
                     placeholder="Savolingizni batafsil tushuntiring..."
-                    className="w-full bg-background border border-outline-variant/30 text-white rounded-xl p-3 text-sm focus:outline-none focus:border-secondary-container focus:ring-1 focus:ring-secondary-container transition-all resize-none"
+                    className="w-full bg-background border border-outline-variant/30 text-on-primary-container rounded-xl p-3 text-sm focus:outline-none focus:border-secondary-container focus:ring-1 focus:ring-secondary-container transition-all resize-none"
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                   />
@@ -219,7 +219,7 @@ export default function SupportPage({ setView, onActionToast }: { setView: (view
         {/* FAQs */}
         <div className="md:col-span-7 space-y-4">
           <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 shadow-xl">
-            <h2 className="text-xl font-black text-white flex items-center gap-2 mb-6 border-b border-outline-variant/15 pb-4">
+            <h2 className="text-xl font-black text-on-primary-container flex items-center gap-2 mb-6 border-b border-outline-variant/15 pb-4">
               <HelpCircle className="text-secondary-container w-6 h-6" />
               Ko'p beriladigan savollar (FAQ)
             </h2>
@@ -236,7 +236,7 @@ export default function SupportPage({ setView, onActionToast }: { setView: (view
                       onClick={() => toggleFaq(index)}
                       className="w-full flex justify-between items-center p-4 text-left hover:bg-white/5 transition-all"
                     >
-                      <span className="font-bold text-sm text-white pr-4">{faq.question}</span>
+                      <span className="font-bold text-sm text-on-primary-container pr-4">{faq.question}</span>
                       <ChevronDown className={`w-5 h-5 text-secondary-container transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
                     </button>
                     

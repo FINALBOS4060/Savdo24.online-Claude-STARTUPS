@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Startup, UserProfileData, ProfileTab, Category } from '../types';
 import { apiFetch as fetch } from '../lib/api';
+import { formatDate } from '../lib/formatDate';
+import { telegramLinkDeepLink, TELEGRAM_BOT_USERNAME } from '../lib/constants';
 import { ProfileReferralsTab } from './profile/ProfileReferralsTab';
 import { ProfileB2BTab } from './profile/ProfileB2BTab';
 import { ProfileStartupsTab } from './profile/ProfileStartupsTab';
 import { ProfileVipTab } from './profile/ProfileVipTab';
+import { ProfileExchangeTab } from './profile/ProfileExchangeTab';
 import { ProfileSavedTab } from './profile/ProfileSavedTab';
 import { ProfilePurchasesTab } from './profile/ProfilePurchasesTab';
 import { ProfileEarningsTab } from './profile/ProfileEarningsTab';
@@ -26,7 +29,8 @@ import {
   Crown, 
   Shield, 
   X, 
-  ArrowUpCircle 
+  ArrowUpCircle,
+  Repeat
 } from 'lucide-react';
 
 interface ProfilePageProps {
@@ -178,6 +182,8 @@ export default function ProfilePage({
   const [editRole, setEditRole] = useState(user.role);
   const [editAvatar, setEditAvatar] = useState(user.avatarUrl);
   const [linkCode, setLinkCode] = useState<string | null>(null);
+  const [linkCodeExpiresAt, setLinkCodeExpiresAt] = useState<number | null>(null);
+  const [linkCodeSecondsLeft, setLinkCodeSecondsLeft] = useState<number>(0);
   const [topModal, setTopModal] = useState<{ isOpen: boolean; startupId: string | null; startupName: string }>({ isOpen: false, startupId: null, startupName: '' });
   const [boostDays, setBoostDays] = useState(7);
   const [estimatedPrice, setEstimatedPrice] = useState(0);
@@ -199,13 +205,41 @@ export default function ProfilePage({
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const coverInputRef = React.useRef<HTMLInputElement>(null);
 
+  // 1-so'rov: "Bildirishnomalarni boshqarish (opt-out)" — faqat reklama/
+  // broadcast xabarlaridan chiqish uchun toggle.
+  const handleToggleTelegramBroadcastOptOut = async (optOut: boolean) => {
+    try {
+      const res = await fetch('/api/users/me/telegram-notifications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telegramBroadcastOptOut: optOut }),
+      });
+      if (res.ok) {
+        setUser((prev) => ({ ...prev, telegramBroadcastOptOut: optOut }));
+        onActionToast(optOut ? "Reklama xabarlari o'chirildi." : "Reklama xabarlari yoqildi.");
+      } else {
+        const err = await res.json();
+        onActionToast(err.error || "Sozlamani saqlashda xatolik yuz berdi.");
+      }
+    } catch {
+      onActionToast("Sozlamani saqlashda xatolik yuz berdi.");
+    }
+  };
+
   const generateLinkCode = async () => {
     try {
       const res = await fetch('/api/users/me/telegram-link-code', { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
         setLinkCode(data.code);
-        onActionToast("Telegram bog'lash kodi generatsiya qilindi.");
+        // MUHIM: backend kod 15 daqiqa (15*60*1000 ms) amal qilishini
+        // belgilaydi (server.ts), lekin frontend bu haqda hech qanday
+        // vizual ko'rsatkichga ega emas edi — foydalanuvchi kod eskirganini
+        // faqat botdan "kod muddati tugagan" xatosini olgandagina bilardi,
+        // sahifada esa eski kod tinch qolib berardi. Endi shu muddatni
+        // frontendda ham kuzatib, hisoblagich ko'rsatamiz.
+        setLinkCodeExpiresAt(Date.now() + 15 * 60 * 1000);
+        onActionToast("Telegram bog'lash kodi generatsiya qilindi. Kod 15 daqiqa amal qiladi.");
       } else {
         const err = await res.json();
         onActionToast(err.error || "Kod generatsiya qilishda xatolik yuz berdi.");
@@ -215,6 +249,60 @@ export default function ProfilePage({
       onActionToast("Tarmoq xatosi yuz berdi.");
     }
   };
+
+  // Har soniyada qolgan vaqtni yangilaydi va muddati tugaganda kodni
+  // avtomatik tozalaydi — shunda UI "Yangi kod olish" tugmasiga o'zi
+  // qaytadi, foydalanuvchi eskirgan kod bilan qolib ketmaydi.
+  useEffect(() => {
+    if (!linkCode || !linkCodeExpiresAt) {
+      setLinkCodeSecondsLeft(0);
+      return;
+    }
+
+    const tick = () => {
+      const secondsLeft = Math.max(0, Math.round((linkCodeExpiresAt - Date.now()) / 1000));
+      setLinkCodeSecondsLeft(secondsLeft);
+      if (secondsLeft === 0) {
+        setLinkCode(null);
+        setLinkCodeExpiresAt(null);
+        onActionToast("⏱ Kodning amal qilish muddati tugadi. Iltimos, yangi kod oling.");
+      }
+    };
+
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [linkCode, linkCodeExpiresAt, onActionToast]);
+
+  // MUHIM: avval kod generatsiya qilingandan keyin foydalanuvchi botga o'tib
+  // /start bosgach, sayt sahifasi bu haqda umuman xabardor bo'lmasdi —
+  // "Hisobingiz tasdiqlanmagan" degan ogohlantirish banneri qo'lda sahifani
+  // yangilamaguncha yo'qolmay turaverardi, garchi hisob allaqachon
+  // tasdiqlangan bo'lsa ham. Endi kod faol bo'lganda sayt har 4 soniyada
+  // holatni avtomatik tekshiradi va tasdiqlanishi bilanoq banner o'zi
+  // yo'qoladi — foydalanuvchi qo'lda hech narsa qilishi shart emas.
+  useEffect(() => {
+    if (!linkCode || user.emailVerified) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.user?.emailVerified) {
+          setUser((prev) => ({ ...prev, ...data.user }));
+          setLinkCode(null);
+          setLinkCodeExpiresAt(null);
+          onActionToast("🎉 Hisobingiz Telegram orqali muvaffaqiyatli tasdiqlandi!");
+        }
+      } catch {
+        // Tarmoq xatosi — jimgina keyingi urinishni kutamiz, foydalanuvchini
+        // har 4 soniyada xato haqida bezovta qilish shart emas.
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [linkCode, user.emailVerified, setUser, onActionToast]);
 
   useEffect(() => {
     if (topModal.isOpen) {
@@ -322,9 +410,34 @@ export default function ProfilePage({
     }
   };
 
+  // SellPage.tsx'dagi rasm yuklash validatsiyasi bilan bir xil — backend
+  // (multer, server.ts) 10MB va faqat jpeg/png/webp/gif'ni qabul qiladi.
+  // Ilgari bu yerda hech qanday oldindan tekshiruv yo'q edi: foydalanuvchi
+  // noto'g'ri formatdagi yoki juda katta faylni tanlasa, u avval to'liq
+  // serverga yuklanib, KEYIN rad etilardi — vaqt va trafikni behuda
+  // sarflardi. Endi xatolik darhol, hech narsa yuklanmasdan ko'rsatiladi.
+  const validateImageFile = (file: File): string | null => {
+    const MAX_FILE_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      return "Fayl hajmi 10MB dan kam bo'lishi kerak.";
+    }
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+      return "Faqat JPG, PNG, WebP, yoki GIF formatini qo'llab-quvvatlaydi.";
+    }
+    return null;
+  };
+
   const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const validationError = validateImageFile(file);
+    if (validationError) {
+      onActionToast(validationError);
+      e.target.value = '';
+      return;
+    }
 
     setIsUploadingCover(true);
     try {
@@ -366,6 +479,13 @@ export default function ProfilePage({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const validationError = validateImageFile(file);
+    if (validationError) {
+      onActionToast(validationError);
+      e.target.value = '';
+      return;
+    }
+
     setIsUploadingAvatar(true);
     try {
       const formData = new FormData();
@@ -405,11 +525,21 @@ export default function ProfilePage({
     }
   };
 
+  // MUHIM BUG: bu effekt avval [user] (butun obyekt)ga bog'liq edi — ya'ni
+  // `user` har safar o'zgarganda (masalan, foydalanuvchi "Sozlamalar"
+  // bo'limida yangi ism yozib turgan payida, sahifa yuqorisidagi "Bannerni
+  // tahrirlash" orqali muqova rasmini yuklasa — bu handleCoverUpload ichida
+  // setUser(prev => ({...prev, coverUrl})) chaqiradi) editName/editRole/
+  // editAvatar formadagi HALI SAQLANMAGAN o'zgarishlar serverdagi eski
+  // qiymatlar bilan almashtirilib, jimgina yo'qolib qolardi. Endi faqat
+  // foydalanuvchi identifikatori (birinchi yuklanish/login) o'zgarganda
+  // ishga tushadi, forma har qanday tasodifiy `user` yangilanishida
+  // qayta tiklanmaydi.
   React.useEffect(() => {
     setEditName(user.name);
     setEditRole(user.role);
     setEditAvatar(user.avatarUrl);
-  }, [user]);
+  }, [user.id]);
 
   // If the user is logged in (has an id), show only startups matching their userId.
   // Otherwise, there is nothing personal to show yet.
@@ -469,18 +599,41 @@ export default function ProfilePage({
           <div className="flex items-start gap-3">
             <AlertTriangle className="text-secondary w-5 h-5 mt-0.5 shrink-0" />
             <div>
-              <h4 className="text-white font-bold text-sm">Hisobingiz tasdiqlanmagan</h4>
+              <h4 className="text-on-primary-container font-bold text-sm">Hisobingiz tasdiqlanmagan</h4>
+              {/* MUHIM: bu yerda avval noto'g'ri, ishlatilmaydigan bot nomi
+                  ("@Savdo24_Official_bot") qattiq yozib qo'yilgan edi —
+                  saytning haqiqiy boti @Savdo24_Register_bot bo'lsa ham.
+                  Foydalanuvchi mavjud bo'lmagan botni qidirib, uni topa
+                  olmasdi. Bundan tashqari kodni QO'LDA yozish talab
+                  qilinardi — endi bitta tugma bosilsa bot ochilib, kod
+                  avtomatik yuboriladi. */}
               <p className="text-on-primary-container text-xs mt-1">
-                Hisobingizni tasdiqlash uchun <b>@Savdo24_Official_bot</b> botiga <b>/start {linkCode || user.telegramLinkCode || "kod_olish_uchun_bosing"}</b> deb yozing.
+                Hisobingizni tasdiqlash uchun Telegram botimizga ulaning — kod avtomatik yuboriladi, hech narsa yozish shart emas.
               </p>
+              {linkCode && (
+                <p className="text-on-primary-container/70 text-xs mt-1 font-mono">
+                  ⏱ Kod amal qilish muddati: <span className="font-bold text-secondary">{String(Math.floor(linkCodeSecondsLeft / 60)).padStart(2, '0')}:{String(linkCodeSecondsLeft % 60).padStart(2, '0')}</span>
+                </p>
+              )}
             </div>
           </div>
-          <button 
-            onClick={generateLinkCode}
-            className="shrink-0 bg-secondary text-on-secondary px-4 py-2 rounded-lg text-xs font-bold hover:brightness-110 transition-all focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
-          >
-            Yangi kod olish
-          </button>
+          {linkCode ? (
+            <a
+              href={telegramLinkDeepLink(linkCode)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 bg-secondary text-on-secondary px-4 py-2 rounded-lg text-xs font-bold hover:brightness-110 transition-all focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
+            >
+              🤖 @{TELEGRAM_BOT_USERNAME}'ni ochish
+            </a>
+          ) : (
+            <button 
+              onClick={generateLinkCode}
+              className="shrink-0 bg-secondary text-on-secondary px-4 py-2 rounded-lg text-xs font-bold hover:brightness-110 transition-all focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
+            >
+              Yangi kod olish
+            </button>
+          )}
         </div>
       )}
 
@@ -526,6 +679,12 @@ export default function ProfilePage({
                 loading="lazy"
                 width={160}
                 height={160}
+                onError={(e) => {
+                  const img = e.currentTarget;
+                  if (img.dataset.fallback) return;
+                  img.dataset.fallback = '1';
+                  img.src = '/default-avatar.svg';
+                }}
               />
             </div>
             <div className="absolute bottom-2 right-2 w-8 h-8 bg-secondary-container rounded-full flex items-center justify-center border-4 border-background shadow-lg">
@@ -535,21 +694,21 @@ export default function ProfilePage({
 
           <div className="flex-1 flex flex-col md:flex-row justify-between items-center md:items-end w-full text-center md:text-left">
             <div className="mb-4 md:mb-0">
-              <h1 className="text-2xl md:text-3xl font-extrabold text-white flex items-center gap-2 justify-center md:justify-start">
+              <h1 className="text-2xl md:text-3xl font-extrabold text-on-primary-container flex items-center gap-2 justify-center md:justify-start">
                 {user.name}
               </h1>
               <div className="flex items-center gap-2 mt-1 justify-center md:justify-start">
                 <span className="px-3 py-0.5 rounded-full bg-secondary-container text-on-secondary-fixed font-bold text-xs uppercase tracking-wide">
                   {user.role}
                 </span>
-                <span className="text-on-primary-container text-xs">• A'zo bo'lgan sanasi: {user.joinDate}</span>
+                <span className="text-on-primary-container text-xs">• A'zo bo'lgan sanasi: {formatDate(user.joinDate, { month: 'long', year: 'numeric' })}</span>
               </div>
             </div>
 
             <div className="flex gap-3">
               <button
                 onClick={() => setActiveTab('settings')}
-                className="px-5 py-2 border border-outline-variant/40 rounded-xl font-bold text-xs hover:bg-white/5 text-white transition-all active:scale-95"
+                className="px-5 py-2 border border-outline-variant/40 rounded-xl font-bold text-xs hover:bg-white/5 text-on-primary-container transition-all active:scale-95"
               >
                 Profilni tahrirlash
               </button>
@@ -564,119 +723,77 @@ export default function ProfilePage({
         </div>
       </header>
 
-      {/* Profile Tabs */}
-      <div className="flex border-b border-outline-variant/20 mb-8 overflow-x-auto scrollbar-none">
-        <button
-          onClick={() => setActiveTab('startups')}
-          className={`px-8 py-4 font-bold text-sm border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
-            activeTab === 'startups'
-              ? 'text-secondary-container border-secondary-container'
-              : 'text-on-primary-container border-transparent hover:text-secondary-container'
-          }`}
-        >
-          <Rocket className="w-4 h-4" />
-          Mening loyihalarim va g'oyalarim
-        </button>
-        <button
-          onClick={() => setActiveTab('saved')}
-          className={`px-8 py-4 font-bold text-sm border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
-            activeTab === 'saved'
-              ? 'text-secondary-container border-secondary-container'
-              : 'text-on-primary-container border-transparent hover:text-secondary-container'
-          }`}
-        >
-          <Bookmark className="w-4 h-4" />
-          Saqlanganlar ({savedStartups.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('purchases')}
-          className={`px-8 py-4 font-bold text-sm border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
-            activeTab === 'purchases'
-              ? 'text-secondary-container border-secondary-container'
-              : 'text-on-primary-container border-transparent hover:text-secondary-container'
-          }`}
-        >
-          <ShoppingCart className="w-4 h-4" />
-          Xaridlarim
-        </button>
-        <button
-          onClick={() => setActiveTab('earnings')}
-          className={`px-8 py-4 font-bold text-sm border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
-            activeTab === 'earnings'
-              ? 'text-secondary-container border-secondary-container'
-              : 'text-on-primary-container border-transparent hover:text-secondary-container'
-          }`}
-        >
-          <Coins className="w-4 h-4" />
-          Daromadlarim
-        </button>
-        <button
-          onClick={() => setActiveTab('reviews')}
-          className={`px-8 py-4 font-bold text-sm border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
-            activeTab === 'reviews'
-              ? 'text-secondary-container border-secondary-container'
-              : 'text-on-primary-container border-transparent hover:text-secondary-container'
-          }`}
-        >
-          <MessageSquare className="w-4 h-4" />
-          Sharhlarim
-        </button>
-        <button
-          onClick={() => setActiveTab('referral')}
-          className={`px-8 py-4 font-bold text-sm border-b-2 flex items-center gap-2 whitespace-nowrap transition-all focus:outline-none focus:ring-2 focus:ring-success ${
-            activeTab === 'referral'
-              ? 'text-success border-success'
-              : 'text-on-primary-container border-transparent hover:text-success'
-          }`}
-        >
-          <UserPlus className="w-4 h-4" />
-          Referral
-        </button>
-        <button
-          onClick={() => setActiveTab('b2b')}
-          className={`px-8 py-4 font-bold text-sm border-b-2 flex items-center gap-2 whitespace-nowrap transition-all focus:outline-none focus:ring-2 focus:ring-secondary ${
-            activeTab === 'b2b'
-              ? 'text-secondary border-secondary'
-              : 'text-on-primary-container border-transparent hover:text-secondary'
-          }`}
-        >
-          <Building2 className="w-4 h-4" />
-          B2B Wholesale
-        </button>
-        <button
-          onClick={() => setActiveTab('settings')}
-          className={`px-8 py-4 font-bold text-sm border-b-2 flex items-center gap-2 whitespace-nowrap transition-all focus:outline-none focus:ring-2 focus:ring-secondary-container ${
-            activeTab === 'settings'
-              ? 'text-secondary-container border-secondary-container'
-              : 'text-on-primary-container border-transparent hover:text-secondary-container'
-          }`}
-        >
-          <Settings className="w-4 h-4" />
-          Sozlamalar
-        </button>
-        <button
-          onClick={() => setActiveTab('vip')}
-          className={`px-8 py-4 font-bold text-sm border-b-2 flex items-center gap-2 whitespace-nowrap transition-all focus:outline-none focus:ring-2 focus:ring-secondary ${
-            activeTab === 'vip'
-              ? 'text-secondary border-secondary'
-              : 'text-on-primary-container border-transparent hover:text-secondary'
-          }`}
-        >
-          <Crown className="w-4 h-4" />
-          VIP a'zolik
-        </button>
-        <button
-          onClick={() => setActiveTab('security')}
-          className={`px-8 py-4 font-bold text-sm border-b-2 flex items-center gap-2 whitespace-nowrap transition-all focus:outline-none focus:ring-2 focus:ring-secondary-container ${
-            activeTab === 'security'
-              ? 'text-secondary-container border-secondary-container'
-              : 'text-on-primary-container border-transparent hover:text-secondary-container'
-          }`}
-        >
-          <Shield className="w-4 h-4" />
-          Xavfsizlik
-        </button>
-      </div>
+      {/* Profile Tabs — ixchamlashtirish: avval 11 ta tab bitta gorizontal
+          skroll qatorida, har biri katta (px-8 py-4) tugma bo'lib, mobil
+          ekranda deyarli hammasi ko'rinmasdi (foydalanuvchi "Xavfsizlik"
+          yoki "VIP" kabi tablarni topish uchun uzoq skroll qilishi kerak edi).
+          Endi tablar mazmuniga ko'ra guruhlangan, kichik pill-tugmalarga
+          o'tkazilgan (Admin panelidagi kabi), barchasi bir ekranga sig'adi va
+          gorizontal skroll shart emas. */}
+      {(() => {
+        const PROFILE_TAB_GROUPS: { label: string; tabs: { id: ProfileTab; label: string; icon: any; count?: number; ring?: string }[] }[] = [
+          {
+            label: 'Asosiy',
+            tabs: [
+              { id: 'startups', label: 'Loyihalarim', icon: Rocket },
+              { id: 'saved', label: 'Saqlanganlar', icon: Bookmark, count: savedStartups.length },
+              { id: 'purchases', label: 'Xaridlarim', icon: ShoppingCart },
+            ],
+          },
+          {
+            label: 'Moliyaviy',
+            tabs: [
+              { id: 'earnings', label: 'Daromadlarim', icon: Coins },
+              { id: 'referral', label: 'Referral', icon: UserPlus, ring: 'focus:ring-success' },
+              { id: 'vip', label: "VIP a'zolik", icon: Crown, ring: 'focus:ring-secondary' },
+              { id: 'b2b', label: 'B2B Wholesale', icon: Building2, ring: 'focus:ring-secondary' },
+            ],
+          },
+          {
+            label: 'Boshqa',
+            tabs: [
+              { id: 'reviews', label: 'Sharhlarim', icon: MessageSquare },
+              { id: 'exchange', label: 'Obuna almashish', icon: Repeat, ring: 'focus:ring-secondary' },
+              { id: 'settings', label: 'Sozlamalar', icon: Settings, ring: 'focus:ring-secondary-container' },
+              { id: 'security', label: 'Xavfsizlik', icon: Shield, ring: 'focus:ring-secondary-container' },
+            ],
+          },
+        ];
+        return (
+          <div className="space-y-2.5 mb-8 p-3 bg-primary-container/40 border border-outline-variant/20 rounded-2xl">
+            {PROFILE_TAB_GROUPS.map(group => (
+              <div key={group.label} className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-on-primary-container/40 w-full sm:w-auto sm:min-w-[80px] shrink-0">
+                  {group.label}
+                </span>
+                {group.tabs.map(tab => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-xl flex items-center gap-1.5 whitespace-nowrap transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background ${tab.ring || 'focus:ring-secondary-container'} ${
+                        isActive
+                          ? 'bg-secondary-container text-on-secondary-fixed shadow-md'
+                          : 'bg-surface-container text-on-primary-container hover:bg-white/10 border border-white/5'
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      {tab.label}
+                      {!!tab.count && (
+                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] leading-none ${isActive ? 'bg-on-secondary-fixed/20' : 'bg-secondary/20 text-secondary'}`}>
+                          {tab.count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Content Area */}
       {activeTab === 'b2b' && (
@@ -716,13 +833,17 @@ export default function ProfilePage({
         />
       )}
 
+      {activeTab === 'exchange' && (
+        <ProfileExchangeTab />
+      )}
+
       {/* TOP Boost Modal */}
       {topModal.isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="glass-card w-full max-w-md p-8 rounded-2xl border-secondary-container/30 space-y-6 shadow-2xl relative overflow-hidden">
             <button 
               onClick={() => setTopModal({ ...topModal, isOpen: false })}
-              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-all text-white focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
+              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-all text-on-primary-container focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface"
               aria-label="Yopish"
             >
               <X className="w-5 h-5" />
@@ -730,7 +851,7 @@ export default function ProfilePage({
 
             <div className="text-center space-y-2">
               <ArrowUpCircle className="w-10 h-10 text-secondary-container mx-auto" />
-              <h3 className="text-2xl font-black text-white">Elonni TOPga chiqarish</h3>
+              <h3 className="text-2xl font-black text-on-primary-container">Elonni TOPga chiqarish</h3>
               <p className="text-xs text-on-primary-container">"{topModal.startupName}"</p>
             </div>
 
@@ -745,7 +866,7 @@ export default function ProfilePage({
                       className={`py-2 rounded-xl border font-bold text-xs transition-all focus:outline-none focus:ring-2 focus:ring-secondary-container ${
                         boostDays === d 
                           ? 'bg-secondary-container text-on-secondary-fixed border-secondary-container' 
-                          : 'bg-white/5 border-white/10 text-white hover:bg-white/10'
+                          : 'bg-white/5 border-white/10 text-on-primary-container hover:bg-white/10'
                       }`}
                     >
                       {d} kun
@@ -756,7 +877,7 @@ export default function ProfilePage({
                   type="number"
                   value={boostDays}
                   onChange={(e) => setBoostDays(Math.min(365, Math.max(1, parseInt(e.target.value) || 1)))}
-                  className="w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-mono font-bold outline-none focus:outline-none focus:ring-2 focus:ring-secondary-container focus:ring-offset-2 focus:ring-offset-surface"
+                  className="w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-on-primary-container font-mono font-bold outline-none focus:outline-none focus:ring-2 focus:ring-secondary-container focus:ring-offset-2 focus:ring-offset-surface"
                   placeholder="Boshqa kun..."
                 />
               </div>
@@ -831,7 +952,9 @@ export default function ProfilePage({
           editRole={editRole}
           isSavingSettings={isSavingSettings}
           linkCode={linkCode}
+          linkCodeSecondsLeft={linkCodeSecondsLeft}
           generateLinkCode={generateLinkCode}
+          onToggleTelegramBroadcastOptOut={handleToggleTelegramBroadcastOptOut}
         />
       )}
 

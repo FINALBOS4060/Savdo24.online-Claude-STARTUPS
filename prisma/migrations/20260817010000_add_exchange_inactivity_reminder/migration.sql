@@ -1,0 +1,24 @@
+-- TUZATISH (tizim tekshiruvi paytida topildi): prisma/schema.prisma va
+-- schema.sqlite.prisma'da ExchangeChannel.lastInactivityReminderAt maydoni
+-- ANCHADAN buyon mavjud edi (GET /api/telegram/exchange/inactivity-reminder-report
+-- endpointi buni ishlatadi — "kanal qo'shdi-yu, o'zi hech kimga obuna
+-- bo'lmadi" degan yumshoq eslatma uchun), LEKIN bu ustunni bazaga
+-- qo'shadigan migratsiya fayli HECH QACHON yaratilmagan edi.
+--
+-- Natijada production bazasida bu ustun UMUMAN yo'q edi — shu ustunni
+-- o'qishga/yozishga urinadigan HAR BIR so'rov (soatlik cron: "30 * * * *"
+-- orqali chaqiriladigan /inactivity-reminder-report, shuningdek
+-- /summary va boshqa ExchangeChannel'ni to'liq o'qiydigan endpointlar)
+-- Prisma xatosi bilan yiqilardi — ya'ni "obunachi yig'ish" tizimidagi
+-- faollikni rag'batlantiruvchi eslatma funksiyasi jimgina umuman
+-- ishlamas edi (xato faqat serverning o'z log'ida ko'rinardi, adminga
+-- ham, foydalanuvchiga ham hech narsa ko'rinmasdi).
+--
+-- Bu xuddi avvalgi "Payment.updatedAt" bugi bilan bir xil turkumdagi
+-- muammo (schema.prisma'da yozib qo'yilgan-u, migratsiyasi unutilgan
+-- maydon) — shu sabab boshqa barcha ExchangeChannel maydonlari ham shu
+-- tekshiruv paytida migratsiya fayllari bilan solishtirib chiqildi;
+-- faqat shu bittasi yetishmayotgani aniqlandi.
+
+-- AlterTable
+ALTER TABLE "ExchangeChannel" ADD COLUMN "lastInactivityReminderAt" TIMESTAMP(3);

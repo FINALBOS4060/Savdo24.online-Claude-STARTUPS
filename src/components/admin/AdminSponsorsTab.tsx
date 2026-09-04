@@ -41,7 +41,7 @@ export const AdminSponsorsTab: React.FC<AdminSponsorsTabProps> = ({
         onCancel={() => setSponsorToDeleteId(null)}
       />
       <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
-        <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4">
+        <h2 className="text-lg font-bold text-on-primary-container flex items-center gap-2 border-b border-white/5 pb-4">
           <Megaphone className="text-secondary w-5 h-5" />
           Yangi sponsor kanal qo'shish
         </h2>
@@ -54,7 +54,7 @@ export const AdminSponsorsTab: React.FC<AdminSponsorsTabProps> = ({
               placeholder="-100..."
               value={newSponsor.channelId}
               onChange={e => setNewSponsor({...newSponsor, channelId: e.target.value})}
-              className="w-full p-2.5 bg-surface-container border border-white/10 rounded-xl text-white text-xs focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/50"
+              className="w-full p-2.5 bg-surface-container border border-white/10 rounded-xl text-on-primary-container text-xs focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/50"
             />
           </div>
           <div className="space-y-1">
@@ -65,7 +65,7 @@ export const AdminSponsorsTab: React.FC<AdminSponsorsTabProps> = ({
               placeholder="savdo24_uz"
               value={newSponsor.channelUsername}
               onChange={e => setNewSponsor({...newSponsor, channelUsername: e.target.value})}
-              className="w-full p-2.5 bg-surface-container border border-white/10 rounded-xl text-white text-xs focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/50"
+              className="w-full p-2.5 bg-surface-container border border-white/10 rounded-xl text-on-primary-container text-xs focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/50"
             />
           </div>
           <div className="space-y-1">
@@ -76,7 +76,7 @@ export const AdminSponsorsTab: React.FC<AdminSponsorsTabProps> = ({
               placeholder="Savdo24 Rasmiy"
               value={newSponsor.displayName}
               onChange={e => setNewSponsor({...newSponsor, displayName: e.target.value})}
-              className="w-full p-2.5 bg-surface-container border border-white/10 rounded-xl text-white text-xs focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/50"
+              className="w-full p-2.5 bg-surface-container border border-white/10 rounded-xl text-on-primary-container text-xs focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/50"
             />
           </div>
           <div className="space-y-1">
@@ -86,7 +86,7 @@ export const AdminSponsorsTab: React.FC<AdminSponsorsTabProps> = ({
               placeholder="@user_admin"
               value={newSponsor.advertiserContact}
               onChange={e => setNewSponsor({...newSponsor, advertiserContact: e.target.value})}
-              className="w-full p-2.5 bg-surface-container border border-white/10 rounded-xl text-white text-xs focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/50"
+              className="w-full p-2.5 bg-surface-container border border-white/10 rounded-xl text-on-primary-container text-xs focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/50"
             />
           </div>
           <div className="space-y-1">
@@ -96,7 +96,7 @@ export const AdminSponsorsTab: React.FC<AdminSponsorsTabProps> = ({
               placeholder="10"
               value={newSponsor.pricePerMonth}
               onChange={e => setNewSponsor({...newSponsor, pricePerMonth: e.target.value})}
-              className="w-full p-2.5 bg-surface-container border border-white/10 rounded-xl text-white text-xs focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/50"
+              className="w-full p-2.5 bg-surface-container border border-white/10 rounded-xl text-on-primary-container text-xs focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/50"
             />
           </div>
           <div className="space-y-1">
@@ -105,7 +105,7 @@ export const AdminSponsorsTab: React.FC<AdminSponsorsTabProps> = ({
               type="date"
               value={newSponsor.startDate}
               onChange={e => setNewSponsor({...newSponsor, startDate: e.target.value})}
-              className="w-full p-2.5 bg-surface-container border border-white/10 rounded-xl text-white text-xs focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/50"
+              className="w-full p-2.5 bg-surface-container border border-white/10 rounded-xl text-on-primary-container text-xs focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/50"
             />
           </div>
           <div className="space-y-1">
@@ -114,7 +114,7 @@ export const AdminSponsorsTab: React.FC<AdminSponsorsTabProps> = ({
               type="date"
               value={newSponsor.endDate}
               onChange={e => setNewSponsor({...newSponsor, endDate: e.target.value})}
-              className="w-full p-2.5 bg-surface-container border border-white/10 rounded-xl text-white text-xs focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/50"
+              className="w-full p-2.5 bg-surface-container border border-white/10 rounded-xl text-on-primary-container text-xs focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/50"
             />
           </div>
           <div className="flex gap-2 items-end">
@@ -130,7 +130,7 @@ export const AdminSponsorsTab: React.FC<AdminSponsorsTabProps> = ({
       </div>
 
       <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl">
-        <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4 mb-6">
+        <h2 className="text-lg font-bold text-on-primary-container flex items-center gap-2 border-b border-white/5 pb-4 mb-6">
           <List className="text-secondary w-5 h-5" />
           Mavjud sponsor kanallar ({sponsorChannels.length})
         </h2>
@@ -148,7 +148,7 @@ export const AdminSponsorsTab: React.FC<AdminSponsorsTabProps> = ({
             <tbody className="divide-y divide-white/5 text-gray-300">
               {sponsorChannels.map((chan) => (
                 <tr key={chan.id} className="hover:bg-white/5 transition-colors">
-                  <td className="py-3.5 px-4 font-bold text-white">{chan.displayName || chan.title}</td>
+                  <td className="py-3.5 px-4 font-bold text-on-primary-container">{chan.displayName || chan.title}</td>
                   <td className="py-3.5 px-4 text-on-primary-container">@{chan.channelUsername || chan.username}</td>
                   <td className="py-3.5 px-4">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase ${chan.isActive ? 'bg-success-container/10 text-success border border-success/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>

@@ -20,7 +20,7 @@ export default function MobileNav({
 }: MobileNavProps) {
   const tabs: Array<{ id: string; label: string; icon: string; view?: string; isCenter?: boolean; fillIcon?: boolean; toast?: string }> = [
     { id: 'browse', label: 'Asosiy', icon: 'home', view: 'browse' },
-    { id: 'ideas-rating', label: 'G\'oyalar', icon: 'emoji_events', view: 'ideas-rating' },
+    { id: 'ideas-rating', label: 'Loyihalar', icon: 'emoji_events', view: 'ideas-rating' },
     { id: 'post', label: 'E\'lon', icon: 'add_box', view: 'sell', isCenter: true },
     { id: 'portfolio', label: 'Saqlanganlar', icon: 'bookmark' },
     { id: 'profile', label: 'Profil', icon: 'person', view: 'profile', fillIcon: true }
@@ -89,7 +89,7 @@ export default function MobileNav({
             className={`flex flex-col items-center justify-center transition-all ${
               isActive
                 ? 'text-secondary-container font-bold scale-105'
-                : 'text-on-primary-container hover:text-white'
+                : 'text-on-primary-container hover:text-on-primary-container'
             }`}
           >
             {renderIcon(tab.icon, isActive)}

@@ -1,5 +1,5 @@
 import { Router, Response } from "express";
-import { PUBLIC_USER_SELECT } from "../lib/pure-helpers";
+import { PUBLIC_USER_SELECT, APP_TIMEZONE, formatDateInTimezone, getStartOfDayInTimezone } from "../lib/pure-helpers";
 import { logger } from "../lib/logger";
 // 120-bosqich (server.ts modullashtirish, ARXITEKTURA 3-band): bu fayl
 // server.ts'dan ko'chirildi (GET /api/admin/audit-logs va GET /api/admin/stats).
@@ -40,7 +40,7 @@ router.get("/audit-logs", authenticateToken, requireAdmin, async (req: AuthReque
       page,
       totalPages: Math.ceil(total / safeLimit)
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error({ err }, "Get audit logs error");
     res.status(500).json({ error: "Audit loglarni olishda xatolik yuz berdi." });
   }
@@ -126,9 +126,88 @@ router.get("/stats", authenticateToken, requireAdmin, async (req: AuthRequest, r
         envWarnings: (process.env.NODE_ENV === "production" && !coingateTokenConfigured) ? ["To'lov tizimi sozlanmagan (COINGATE_API_TOKEN topilmadi)"] : []
       }
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error({ err }, "Get stats error");
     res.status(500).json({ error: "Statistikani olishda xatolik yuz berdi." });
+  }
+});
+
+// GET /api/admin/telegram-stats — Bot faolligi statistikasi (4-so'rov: Admin
+// Dashboard uchun). Nechta ulangan foydalanuvchi, bugungi harakatlar soni,
+// eng ko'p ishlatilgan funksiyalar va oxirgi 7 kunlik faollik grafigi.
+// Hodisalar src/routes/telegram-integration.ts'dagi POST /api/telegram/track-event
+// orqali botning o'zi tomonidan AnalyticsEvent(source="telegram_bot")
+// sifatida yoziladi.
+router.get("/telegram-stats", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const now = new Date();
+    // TUZATISH: kun chegaralari endi server protsessining mahalliy vaqt
+    // zonasiga (UTC bo'lishi ham, boshqa narsa bo'lishi ham mumkin edi)
+    // emas, doim belgilangan APP_TIMEZONE'ga (Asia/Tashkent) nisbatan
+    // hisoblanadi — qarang: src/lib/pure-helpers.ts. Bu "Bugun" ko'rsatkichi
+    // va 7 kunlik grafikning haqiqiy mahalliy kunlarga mos kelishini
+    // ta'minlaydi, server qanday TZ'da ishga tushirilishidan qat'iy nazar.
+    const todayStart = getStartOfDayInTimezone(now, APP_TIMEZONE);
+    // Asia/Tashkent doimiy UTC+5 (yozgi vaqtga o'tish yo'q) bo'lgani uchun
+    // aniq 24 soatlik qadamlar bilan orqaga surish xavfsiz — DST bo'lgan
+    // zonalarda bu taxminni qayta ko'rib chiqish kerak bo'lardi.
+    const sevenDaysAgoStart = new Date(todayStart.getTime() - 6 * 24 * 60 * 60 * 1000);
+
+    // TUZATISH: "obunachi yig'ish" boti (telegram-bot/subscriber-bot/
+    // index.ts) o'z hodisalarini (subscriber_bot_start,
+    // subscriber_bot_gate_passed) bir xil "telegram_bot" source ostida
+    // yozadi — shu sabab pastdagi topFeatures/actionsToday ichida
+    // ko'rinardi, lekin alohida "necha kishi /start bosdi, nechtasi
+    // obuna bo'lib o'tdi" konversiya ko'rsatkichi yo'q edi. Endi bu
+    // ikkisi (jami, hamma vaqt bo'yicha) alohida hisoblanadi.
+    const [linkedUsersCount, eventsToday, topEventsRaw, recentEvents, subscriberBotStarts, subscriberBotGatePassed] = await Promise.all([
+      prisma.user.count({ where: { telegramUserId: { not: null } } }),
+      prisma.analyticsEvent.count({ where: { source: "telegram_bot", createdAt: { gte: todayStart } } }),
+      prisma.analyticsEvent.groupBy({
+        by: ["event"],
+        where: { source: "telegram_bot", createdAt: { gte: sevenDaysAgoStart } },
+        _count: { event: true },
+        orderBy: { _count: { event: "desc" } },
+        take: 6
+      }),
+      // SQLite (lokal) va PostgreSQL (production) orasida mos keladigan sanaga
+      // ko'ra guruhlash uchun xom SQL o'rniga sodda JS guruhlash ishlatiladi —
+      // 7 kunlik oyna kichik hajmda bo'lgani uchun bu yetarlicha samarali.
+      prisma.analyticsEvent.findMany({
+        where: { source: "telegram_bot", createdAt: { gte: sevenDaysAgoStart } },
+        select: { createdAt: true }
+      }),
+      prisma.analyticsEvent.count({ where: { source: "telegram_bot", event: "subscriber_bot_start" } }),
+      prisma.analyticsEvent.count({ where: { source: "telegram_bot", event: "subscriber_bot_gate_passed" } })
+    ]);
+
+    const dailyCounts = new Map<string, number>();
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(sevenDaysAgoStart.getTime() + i * 24 * 60 * 60 * 1000);
+      dailyCounts.set(formatDateInTimezone(d, APP_TIMEZONE), 0);
+    }
+    for (const e of recentEvents) {
+      // TUZATISH: ilgari `toISOString().slice(0,10)` (har doim UTC) bilan
+      // guruhlanardi — endi yuqoridagi kunlar bilan bir xil TZ (Asia/Tashkent)
+      // bo'yicha, shuning uchun kalitlar har doim mos tushadi.
+      const key = formatDateInTimezone(new Date(e.createdAt), APP_TIMEZONE);
+      if (dailyCounts.has(key)) dailyCounts.set(key, (dailyCounts.get(key) || 0) + 1);
+    }
+
+    res.json({
+      linkedUsersCount,
+      actionsToday: eventsToday,
+      topFeatures: topEventsRaw.map((e: any) => ({ event: e.event, count: e._count.event })),
+      dailySeries: Array.from(dailyCounts.entries()).map(([day, count]) => ({ day, count })),
+      subscriberBotFunnel: {
+        starts: subscriberBotStarts,
+        gatePassed: subscriberBotGatePassed,
+        conversionRate: subscriberBotStarts > 0 ? Math.round((subscriberBotGatePassed / subscriberBotStarts) * 1000) / 10 : 0
+      }
+    });
+  } catch (err: unknown) {
+    logger.error({ err }, "Get telegram stats error");
+    res.status(500).json({ error: "Bot statistikasini yuklashda xatolik yuz berdi." });
   }
 });
 

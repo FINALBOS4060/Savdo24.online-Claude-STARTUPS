@@ -1,76 +1,48 @@
 # Savdo24 — Production Deployment Guide
 
-Ushbu hujjat loyihani production muhitiga muvaffaqiyatli va xavfsiz deploy qilish bo'yicha yo'riqnoma va talablarni o'z ichiga oladi.
+Ushbu hujjat loyihani production muhitiga deploy qilish bo'yicha yo'riqnoma.
 
-## 🛑 MUHIM XAVFSIZLIK TALABI (Pre-deployment Checklist)
+## ✅ Endi hammasi avtomatik
 
-Deploy qilishdan oldin albatta `.env` faylida yoki serverning muhit o'zgaruvchilarida quyidagi ikki o'zgaruvchini qo'lda va mustahkam o'rnatishingiz shart. 
+Quyidagilar endi **QO'LDA HECH NARSA QILMASDAN** avtomatik amalga oshadi:
 
-> [!WARNING]
-> **JWT_SECRET** va **ENCRYPTION_KEY** qiymatlarini hech qachon yo'qotmasligingiz kerak! Agar ushbu kalitlar o'zgarib qolsa yoki yo'qolsa:
-> 1. Tizimdagi shifrlangan barcha ma'lumotlar va sozlamalar (masalan, API kalitlari, to'lov sozlamalari va b.) **butunlay qayta tiklab bo'lmaydigan holatga keladi** (shifrdan ochib bo'lmaydi).
-> 2. Foydalanuvchilarning barcha joriy seanslari va JWT tokenlari bekor qilinadi.
+- **JWT_SECRET, ENCRYPTION_KEY, TELEGRAM_BOT_INTERNAL_SECRET** — birinchi deploy'da avtomatik xavfsiz tasodifiy qiymat bilan generatsiya qilinib `.env` fayliga yoziladi (`scripts/ensure-env-secrets.sh`). Bir marta yozilgach, keyingi HAR BIR deploy'da (yangi zip tashlaganingizda ham) xuddi shu qiymat qayta ishlatiladi — hech qachon o'zgartirilmaydi, shuning uchun foydalanuvchi sessiyalari va shifrlangan sozlamalar buzilmaydi.
+- **PostgreSQL baza va foydalanuvchi** — birinchi ishga tushirishda avtomatik yaratiladi, tasodifiy parol bilan.
+- **npm install, build, Prisma migratsiya, PM2 qayta ishga tushirish** — har safar avtomatik.
+- **Nginx + SSL (Let's Encrypt)** — domen shu serverga to'g'ri yo'naltirilgan bo'lsa, avtomatik sozlanadi.
 
-Production muhitida (`NODE_ENV=production`) agar ushbu o'zgaruvchilar o'rnatilmagan bo'lsa, **server xato berib ishga tushishdan darhol to'xtaydi** (`process.exit(1)`). Bu xavfsiz bo'lmagan avto-generatsiyaning oldini olish uchun joriy etilgan qat'iy xavfsizlik chorasidir.
+Sizga qolgan ISH: to'lov, email, Telegram, Google OAuth kabi ixtiyoriy xizmatlarning API kalitlarini **Admin panel → Sozlamalar** bo'limidan kiritish. Bular kod ichida emas, ma'lumotlar bazasida shifrlangan holda saqlanadi va serverni qayta ishga tushirmasdan yangilanadi.
 
-### 1. Kalitlarni generatsiya qilish
-
-Har bir kalit kamida **32 ta belgidan** iborat bo'lishi shart. Kalitlarni xavfsiz generatsiya qilish uchun quyidagi terminal buyruqlaridan foydalanishingiz mumkin:
+## 🚀 Birinchi marta serverga qo'yish (bitta buyruq)
 
 ```bash
-# JWT_SECRET uchun:
-openssl rand -hex 32
-
-# ENCRYPTION_KEY uchun:
-openssl rand -hex 32
+scp deploy-bootstrap.sh root@SERVER_IP:/root/savdo24/
+ssh root@SERVER_IP
+cd /root/savdo24
+bash deploy-bootstrap.sh
 ```
 
-### 2. .env faylini sozlash
+Bu skript: kerakli tizim paketlarini (Node.js, PostgreSQL, Nginx, PM2, Certbot) o'rnatadi, bazani yaratadi, `.env`dagi barcha majburiy kalitlarni generatsiya qiladi, build qiladi, migratsiyalarni qo'llaydi, PM2 orqali ishga tushiradi, Nginx+SSL sozlaydi va kelajakdagi avtomatik deploy tizimini (`deploy-watcher`) o'rnatadi. Skript idempotent — xato bo'lib qayta ishga tushirsangiz, allaqachon bajarilgan qadamlarni buzmaydi.
 
-Yaratilgan qiymatlarni `.env` fayliga yozing:
+## 🔄 Keyingi yangilanishlar (yangi kod)
 
-```env
-# Database & Auth
-DATABASE_URL="postgresql://user:password@host:5432/db_name?schema=public"
-JWT_SECRET="siz_generatsiya_qilgan_mustahkam_jwt_secret_kaliti_32_belgi"
-ENCRYPTION_KEY="siz_generatsiya_qilgan_mustahkam_shifrlash_kaliti_32_belgi"
+deploy-watcher o'rnatilgach, yangilanish uchun FAQAT shu kerak:
+
+```bash
+scp My_Projekt.zip root@SERVER_IP:/root/deploy-incoming/
 ```
 
----
+Zip serverga tushishi bilan avtomatik: joriy versiya zaxiralanadi → `.env`/`uploads/` saqlab qolinadi → majburiy kalitlar tekshiriladi (yo'q bo'lsa to'ldiriladi, bor bo'lsa tegilmaydi) → `npm install` → `npm run build` → Prisma migratsiya → PM2 qayta ishga tushadi → sog'lomlik tekshiruvi. Har qanday bosqichda xato chiqsa — avtomatik ROLLBACK qilinadi va (agar Telegram bot sozlangan bo'lsa) xabar keladi.
 
-## 🚀 Deploy Bosqichlari (PM2 & Git yordamida)
-
-Loyiha serverda `deploy.sh` skripti orqali deploy qilinadi.
-
-1. **Serverga ulaning va loyiha papkasiga o'ting:**
-   ```bash
-   cd /var/www/savdo24
-   ```
-
-2. **Deploy skriptini ishga tushiring:**
-   ```bash
-   ./deploy.sh
-   ```
-
-   `deploy.sh` quyidagi amallarni avtomatik bajaradi:
-   - Git orqali oxirgi o'zgarishlarni yuklaydi (`git pull`).
-   - Bazaning zaxira nusxasini oladi (`npm run backup`).
-   - Barcha dependencies yuklanadi (`npm install`).
-   - Frontend build qilinadi (`npm run build`).
-   - Prisma migratsiyalari yoki db push qo'llaniladi (`npx prisma db push`).
-   - PM2 orqali backend va bot jarayonlari qayta ishga tushiriladi (`pm2 reload all`).
-
----
+Muqobil variant — serverda git orqali ishlayotgan bo'lsangiz, `./deploy.sh` xuddi shu tekshiruvlar bilan ishlaydi (`git pull` → kalitlarni tekshirish → build → migratsiya → PM2 restart).
 
 ## 🛠️ Nosozliklarni aniqlash (Troubleshooting)
 
-Agar server ishga tushmayotgan bo'lsa, PM2 loglarini tekshiring:
-
 ```bash
-pm2 logs savdo24-backend
+pm2 logs savdo24                                  # jonli loglar
+journalctl -u savdo24-deploy-watcher -f           # deploy-watcher jonli logi
+tail -f /var/log/savdo24-deploy.log               # deploy tarixi
+systemctl status savdo24-deploy-watcher           # watcher xizmati holati
 ```
 
-Agar xatoliklar orasida quyidagi yozuvni ko'rsangiz:
-`❌ XATOLIK: Production muhitida "JWT_SECRET" o'zgaruvchisi sozlanmagan...`
-
-Bu sizning `.env` faylingiz to'g'ri o'qilmaganini yoki kalitlar yetarlicha uzun emasligini ko'rsatadi. `.env` faylini tekshiring, undagi bo'shliqlarni olib tashlang va kalitlar uzunligi kamida 32 ta belgidan iborat ekaniga ishonch hosil qiling.
+Agar ilova ishlamasa, avvalo `pm2 status` orqali holatini, keyin `pm2 logs savdo24 --lines 100` orqali oxirgi xatoni tekshiring. Deploy muvaffaqiyatsiz bo'lsa, watcher avtomatik oldingi versiyaga qaytaradi — sayt hech qachon "yarim buzilgan" holatda qolmaydi.

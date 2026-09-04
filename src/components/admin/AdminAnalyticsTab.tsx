@@ -18,7 +18,7 @@ export const AdminAnalyticsTab: React.FC<AdminAnalyticsTabProps> = ({
   return (
     <div className="space-y-8 animate-fade-in">
       <div className="flex justify-between items-center bg-surface-container/80 p-4 rounded-2xl border border-white/5">
-        <h2 className="text-xl font-black text-white">Platforma Analitikasi</h2>
+        <h2 className="text-xl font-black text-on-primary-container">Platforma Analitikasi</h2>
         <div className="flex gap-2">
           {(['day', 'week', 'month'] as const).map((p) => (
             <button
@@ -49,8 +49,8 @@ export const AdminAnalyticsTab: React.FC<AdminAnalyticsTabProps> = ({
             <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={analytics.dailyRevenue.map((d: any) => ({
-                  date: new Date(d.createdAt).toLocaleDateString(),
-                  amount: d._sum.platformFeeAmount || 0
+                  date: new Date(d.date).toLocaleDateString(),
+                  amount: d.amount || 0
                 }))}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.1)" vertical={false} />
                   <XAxis dataKey="date" stroke="var(--color-on-primary-container)" fontSize={10} tickLine={false} axisLine={false} />

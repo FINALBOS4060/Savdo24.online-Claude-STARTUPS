@@ -9,7 +9,7 @@ import {
   requireAdmin, 
   AuthRequest 
 } from "../lib/context";
-import { escapeHtml } from "../lib/pure-helpers";
+import { escapeHtml, getErrorCode } from "../lib/pure-helpers";
 import { supportLimiter, reportLimiter } from "../lib/rateLimiters";
 
 const router = Router();
@@ -75,7 +75,7 @@ router.post("/support", supportLimiter, async (req: Request, res: Response) => {
     );
 
     res.json({ success: true, message: "Xabaringiz muvaffaqiyatli yuborildi. Tez orada siz bilan bog'lanamiz." });
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error({ err }, "Support ticket error");
     res.status(500).json({ error: "Xabarni yuborishda xatolik yuz berdi." });
   }
@@ -88,7 +88,7 @@ router.post("/support", supportLimiter, async (req: Request, res: Response) => {
 // olib tashlandi (94-band bilan bir xil turdagi tozalash).
 
 // GET /api/admin/support-tickets
-router.get("/admin/support-tickets", authenticateToken, requireAdmin, async (req, res) => {
+router.get("/admin/support-tickets", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const tickets = await prisma.supportTicket.findMany({
       orderBy: { createdAt: 'desc' }
@@ -101,7 +101,7 @@ router.get("/admin/support-tickets", authenticateToken, requireAdmin, async (req
 });
 
 // PATCH /api/admin/support-tickets/:id/status
-router.patch("/admin/support-tickets/:id/status", authenticateToken, requireAdmin, async (req, res) => {
+router.patch("/admin/support-tickets/:id/status", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   const result = statusSchema.safeParse(req.body);
   if (!result.success) {
     return res.status(400).json({ error: result.error.issues.map((e: any) => e.message).join(" ") });
@@ -115,7 +115,7 @@ router.patch("/admin/support-tickets/:id/status", authenticateToken, requireAdmi
 
     // Boshqa admin amallari kabi (reports, users va h.k.) bu o'zgarish ham
     // audit logga yozilishi kerak — avval bu yerda unutilgan edi.
-    const adminUser = (req as any).user;
+    const adminUser = req.user;
     await prisma.auditLog.create({
       data: {
         adminId: adminUser?.id || 0,
@@ -132,6 +132,69 @@ router.patch("/admin/support-tickets/:id/status", authenticateToken, requireAdmi
     res.json(ticket);
   } catch (err) {
     logger.error({ err }, "Update ticket error");
+    res.status(500).json({ error: "Xatolik yuz berdi." });
+  }
+});
+
+// POST /api/support/tickets/:id/reply — Admin murojaatga javob yozadi va
+// foydalanuvchiga email orqali yuboradi
+const replySchema = z.object({
+  message: z.string().min(1, "Xato: Javob matni bo'sh bo'lishi mumkin emas.")
+});
+
+router.post("/support/tickets/:id/reply", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+  const result = replySchema.safeParse(req.body);
+  if (!result.success) {
+    return res.status(400).json({ error: result.error.issues.map((e: any) => e.message).join(" ") });
+  }
+
+  try {
+    const existing = await prisma.supportTicket.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      return res.status(404).json({ error: "Murojaat topilmadi." });
+    }
+
+    const ticket = await prisma.supportTicket.update({
+      where: { id: req.params.id },
+      data: {
+        adminReply: result.data.message,
+        repliedAt: new Date(),
+        status: "closed"
+      }
+    });
+
+    const safeReply = escapeHtml(result.data.message).replace(/\n/g, "<br>");
+    const safeSubject = escapeHtml(existing.subject);
+    await sendEmail(
+      existing.email,
+      `Savdo24 — Murojaatingizga javob: ${existing.subject}`,
+      `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
+         <h2>Assalomu alaykum!</h2>
+         <p>Sizning <b>"${safeSubject}"</b> mavzusidagi murojaatingizga javob berildi:</p>
+         <div style="background:#f5f5f5;padding:16px;border-radius:8px;margin:16px 0;">${safeReply}</div>
+         <p style="color:#888;font-size:13px;">Savdo24.online jamoasi</p>
+       </div>`
+    ).catch((emailErr: any) => {
+      logger.error({ err: emailErr }, "Support javobini email orqali yuborishda xatolik");
+    });
+
+    const adminUser = req.user;
+    await prisma.auditLog.create({
+      data: {
+        adminId: adminUser?.id || 0,
+        adminEmail: adminUser?.email,
+        action: "reply_support_ticket",
+        targetType: "SupportTicket",
+        targetId: String(ticket.id),
+        details: `Support ticket javob berildi va yopildi`
+      }
+    }).catch((auditErr: any) => {
+      logger.error({ err: auditErr }, "Audit log yozishda xatolik (support reply)");
+    });
+
+    res.json(ticket);
+  } catch (err) {
+    logger.error({ err }, "Reply to support ticket error");
     res.status(500).json({ error: "Xatolik yuz berdi." });
   }
 });
@@ -184,12 +247,12 @@ router.post("/reports", authenticateToken, reportLimiter, async (req: AuthReques
     );
 
     res.status(201).json(report);
-  } catch (err: any) {
+  } catch (err: unknown) {
     // Yangi qo'shilgan @@unique([reporterId, targetId, targetType]) cheklovi
     // poyga holatida (ikkita bir vaqtdagi so'rov) ishga tushishi mumkin —
     // bu holatda ham foydalanuvchiga tushunarli xabar ko'rsatamiz, xom 500
     // xatosi emas.
-    if (err?.code === "P2002") {
+    if (getErrorCode(err) === "P2002") {
       return res.status(409).json({ error: "Siz ushbu e'lon yoki izoh bo'yicha allaqachon shikoyat qoldirgansiz." });
     }
     logger.error({ err }, "Create report error");

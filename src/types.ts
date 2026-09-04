@@ -60,6 +60,8 @@ export interface UserProfileData {
   avatarUrl: string;
   coverUrl?: string;
   telegramLinkCode?: string;
+  telegramLinked?: boolean;
+  telegramBroadcastOptOut?: boolean;
   averageRating?: number;
   totalReviews?: number;
 }
@@ -69,6 +71,13 @@ export interface Category {
   name: string;
   icon: string;
   fields: any[];
+  status?: 'active' | 'pending';
+  proposedByUserId?: number | null;
+  proposedByUser?: { id: number; name: string; email: string } | null;
+  createdAt?: string;
+  // Faqat GET /api/categories javobida keladi (admin ro'yxatida yo'q) —
+  // shu kategoriyadagi FAOL e'lonlar soni.
+  listingCount?: number;
 }
 
 export interface Notification {
@@ -81,7 +90,7 @@ export interface Notification {
   createdAt: string;
 }
 
-export type ProfileTab = 'startups' | 'saved' | 'purchases' | 'earnings' | 'reviews' | 'settings' | 'security' | 'vip' | 'referral' | 'b2b';
+export type ProfileTab = 'startups' | 'saved' | 'purchases' | 'earnings' | 'reviews' | 'settings' | 'security' | 'vip' | 'referral' | 'b2b' | 'exchange';
 
 export interface Idea {
   id: number;

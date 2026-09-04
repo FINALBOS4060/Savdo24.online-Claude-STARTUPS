@@ -34,7 +34,7 @@ export const AdminReportsTab: React.FC<AdminReportsTabProps> = ({
 }) => {
   return (
     <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
-      <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4">
+      <h2 className="text-lg font-bold text-on-primary-container flex items-center gap-2 border-b border-white/5 pb-4">
         <Flag className="text-red-500 w-5 h-5" />
         Foydalanuvchilar shikoyatlari (Shikoyatlar) ({reports.length})
       </h2>
@@ -65,7 +65,7 @@ export const AdminReportsTab: React.FC<AdminReportsTabProps> = ({
                       </span>
                       <span className="text-on-primary-container text-xs">ID: {report.targetId}</span>
                     </div>
-                    <h4 className="text-white font-black text-sm">
+                    <h4 className="text-on-primary-container font-black text-sm">
                       {report.targetType === 'startup' 
                         ? (reportedStartup ? `Loyiha: ${reportedStartup.name}` : `Noma'lum Loyiha (ID: ${report.targetId})`)
                         : report.targetType === 'user'
@@ -78,7 +78,7 @@ export const AdminReportsTab: React.FC<AdminReportsTabProps> = ({
                   <div className="flex items-center gap-2">
                     <span className={`text-xs font-extrabold uppercase px-2.5 py-1 rounded-lg border ${
                       report.status === 'pending'
-                        ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
+                        ? 'bg-secondary/10 text-secondary border-secondary/20'
                         : report.status === 'reviewed'
                         ? 'bg-success-container/10 text-success border-success/20'
                         : 'bg-gray-500/10 text-gray-400 border-gray-500/20'
@@ -91,7 +91,7 @@ export const AdminReportsTab: React.FC<AdminReportsTabProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                   <div className="space-y-1 bg-surface-container p-3.5 rounded-xl border border-white/5">
                     <span className="text-secondary font-bold uppercase text-xs tracking-wider block">Shikoyat sababi</span>
-                    <p className="text-white font-extrabold">"{report.reason}"</p>
+                    <p className="text-on-primary-container font-extrabold">"{report.reason}"</p>
                     <p className="text-on-primary-container text-xs mt-1.5">{formatDateTime(report.createdAt)}</p>
                   </div>
 
@@ -118,7 +118,7 @@ export const AdminReportsTab: React.FC<AdminReportsTabProps> = ({
                         <button
                           onClick={() => handleReportStatusChange(report.id, 'dismissed')}
                           disabled={updatingReportId === report.id || isDeletingReportedItem === report.id}
-                          className="px-3 py-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 disabled:opacity-50 font-bold text-xs rounded-lg transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
+                          className="px-3 py-2 bg-white/5 hover:bg-white/10 text-on-primary-container border border-white/10 disabled:opacity-50 font-bold text-xs rounded-lg transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
                         >
                           <X className="w-3.5 h-3.5" />
                           Inkor etish (Rad etish)
@@ -133,7 +133,7 @@ export const AdminReportsTab: React.FC<AdminReportsTabProps> = ({
                         setActiveTab('users');
                         setUsersSearch(report.targetId);
                       }}
-                      className="px-3 py-2 bg-white/5 text-white border border-white/10 hover:bg-white/10 font-black text-xs rounded-lg transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
+                      className="px-3 py-2 bg-white/5 text-on-primary-container border border-white/10 hover:bg-white/10 font-black text-xs rounded-lg transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
                     >
                       <Search className="w-3.5 h-3.5" />
                       Foydalanuvchini ko'rish

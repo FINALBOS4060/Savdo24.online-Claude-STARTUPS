@@ -79,7 +79,7 @@ export default function Navbar({
       <div className="flex items-center gap-8">
         <span
           onClick={() => setView('browse')}
-          className="text-2xl font-black text-secondary-container tracking-tight cursor-pointer select-none"
+          className="font-display text-2xl font-bold text-secondary-container tracking-tight cursor-pointer select-none"
         >
           Savdo24
         </span>
@@ -102,14 +102,8 @@ export default function Navbar({
                 : 'text-on-primary-container hover:text-secondary-container'
             }`}
           >
-            <Trophy className="w-4 h-4 text-yellow-400" />
-            G'oyalar reytingi
-          </button>
-          <button
-            onClick={() => setView('browse')}
-            className="font-semibold text-sm text-on-primary-container hover:text-secondary-container transition-colors"
-          >
-            Kategoriyalar
+            <Trophy className="w-4 h-4 text-secondary" />
+            Loyihalar reytingi
           </button>
           <button
             onClick={() => setView('profile')}
@@ -136,7 +130,7 @@ export default function Navbar({
           <Search className="w-4 h-4 text-on-primary-container shrink-0" />
           <input
             type="text"
-            className="bg-transparent border-none text-white focus:ring-0 text-sm w-48 placeholder-on-primary-container focus:outline-none ml-1"
+            className="bg-transparent border-none text-on-primary-container focus:ring-0 text-sm w-48 placeholder-on-primary-container placeholder:opacity-60 focus:outline-none ml-1"
             placeholder="Loyiha va g'oyalarni qidirish..."
             value={localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
@@ -147,10 +141,10 @@ export default function Navbar({
           href="https://t.me/Dasturchilar_Python_JS_HTML_CSS"
           target="_blank"
           rel="noopener noreferrer"
-          className="p-2 text-on-primary-container hover:text-secondary-container transition-colors rounded-lg bg-white/5 hidden sm:flex"
-          title="Telegram guruh"
+          className="p-2.5 text-on-primary-container hover:text-secondary-container transition-colors rounded-lg bg-white/5 hidden sm:flex"
+          aria-label="Telegram guruh" title="Telegram guruh"
         >
-          <Send className="w-4 h-4" />
+          <Send className="w-5 h-5" />
         </a>
 
         {/* MUHIM: MessagesPage /messages yo'lida mavjud edi, lekin uni ochish uchun
@@ -159,12 +153,12 @@ export default function Navbar({
         {user.name !== 'Mehmon' && (
           <button
             onClick={() => setView('messages')}
-            className={`p-2 transition-colors rounded-lg bg-white/5 ${
+            className={`p-2.5 transition-colors rounded-lg bg-white/5 ${
               currentView === 'messages' ? 'text-secondary-container' : 'text-on-primary-container hover:text-secondary-container'
             }`}
             title="Xabarlar"
           >
-            <MessageCircle className="w-4 h-4" />
+            <MessageCircle className="w-5 h-5" />
           </button>
         )}
 
@@ -173,10 +167,10 @@ export default function Navbar({
           <div className="relative">
             <button
               onClick={() => setNotifDropdownOpen(!notifDropdownOpen)}
-              className="p-2 text-on-primary-container hover:text-secondary-container transition-colors rounded-lg bg-white/5 relative"
+              className="p-2.5 text-on-primary-container hover:text-secondary-container transition-colors rounded-lg bg-white/5 relative"
               title="Bildirishnomalar"
             >
-              <Bell className="w-4 h-4" />
+              <Bell className="w-5 h-5" />
               {unreadCount > 0 && (
                 <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
                   {unreadCount > 9 ? '9+' : unreadCount}
@@ -185,9 +179,9 @@ export default function Navbar({
             </button>
 
             {notifDropdownOpen && (
-              <div className="absolute right-0 mt-3 w-80 bg-primary-container border border-outline-variant/30 rounded-2xl shadow-2xl z-[60] overflow-hidden animate-fade-in">
+              <div className="absolute right-0 mt-3 w-80 max-w-[calc(100vw-2rem)] bg-primary-container border border-outline-variant/30 rounded-2xl shadow-2xl z-[60] overflow-hidden animate-fade-in">
                 <div className="p-4 border-b border-outline-variant/10 flex justify-between items-center bg-white/5">
-                  <h3 className="text-sm font-bold text-white">Bildirishnomalar</h3>
+                  <h3 className="text-sm font-bold text-on-primary-container">Bildirishnomalar</h3>
                   {unreadCount > 0 && (
                     <button
                       onClick={markAllAsRead}
@@ -204,46 +198,56 @@ export default function Navbar({
                       <p className="text-xs text-on-primary-container">Hozircha bildirishnomalar yo'q</p>
                     </div>
                   ) : (
-                    notifications.map((notif) => (
-                      <div
-                        key={notif.id}
-                        onClick={async () => {
-                          if (!notif.isRead) await markAsRead(notif.id);
-                          
-                          if (notif.link) {
-                            setNotifDropdownOpen(false);
-                            
-                            if (notif.link.startsWith('/startup/')) {
-                              const startupId = notif.link.split('/')[2];
-                              if (setSelectedStartupId) setSelectedStartupId(startupId);
-                              setView('detail');
+                    notifications.map((notif) => {
+                      const openNotification = async () => {
+                        if (!notif.isRead) await markAsRead(notif.id);
+
+                        if (notif.link) {
+                          setNotifDropdownOpen(false);
+
+                          if (notif.link.startsWith('/startup/')) {
+                            const startupId = notif.link.split('/')[2];
+                            if (setSelectedStartupId) setSelectedStartupId(startupId);
+                            setView('detail');
+                          } else {
+                            // MUHIM: server ba'zi bildirishnomalarni `/profile?tab=sales`
+                            // kabi query-param bilan yuboradi, lekin bu param hech qayerda
+                            // o'qilmasdi — bosilganda doim standart tabga tushirardi.
+                            // Endi `tab` qiymati o'qilib, setProfileTab chaqiriladi.
+                            const [rawPath, query] = notif.link.replace(/^\//, '').split('?');
+                            if (rawPath === 'profile' && query && setProfileTab) {
+                              const tab = new URLSearchParams(query).get('tab');
+                              if (tab) setProfileTab(tab as ProfileTab);
+                              setView(rawPath);
                             } else {
-                              // MUHIM: server ba'zi bildirishnomalarni `/profile?tab=sales`
-                              // kabi query-param bilan yuboradi, lekin bu param hech qayerda
-                              // o'qilmasdi — bosilganda doim standart tabga tushirardi.
-                              // Endi `tab` qiymati o'qilib, setProfileTab chaqiriladi.
-                              const [rawPath, query] = notif.link.replace(/^\//, '').split('?');
-                              if (rawPath === 'profile' && query && setProfileTab) {
-                                const tab = new URLSearchParams(query).get('tab');
-                                if (tab) setProfileTab(tab as ProfileTab);
-                                setView(rawPath);
-                              } else {
-                                // 93-band: profile'dan boshqa sahifalar (masalan AdminPage)
-                                // o'z tabini App.tsx orqali emas, to'g'ridan-to'g'ri URL
-                                // query'dan o'qiydi — shu sabab query qismini
-                                // tashlab yubormaslik kerak (avval faqat rawPath
-                                // uzatilardi, ?tab=... har doim yo'qolib ketardi).
-                                setView(rawPath + (query ? `?${query}` : ''));
-                              }
+                              // 93-band: profile'dan boshqa sahifalar (masalan AdminPage)
+                              // o'z tabini App.tsx orqali emas, to'g'ridan-to'g'ri URL
+                              // query'dan o'qiydi — shu sabab query qismini
+                              // tashlab yubormaslik kerak (avval faqat rawPath
+                              // uzatilardi, ?tab=... har doim yo'qolib ketardi).
+                              setView(rawPath + (query ? `?${query}` : ''));
                             }
                           }
+                        }
+                      };
+                      return (
+                      <div
+                        key={notif.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={openNotification}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            openNotification();
+                          }
                         }}
-                        className={`p-4 border-b border-outline-variant/5 cursor-pointer transition-colors ${
+                        className={`p-4 border-b border-outline-variant/5 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-secondary-container focus:ring-inset ${
                           !notif.isRead ? 'bg-secondary-container/5 hover:bg-secondary-container/10' : 'hover:bg-white/5'
                         }`}
                       >
                         <div className="flex justify-between items-start mb-1">
-                          <h4 className={`text-xs font-bold ${!notif.isRead ? 'text-secondary' : 'text-white'}`}>
+                          <h4 className={`text-xs font-bold ${!notif.isRead ? 'text-secondary' : 'text-on-primary-container'}`}>
                             {notif.title}
                           </h4>
                           {!notif.isRead && <div className="w-2 h-2 rounded-full bg-secondary" />}
@@ -255,7 +259,8 @@ export default function Navbar({
                           {formatDateTime(notif.createdAt)}
                         </span>
                       </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -266,11 +271,11 @@ export default function Navbar({
         {/* Dynamic Dark Mode toggle */}
         <button
           onClick={toggleTheme}
-          className="p-2 text-on-primary-container hover:text-secondary-container transition-colors rounded-lg bg-white/5"
+          className="p-2.5 text-on-primary-container hover:text-secondary-container transition-colors rounded-lg bg-white/5"
           title={isDark ? "Yorug' rejimga o'tish" : "Qorong'i rejimga o'tish"}
           aria-label={isDark ? "Yorug' rejimga o'tish" : "Qorong'i rejimga o'tish"}
         >
-          {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
         </button>
 
         <button
@@ -278,17 +283,17 @@ export default function Navbar({
           className="hidden sm:block font-semibold text-sm text-on-primary-container hover:text-secondary-container transition-colors"
         >
           <span className="flex items-center gap-1.5">
-            {user.isVip && <span title="VIP a'zo"><Crown className="w-4 h-4 text-yellow-400 fill-yellow-400" /></span>}
+            {user.isVip && <span title="VIP a'zo"><Crown className="w-4 h-4 text-secondary fill-secondary" /></span>}
             {user.name !== 'Mehmon' ? user.name : 'Kirish'}
           </span>
         </button>
 
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="md:hidden p-2 text-on-primary-container hover:text-secondary-container transition-colors"
+          className="md:hidden p-2.5 text-on-primary-container hover:text-secondary-container transition-colors"
           aria-label={mobileMenuOpen ? "Menuni yopish" : "Menuni ochish"}
         >
-          {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+          {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
       </div>
 
@@ -311,16 +316,7 @@ export default function Navbar({
             }}
             className="text-left py-2 text-secondary-container hover:text-secondary-container font-bold flex items-center gap-1.5"
           >
-            <Trophy className="w-4 h-4 text-yellow-400" /> G'oyalar reytingi
-          </button>
-          <button
-            onClick={() => {
-              setView('browse');
-              setMobileMenuOpen(false);
-            }}
-            className="text-left py-2 text-on-primary-container hover:text-secondary-container font-semibold"
-          >
-            Kategoriyalarni o'rganish
+            <Trophy className="w-4 h-4 text-secondary" /> Loyihalar reytingi
           </button>
           <button
             onClick={() => {
@@ -339,15 +335,6 @@ export default function Navbar({
             className="text-left py-2 text-on-primary-container hover:text-secondary-container font-semibold"
           >
             G'oyani ulashish
-          </button>
-          <button
-            onClick={() => {
-              setView('profile');
-              setMobileMenuOpen(false);
-            }}
-            className="text-left py-2 text-on-primary-container hover:text-secondary-container font-semibold"
-          >
-            Foydalanuvchi profili
           </button>
           <div className="border-t border-outline-variant/10 pt-4 flex justify-between items-center">
             <button

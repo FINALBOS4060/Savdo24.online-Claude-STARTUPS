@@ -11,6 +11,12 @@ dotenv.config();
 
 const prisma = new PrismaClient();
 
+// TUZATILDI (XAVFLI FALLBACK — bir xil xato scripts/backup-db.ts va
+// src/routes/admin-backup.ts'da ham topilgan): deshifrlash muvaffaqiyatsiz
+// bo'lsa, endi xom shifr matni emas, `null` qaytariladi — aks holda
+// pastda `git remote`/GitHub API chaqiruvlarida noma'lum, ishlatib
+// bo'lmaydigan qiymat haqiqiy token sifatida ishlatilib, tushunarsiz
+// xatoga olib kelishi mumkin edi.
 async function getSetting(key: string): Promise<string | null> {
   try {
     const dbSetting = await prisma.setting.findUnique({ where: { key } });
@@ -19,7 +25,8 @@ async function getSetting(key: string): Promise<string | null> {
         const decrypted = decryptSecret(dbSetting.value);
         return decrypted;
       } catch (decryptErr) {
-        return dbSetting.value; // Fallback if not encrypted
+        console.error(`[Settings] "${key}" sozlamasini deshifrlab bo'lmadi (ENCRYPTION_KEY mos kelmasligi mumkin) — Admin panel → Sozlamalar orqali qayta kiriting.`);
+        return null;
       }
     }
   } catch (err) {
@@ -38,9 +45,16 @@ export async function exportToGithub() {
   const rawName = await getSetting("BACKUP_GITHUB_NAME");
   const GITHUB_NAME = rawName || 'Savdo24 Backup Bot';
 
+  // TUZATISH (foydalanuvchi so'rovi — PM2 error-log'da doim ko'rinib,
+  // xavotir uyg'otgani sabab): bu HOLAT xato emas — GitHub'ga zaxira
+  // ixtiyoriy (optional) imkoniyat, sozlanmagan bo'lishi mumkin va
+  // funksiya buni to'g'ri, halokatsiz o'tkazib yuboradi. Shunga
+  // qaramay `console.error` ishlatilgani sabab bu PM2'ning ALOHIDA
+  // xato faylida (savdo24-error-0.log) chiqib, xuddi nimadir buzilgandek
+  // ko'rinardi. Endi backup-db.ts'dagi S3/Google Drive bilan bir xil
+  // uslubda — oddiy ma'lumot (console.log) sifatida yoziladi.
   if (!GITHUB_TOKEN || !GITHUB_REPO) {
-    console.error("Error: BACKUP_GITHUB_TOKEN or BACKUP_GITHUB_REPO is not configured in settings or .env!");
-    console.log("Skipping export to private GitHub repository.");
+    console.log("[GitHub Export] BACKUP_GITHUB_TOKEN yoki BACKUP_GITHUB_REPO sozlanmagan — GitHub'ga eksport o'tkazib yuborildi (bu ixtiyoriy zaxira manzili).");
     await prisma.$disconnect();
     return;
   }

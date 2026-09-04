@@ -3,18 +3,27 @@
 // serveridan alohida, doimiy saqlanadigan joyda ushlab turish.
 // Batafsil: README.md dagi "Ma'lumotlar xavfsizligi" bo'limiga qarang.
 
+// dotenv/config MUST be the very first import: ES module imports are
+// evaluated in declaration order (depth-first), so any local module below
+// that reads `process.env.*` at its own top level (e.g. src/lib/context.ts's
+// `isPostgres`) needs .env already loaded before it runs. Previously
+// `dotenv.config()` was called *after* `./src/lib/context` was imported,
+// which meant .env values were not yet visible to that module's top-level
+// code (masked in production only because PM2/Render inject env vars
+// directly, without relying on a .env file).
+import "dotenv/config";
+
 import express, { Request, Response, NextFunction } from "express";
 import { JwtPayload } from "./src/types";
 import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import rateLimit from "express-rate-limit";
-import { execSync } from "child_process";
+import { execSync, spawn } from "child_process";
 import helmet from "helmet";
 import cors from "cors";
 import { createServer } from "http";
 import { Server } from "socket.io";
-import { PrismaClient as PGClient } from "@prisma/client";
 import { createRequire } from 'module';
 import compression from "compression";
 const _require = typeof require !== 'undefined' ? require : createRequire(import.meta.url);
@@ -26,11 +35,9 @@ import multer from "multer";
 import sharp from "sharp";
 import QRCode from "qrcode";
 import crypto from "crypto";
-import { Bot } from "grammy";
 import nodemailer from "nodemailer";
 import Stripe from "stripe";
 import cron from "node-cron";
-import dotenv from "dotenv";
 import { logger } from "./src/lib/logger";
 import {
   prisma,
@@ -49,7 +56,8 @@ import {
   createNotification,
   trackEvent,
   getReferralCount,
-  setSocketIoInstance
+  setSocketIoInstance,
+  sendTelegramMessage
 } from "./src/lib/context";
 export {
   prisma,
@@ -69,7 +77,6 @@ export {
   trackEvent,
   getReferralCount
 };
-import { z } from "zod";
 import {
   ideaLimiter,
   upvoteLimiter,
@@ -80,12 +87,8 @@ import {
   authLimiter,
   clientErrorLimiter
 } from "./src/lib/rateLimiters";
-import { splitAmount, roundToCents, PLATFORM_FEE_PERCENT } from "./src/lib/money";
 import { CATEGORY_FIELDS } from "./src/categoryFields";
 import { createBotMetaHandler } from "./src/lib/botMetaHandler";
-
-dotenv.config();
-
 import { encryptSecret, decryptSecret } from "./src/lib/crypto";
 import { OAuth2Client } from "google-auth-library";
 
@@ -93,8 +96,38 @@ import { OAuth2Client } from "google-auth-library";
 // ko'chirildi (sof funksiyalar, DB'ga bog'liq emas — avtomatik test yozish
 // uchun). Bu yerda faqat qayta eksport qilinadi, boshqa fayllardagi
 // `from "../../server"` importlari o'zgarishsiz ishlayveradi.
-import { escapeHtml, getReferralTier, safeCompare, PUBLIC_USER_SELECT } from "./src/lib/pure-helpers";
+import { escapeHtml, getReferralTier, safeCompare, PUBLIC_USER_SELECT, getErrorMessage } from "./src/lib/pure-helpers";
 export { escapeHtml, getReferralTier, safeCompare, PUBLIC_USER_SELECT };
+
+// Route routers. These used to be `import`ed one by one, scattered right
+// before each `app.use(...)` call further down the file (originally to
+// "prevent circular dependencies" — but none of these routers import
+// anything from server.ts itself, they all get shared instances from
+// ./src/lib/context, so that risk doesn't actually apply here). Consolidated
+// to one place so the full set of mounted routers is visible at a glance;
+// the corresponding `app.use(...)` calls stay where they were, since mount
+// order still matters for middleware.
+import authRouter, { setAuthCookies } from "./src/routes/auth";
+import supportRouter from "./src/routes/support";
+import escrowRouter from "./src/routes/escrow";
+import b2bRouter, { adminB2bRouter } from "./src/routes/b2b";
+import referralsRouter, { adminReferralsRouter } from "./src/routes/referrals";
+import adminUsersRouter from "./src/routes/admin-users";
+import adminBackupRouter from "./src/routes/admin-backup";
+import adminRebuildRouter from "./src/routes/admin-rebuild";
+import startupsRouter from "./src/routes/startups";
+import topBoostVipRouter from "./src/routes/top-boost-vip";
+import { finalizeCompletedPayment } from "./src/lib/payments";
+import paymentsRouter from "./src/routes/payments";
+import telegramIntegrationRouter from "./src/routes/telegram-integration";
+import conversationsRouter from "./src/routes/conversations";
+import reviewsRouter from "./src/routes/reviews";
+import disputesRouter from "./src/routes/disputes";
+import adminAuditRouter from "./src/routes/admin-audit";
+import adminDeleteRouter from "./src/routes/admin-delete";
+import adminSettingsRouter from "./src/routes/admin-settings";
+import sponsorChannelsRouter from "./src/routes/sponsor-channels";
+import exchangeChannelsRouter, { exchangeAdminRouter, exchangeSiteRouter } from "./src/routes/exchange-channels";
 
 const ENCRYPTION_KEY = getSecret("ENCRYPTION_KEY", 32);
 
@@ -135,18 +168,6 @@ async function getDynamicGoogleClientId(): Promise<string | null> {
   if (dbId) return dbId;
   return process.env.GOOGLE_CLIENT_ID || null;
 }
-
-// GET /api/admin/cron/newsletter — Haftalik newsletter yuborish (Internal/Admin)
-app.get("/api/admin/cron/newsletter", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  await sendWeeklyNewsletter();
-  res.json({ message: "Newsletter yuborish boshlandi." });
-});
-
-// GET /api/admin/cron/escrow-release — Escrow to'lovlarini avtomatik ozod qilish
-app.get("/api/admin/cron/escrow-release", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  await autoReleaseEscrows();
-  res.json({ message: "Escrow auto-release jarayoni yakunlandi." });
-});
 
 async function autoReleaseEscrows() {
   try {
@@ -293,6 +314,120 @@ async function expireTopBoosts() {
     }
   } catch (err) {
     logger.error({ err }, "Error in expireTopBoosts");
+  }
+}
+
+// 2-so'rov: "VIP/TOP muddati tugashi haqida eslatma". Ikkita holatni
+// tekshiradi: (a) 1-2 kun ichida tugaydiganlar — oldindan eslatma +
+// "Yangilash" tugmasi bilan; (b) allaqachon tugaganlar — qayta faollashtirish
+// taklifi. Har ikkisi ham *Notified maydonlari orqali faqat BIR MARTA
+// yuboriladi (soatlik cron shu funksiyani chaqirsa ham spam bo'lmaydi).
+async function notifyExpiringVipAndTop() {
+  const now = new Date();
+  const soon = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000); // 2 kun ichida
+  const appUrl = process.env.APP_URL || "https://savdo24.online";
+  const renewButton = (path: string, label: string) => ({
+    inline_keyboard: [[{ text: label, url: `${appUrl}${path}` }]]
+  });
+
+  try {
+    // --- VIP: tugashiga 1-2 kun qolganlar ---
+    const vipExpiringSoon = await prisma.user.findMany({
+      where: {
+        isVip: true,
+        telegramUserId: { not: null },
+        vipExpiresAt: { gt: now, lte: soon },
+        vipExpiryNotifiedAt: null
+      },
+      select: { id: true, name: true, telegramUserId: true, vipExpiresAt: true }
+    });
+    for (const u of vipExpiringSoon) {
+      const daysLeft = Math.max(1, Math.ceil((u.vipExpiresAt!.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)));
+      const sent = await sendTelegramMessage(
+        u.telegramUserId!,
+        `⏳ <b>VIP obunangiz tugashiga ${daysLeft} kun qoldi!</b>\n\n` +
+        `Salom, ${u.name}! VIP imtiyozlaringiz (katta fayl yuklash, maxsus belgi va h.k.) tez orada tugaydi.\n\n` +
+        `Uzilishlarsiz davom ettirish uchun hozir yangilang 👇`,
+        { replyMarkup: renewButton("/profile?tab=vip", "⭐ VIP'ni yangilash") }
+      );
+      if (sent) {
+        await prisma.user.update({ where: { id: u.id }, data: { vipExpiryNotifiedAt: now } }).catch(() => {});
+      }
+    }
+
+    // --- VIP: allaqachon tugagan (va hali reaktivatsiya taklifi yuborilmagan) ---
+    const vipExpired = await prisma.user.findMany({
+      where: {
+        isVip: true,
+        telegramUserId: { not: null },
+        vipExpiresAt: { lte: now },
+        vipExpiredNotifiedAt: null
+      },
+      select: { id: true, name: true, telegramUserId: true }
+    });
+    for (const u of vipExpired) {
+      const sent = await sendTelegramMessage(
+        u.telegramUserId!,
+        `😔 <b>VIP obunangiz tugadi</b>\n\n` +
+        `Salom, ${u.name}! VIP muddatingiz tugagani sababli maxsus imtiyozlar vaqtincha o'chirildi.\n\n` +
+        `Istagan payt qayta faollashtirishingiz mumkin 👇`,
+        { replyMarkup: renewButton("/profile?tab=vip", "⭐ Qayta faollashtirish") }
+      );
+      if (sent) {
+        await prisma.user.update({ where: { id: u.id }, data: { vipExpiredNotifiedAt: now, isVip: false } }).catch(() => {});
+      }
+    }
+
+    // --- TOP: tugashiga 1-2 kun qolgan e'lonlar (sotuvchiga xabar) ---
+    const topExpiringSoon = await prisma.startup.findMany({
+      where: {
+        isTop: true,
+        topExpiresAt: { gt: now, lte: soon },
+        topExpiryNotifiedAt: null,
+        userId: { not: null }
+      },
+      select: { id: true, name: true, topExpiresAt: true, user: { select: { telegramUserId: true } } }
+    });
+    for (const s of topExpiringSoon) {
+      if (!s.user?.telegramUserId) continue;
+      const daysLeft = Math.max(1, Math.ceil((s.topExpiresAt!.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)));
+      const sent = await sendTelegramMessage(
+        s.user.telegramUserId,
+        `⏳ <b>"${escapeHtml(s.name)}" e'loningizning TOP muddati ${daysLeft} kundan keyin tugaydi</b>\n\n` +
+        `TOP holatida qolish uchun (yuqori ko'rinuvchanlik, ko'proq xaridor) hozir uzaytiring 👇`,
+        { replyMarkup: renewButton("/profile?tab=startups", "🔥 TOP'ni uzaytirish") }
+      );
+      if (sent) {
+        await prisma.startup.update({ where: { id: s.id }, data: { topExpiryNotifiedAt: now } }).catch(() => {});
+      }
+    }
+
+    // --- TOP: allaqachon tugagan e'lonlar (qayta faollashtirish taklifi) ---
+    // ESLATMA: isTop ni o'zi soatlik expireTopBoosts() cron'i tomonidan false
+    // qilinadi — bu yerda faqat topExpiresAt allaqachon o'tgan va hali xabar
+    // yuborilmagan (isTop true yoki endigina false bo'lgan) yozuvlar qidiriladi.
+    const topExpired = await prisma.startup.findMany({
+      where: {
+        topExpiresAt: { lte: now, not: null },
+        topExpiredNotifiedAt: null,
+        userId: { not: null }
+      },
+      select: { id: true, name: true, user: { select: { telegramUserId: true } } }
+    });
+    for (const s of topExpired) {
+      if (!s.user?.telegramUserId) continue;
+      const sent = await sendTelegramMessage(
+        s.user.telegramUserId,
+        `😔 <b>"${escapeHtml(s.name)}" e'loningizning TOP muddati tugadi</b>\n\n` +
+        `E'loningiz endi oddiy ro'yxatda ko'rsatiladi. Ko'rinuvchanlikni oshirish uchun qayta TOP qilishingiz mumkin 👇`,
+        { replyMarkup: renewButton("/profile?tab=startups", "🔥 Qayta TOP qilish") }
+      );
+      if (sent) {
+        await prisma.startup.update({ where: { id: s.id }, data: { topExpiredNotifiedAt: now } }).catch(() => {});
+      }
+    }
+  } catch (err) {
+    logger.error({ err }, "notifyExpiringVipAndTop error");
   }
 }
 
@@ -450,9 +585,10 @@ app.post("/api/payments/stripe-webhook", express.raw({ type: "application/json" 
   let event: Stripe.Event;
   try {
     event = stripe.webhooks.constructEvent(req.body, sig as string, webhookSecret);
-  } catch (err: any) {
-    logger.error({ errMsg: err.message }, "Stripe webhook signature tekshiruvi muvaffaqiyatsiz:");
-    return res.status(400).json({ error: `Webhook signature error: ${err.message}` });
+  } catch (err: unknown) {
+    const errMsg = getErrorMessage(err);
+    logger.error({ errMsg }, "Stripe webhook signature tekshiruvi muvaffaqiyatsiz:");
+    return res.status(400).json({ error: `Webhook signature error: ${errMsg}` });
   }
 
   try {
@@ -491,8 +627,8 @@ app.post("/api/payments/stripe-webhook", express.raw({ type: "application/json" 
     }
 
     res.json({ received: true });
-  } catch (err: any) {
-    console.error("Stripe webhook processing error:", err);
+  } catch (err: unknown) {
+    logger.error({ err: err }, "Stripe webhook processing error");
     res.status(500).json({ error: "Webhook processing failed." });
   }
 });
@@ -539,6 +675,39 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false
 }));
 
+// Skaner/bot himoyasi: haqiqiy ilovada mavjud bo'lmagan, lekin hujumchilar
+// tez-tez sinab ko'radigan yo'llarga (masalan /query, /graphql, /.env,
+// /wp-admin) kelgan so'rovlarni CORS bosqichigacha yetib bormasdan darhol
+// rad etamiz va shubhali IP'ni cheklab qo'yamiz. Bu haqiqiy foydalanuvchilarga
+// ta'sir qilmaydi, chunki bizning ilovamiz faqat /api/... yo'llaridan
+// foydalanadi.
+const SUSPICIOUS_PATHS = [
+  "/query", "/graphql", "/.env", "/wp-admin", "/wp-login.php",
+  "/phpmyadmin", "/.git/config", "/xmlrpc.php", "/actuator", "/console"
+];
+
+const scannerLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 daqiqa
+  max: 5, // shu oynada shubhali yo'llarga 5 tadan ortiq so'rov yuborsa
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests" },
+});
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const isSuspicious = SUSPICIOUS_PATHS.some(
+    (p) => req.path === p || req.path.startsWith(p + "/")
+  );
+  if (isSuspicious) {
+    logger.warn(`[Scanner Blocked] ${req.method} ${req.path} from IP ${req.ip}`);
+    return scannerLimiter(req, res, () => {
+      // Route umuman mavjud emas — CORS xatosi o'rniga to'g'ridan-to'g'ri 404
+      res.status(404).json({ error: "Not found" });
+    });
+  }
+  next();
+});
+
 const allowedOrigins = [
   'https://savdo24.online',
   'https://www.savdo24.online',
@@ -569,7 +738,7 @@ app.use(cors({
     if (isAllowed) {
       callback(null, true);
     } else {
-      console.warn(`[CORS Blocked] Origin not allowed: ${origin}`);
+      logger.warn(`[CORS Blocked] Origin not allowed: ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -577,6 +746,36 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-Requested-With', 'Accept', 'X-Redirect-Origin']
 }));
+
+// Yuklangan fayllar (rasmlar) serverning o'z diskida saqlanadi — bu papka
+// `dist`dan tashqarida bo'lgani uchun qayta build/deploy qilinganda o'chib
+// ketmaydi.
+const UPLOADS_DIR = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+app.use("/uploads", express.static(UPLOADS_DIR));
+
+// TUZATISH: bu ikki cron endpoint ilgari yuqorida, cookieParser()/helmet()/cors()
+// o'rnatilishidan OLDIN ro'yxatdan o'tkazilgan edi. authenticateToken avval
+// req.cookies.token'ni tekshiradi — lekin cookieParser() hali ishlamagani sabab
+// req.cookies doim undefined bo'lib, admin panelidagi (browser, httpOnly cookie
+// orqali) sessiya bilan bu ikki endpoint'ga kirish imkonsiz edi (faqat qo'lda
+// Authorization: Bearer sarlavhasi bilan chaqirilganda ishlardi — ilovadagi
+// authenticateToken bilan himoyalangan boshqa BARCHA marshrutlardan farqli
+// o'laroq). Endi middleware to'liq o'rnatilgandan keyin ro'yxatdan o'tkaziladi.
+
+// GET /api/admin/cron/newsletter — Haftalik newsletter yuborish (Internal/Admin)
+app.get("/api/admin/cron/newsletter", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+  await sendWeeklyNewsletter();
+  res.json({ message: "Newsletter yuborish boshlandi." });
+});
+
+// GET /api/admin/cron/escrow-release — Escrow to'lovlarini avtomatik ozod qilish
+app.get("/api/admin/cron/escrow-release", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+  await autoReleaseEscrows();
+  res.json({ message: "Escrow auto-release jarayoni yakunlandi." });
+});
 
 // Multer & Contabo S3 Configuration
 const storage = multer.memoryStorage();
@@ -601,7 +800,7 @@ async function seedDatabase() {
     // One-time migration for listingType
     const countToUpdate = await prisma.startup.count({ where: { listingType: "Butunlay sotiladi" } });
     if (countToUpdate > 0) {
-      console.log(`Migrating ${countToUpdate} startups with old listingType...`);
+      logger.info({ countToUpdate }, "Migrating startups with old listingType");
       await prisma.startup.updateMany({
         where: { listingType: "Butunlay sotiladi" },
         data: { listingType: "To'liq loyiha (manba kodi bilan)" }
@@ -609,7 +808,7 @@ async function seedDatabase() {
     }
 
     if (categoryCount === 0) {
-      console.log("Seeding categories...");
+      logger.info("Seeding categories...");
       const categories = [
         { 
           id: "startups", 
@@ -647,7 +846,7 @@ async function seedDatabase() {
       }
     }
   } catch (err) {
-    console.error("Failed to automatically seed database:", err);
+    logger.error({ err: err }, "Failed to automatically seed database");
   }
 }
 
@@ -661,20 +860,6 @@ export interface AuthRequest extends Request {
     isVip: boolean;
     vipExpiresAt?: string;
   };
-}
-
-async function sendTelegramMessage(telegramUserId: string, text: string) {
-  try {
-    const botToken = await getSetting("TELEGRAM_BOT_TOKEN");
-    if (!botToken) {
-      console.warn("TELEGRAM_BOT_TOKEN is not set, skipping notification.");
-      return;
-    }
-    const bot = new Bot(botToken);
-    await bot.api.sendMessage(telegramUserId, text, { parse_mode: "HTML" });
-  } catch (err) {
-    console.error("Error sending Telegram message:", err);
-  }
 }
 
 // ---------------- API ENDPOINTS ----------------
@@ -695,16 +880,12 @@ app.post("/api/newsletter/subscribe", async (req: Request, res: Response) => {
     });
     return res.json({ message: "Obunangiz muvaffaqiyatli rasmiylashtirildi!" });
   } catch (err) {
-    console.error("Newsletter error:", err);
+    logger.error({ err: err }, "Newsletter error");
     return res.status(500).json({ error: "Xatolik yuz berdi. Iltimos qayta urinib ko'ring." });
   }
 });
 
-// Lazy load auth router to prevent circular dependencies
-import authRouter from "./src/routes/auth";
 app.use("/api/auth", authRouter);
-
-import supportRouter from "./src/routes/support";
 app.use("/api", supportRouter);
 
 app.get("/api/auth/google-client-id", async (req: Request, res: Response) => {
@@ -715,30 +896,6 @@ app.get("/api/auth/google-client-id", async (req: Request, res: Response) => {
     res.status(500).json({ error: "Google client ID yuklashda xatolik." });
   }
 });
-
-// 9-MUAMMO: Google orqali kirishda refreshToken xavfsiz saqlash uchun cookie o'rnatish helper funktsiyasi
-function setAuthCookiesLocal(res: Response, accessToken: string, refreshToken: string) {
-  const isProd = process.env.NODE_ENV === "production";
-  const domain = isProd ? ".savdo24.online" : undefined;
-
-  res.cookie("token", accessToken, {
-    httpOnly: true,
-    secure: isProd,
-    sameSite: isProd ? "strict" : "lax",
-    maxAge: 15 * 60 * 1000, // 15 minutes
-    path: "/",
-    domain: domain
-  });
-
-  res.cookie("refreshToken", refreshToken, {
-    httpOnly: true,
-    secure: isProd,
-    sameSite: isProd ? "strict" : "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    path: "/",
-    domain: domain
-  });
-}
 
 app.post("/api/auth/google", authLimiter, async (req: Request, res: Response) => {
   const { credential } = req.body;
@@ -770,8 +927,8 @@ app.post("/api/auth/google", authLimiter, async (req: Request, res: Response) =>
           authProvider: "google",
           emailVerified: true,
           role: "Xaridor",
-          joinDate: new Date().toLocaleDateString("uz-UZ", { year: "numeric", month: "long" }) + "-yil",
-          avatarUrl: payload.picture || `/default-avatar.jpg`,
+          joinDate: new Date(),
+          avatarUrl: payload.picture || `/default-avatar.svg`,
         },
       });
     } else if (!user.googleId) {
@@ -784,12 +941,15 @@ app.post("/api/auth/google", authLimiter, async (req: Request, res: Response) =>
     const accessToken = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: "15m" });
     const refreshToken = await generateRefreshToken(user.id, req);
 
-    // 9-MUAMMO: Google orqali kirishda refreshToken xavfsiz saqlash uchun setAuthCookiesLocal chaqirildi, refreshToken javob body-sidan olib tashlandi.
-    setAuthCookiesLocal(res, accessToken, refreshToken);
+    // 9-MUAMMO: Google orqali kirishda refreshToken xavfsiz saqlash uchun setAuthCookies chaqirildi, refreshToken javob body-sidan olib tashlandi.
+    // Endi auth.ts dagi bitta umumiy setAuthCookies() funksiyasi ishlatiladi (ilgari bu yerda
+    // ajratilgan nusxasi bor edi va sameSite qiymati dev muhitida "lax", auth.ts'da esa doim
+    // "strict" edi — ikkita kirish usuli orasida nomuvofiqlikka olib kelardi).
+    setAuthCookies(res, accessToken, refreshToken);
 
     res.json({ accessToken, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
   } catch (err) {
-    console.error("Google auth error:", err);
+    logger.error({ err: err }, "Google auth error");
     res.status(401).json({ error: "Google orqali kirish muvaffaqiyatsiz bo'ldi." });
   }
 });
@@ -817,7 +977,7 @@ app.patch("/api/users/me", authenticateToken, async (req: AuthRequest, res: Resp
 
     res.json(updatedUser);
   } catch (err) {
-    console.error("Update profile error:", err);
+    logger.error({ err: err }, "Update profile error");
     res.status(500).json({ error: "Profilni saqlashda xatolik yuz berdi." });
   }
 });
@@ -839,8 +999,31 @@ app.post("/api/users/me/telegram-link-code", authenticateToken, async (req: Auth
     
     res.json({ code });
   } catch (err) {
-    console.error("Generate telegram link code error:", err);
+    logger.error({ err: err }, "Generate telegram link code error");
     res.status(500).json({ error: "Kod generatsiya qilishda xatolik yuz berdi." });
+  }
+});
+
+// PATCH /api/users/me/telegram-notifications — Telegram bildirishnoma sozlamalari
+// (1-so'rov: "Bildirishnomalarni boshqarish (opt-out)"). Faqat reklama/broadcast
+// xabarlaridan chiqishga ruxsat beradi — xarid/nizo kabi muhim xabarlar bunga
+// bog'liq emas va har doim yuboriladi (notifyUserTelegram orqali, bu maydonni tekshirmaydi).
+app.patch("/api/users/me/telegram-notifications", authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { telegramBroadcastOptOut } = req.body;
+    if (typeof telegramBroadcastOptOut !== "boolean") {
+      return res.status(400).json({ error: "telegramBroadcastOptOut boolean bo'lishi kerak." });
+    }
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { telegramBroadcastOptOut },
+      select: { id: true, telegramBroadcastOptOut: true }
+    });
+    res.json(updatedUser);
+  } catch (err) {
+    logger.error({ err: err }, "Update telegram notification settings error");
+    res.status(500).json({ error: "Sozlamalarni saqlashda xatolik yuz berdi." });
   }
 });
 
@@ -869,8 +1052,8 @@ app.get("/api/users/me/earnings", authenticateToken, async (req: AuthRequest, re
         payout: p.sellerPayoutAmount
       }))
     });
-  } catch (err: any) {
-    console.error("Get earnings error:", err);
+  } catch (err: unknown) {
+    logger.error({ err: err }, "Get earnings error");
     res.status(500).json({ error: "Daromadlarni yuklashda xatolik yuz berdi." });
   }
 });
@@ -885,8 +1068,8 @@ app.get("/api/users/me/reviews-given", authenticateToken, async (req: AuthReques
       orderBy: { createdAt: "desc" }
     });
     res.json(reviews);
-  } catch (err: any) {
-    console.error("Get reviews given error:", err);
+  } catch (err: unknown) {
+    logger.error({ err: err }, "Get reviews given error");
     res.status(500).json({ error: "Yozilgan sharhlarni yuklashda xatolik yuz berdi." });
   }
 });
@@ -914,8 +1097,8 @@ app.get("/api/users/me/reviews-received", authenticateToken, async (req: AuthReq
       averageRating: user?.averageRating || 0,
       totalReviews: user?.totalReviews || 0
     });
-  } catch (err: any) {
-    console.error("Get reviews received error:", err);
+  } catch (err: unknown) {
+    logger.error({ err: err }, "Get reviews received error");
     res.status(500).json({ error: "Qabul qilingan sharhlarni yuklashda xatolik yuz berdi." });
   }
 });
@@ -996,11 +1179,9 @@ app.get("/api/ai/price-suggestion", async (req: Request, res: Response) => {
 });
 
 // --- ESCROW (126-bosqich: src/routes/escrow.ts'ga ko'chirildi) ---
-import escrowRouter from "./src/routes/escrow";
 app.use("/api", escrowRouter);
 
 // --- B2B WHOLESALE (111-bosqich: src/routes/b2b.ts'ga ko'chirildi) ---
-import b2bRouter, { adminB2bRouter } from "./src/routes/b2b";
 app.use("/api/b2b", b2bRouter);
 app.use("/api/admin/b2b", adminB2bRouter);
 
@@ -1013,7 +1194,7 @@ app.get("/api/social-proof", async (req: Request, res: Response) => {
         where: { status: "completed", createdAt: { gte: last24h } } 
       }),
       newUsers24h: await prisma.user.count({ 
-        where: { joinDate: { gte: last24h.toISOString() } } 
+        where: { joinDate: { gte: last24h } } 
       }),
       newListings24h: await prisma.startup.count({ 
         where: { dateCreated: { gte: last24h.toISOString() } } 
@@ -1033,7 +1214,7 @@ app.get("/api/social-proof", async (req: Request, res: Response) => {
     
     res.json(stats);
   } catch (err) {
-    console.error("Social proof error:", err);
+    logger.error({ err: err }, "Social proof error");
     res.status(500).json({ error: "Social proof yuklashda xatolik." });
   }
 });
@@ -1123,7 +1304,6 @@ app.post("/api/listings/:id/upgrade", authenticateToken, async (req: AuthRequest
 });
 
 // 114-bosqich: referrals route'lari src/routes/referrals.ts'ga ko'chirildi.
-import referralsRouter, { adminReferralsRouter } from "./src/routes/referrals";
 app.use("/api/referrals", referralsRouter);
 app.use("/api/admin/referrals", adminReferralsRouter);
 
@@ -1132,11 +1312,33 @@ app.get("/api/admin/analytics", authenticateToken, requireAdmin, async (req: Aut
     const period = (req.query.period as string) || "day";
     const days = period === "day" ? 1 : period === "week" ? 7 : 30;
     const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    
+
+    // TUZATISH: avval bu yerda `prisma.payment.groupBy({ by: ["createdAt"] })`
+    // ishlatilardi — lekin createdAt millisekund aniqligidagi DateTime bo'lgani
+    // uchun bu deyarli hech qachon ikkita to'lovni bir guruhga birlashtirmaydi
+    // (har bir to'lov o'zining aniq vaqt belgisiga ega). Natijada "Daromad
+    // Grafigi" kunlik tendensiya o'rniga deyarli har bir to'lov uchun alohida
+    // nuqta chizardi — ayniqsa "Oylik" ko'rinishda foydasiz va tushunarsiz
+    // grafik hosil qilardi. Endi to'lovlar JS tarafida kun (YYYY-MM-DD)
+    // bo'yicha guruhlanadi.
+    const revenuePayments = await prisma.payment.findMany({
+      where: { status: "completed", createdAt: { gte: startDate } },
+      select: { createdAt: true, platformFeeAmount: true },
+      orderBy: { createdAt: "asc" }
+    });
+    const dailyRevenueMap = new Map<string, number>();
+    for (const p of revenuePayments) {
+      const dayKey = p.createdAt.toISOString().slice(0, 10); // YYYY-MM-DD
+      dailyRevenueMap.set(dayKey, (dailyRevenueMap.get(dayKey) || 0) + Number(p.platformFeeAmount || 0));
+    }
+    const dailyRevenue = Array.from(dailyRevenueMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, amount]) => ({ date, amount }));
+
     const stats = {
       totalListings: await prisma.startup.count(),
       activeUsers: await prisma.user.count({ where: { isBanned: false } }),
-      newUsers: await prisma.user.count({ where: { joinDate: { gte: startDate.toISOString() } } }), // Note: joinDate is String in schema, might need better date handling
+      newUsers: await prisma.user.count({ where: { joinDate: { gte: startDate } } }),
       totalSales: await prisma.payment.count({ 
         where: { status: "completed", createdAt: { gte: startDate } } 
       }),
@@ -1146,768 +1348,34 @@ app.get("/api/admin/analytics", authenticateToken, requireAdmin, async (req: Aut
       }))._sum.platformFeeAmount || 0,
       topCategories: await prisma.startup.groupBy({
         by: ["category"],
-        where: { createdAt: { gte: startDate.toISOString() } }, // image/gallery use string dates sometimes
+        where: { dateCreated: { gte: startDate.toISOString() } }, // Startup modelida haqiqiy createdAt yo'q, faqat dateCreated (string)
         _count: true,
         orderBy: { _count: { id: "desc" } as any },
         take: 5
       }),
-      dailyRevenue: await prisma.payment.groupBy({
-        by: ["createdAt"],
-        where: { status: "completed", createdAt: { gte: startDate } },
-        _sum: { platformFeeAmount: true },
-        orderBy: { createdAt: "asc" }
-      })
+      dailyRevenue
     };
     
     res.json(stats);
   } catch (err) {
-    console.error("Analytics error:", err);
+    logger.error({ err: err }, "Analytics error");
     res.status(500).json({ error: "Analitika ma'lumotlarini yuklashda xatolik." });
   }
 });
 
 // 118-bosqich: admin/users route'lari src/routes/admin-users.ts'ga
 // ko'chirildi.
-import adminUsersRouter from "./src/routes/admin-users";
 app.use("/api/admin/users", adminUsersRouter);
+app.use("/api/admin/backup", adminBackupRouter);
+app.use("/api/admin/rebuild", adminRebuildRouter);
 
 // JWT AUTH: Get Profile (Me), Refresh Token, Logout, and Resend Verification are handled by authRouter
 
-// GET /api/startups - barcha startaplarni olish (filter: kategoriya, status, qidiruv, listingType va sahifalash bo'yicha)
-app.get("/api/startups", async (req: Request, res: Response) => {
-  const { category, status, search, listingType, page, limit, onlyActive, isTop, includeMine } = req.query;
-
-  // MUHIM (4-BOSQICH): bu endpoint hech qanday autentifikatsiyasiz, butunlay
-  // ochiq (public) — lekin `status` filtri berilmasa, moderatsiyadan
-  // o'tmagan ("pending") va rad etilgan ("rejected") e'lonlarni ham qaytarib
-  // yuborardi. Bu ma'lumotlar faqat Admin panelidagi moderatsiya ro'yxati
-  // uchun mo'ljallangan edi, lekin App.tsx uni HAR BIR tashrif buyuruvchi
-  // (mehmonlar ham) uchun cheklovsiz chaqiradi — natijada tasdiqlanmagan
-  // e'lonlar butun saytga (va Telegram bot orqali ham) oshkor bo'lardi.
-  // Endi faqat Admin (haqiqiy JWT token bilan) "pending"/"rejected"
-  // statusini so'rashi mumkin; qolgan barcha hollarda faqat "active"
-  // e'lonlar qaytariladi.
-  let isRequestingAdmin = false;
-  let requestingUserId: number | null = null;
-  try {
-    let adminCheckToken = req.cookies?.token;
-    if (!adminCheckToken) {
-      const authHeader = req.headers["authorization"];
-      adminCheckToken = authHeader && authHeader.split(" ")[1];
-    }
-    if (adminCheckToken) {
-      const decoded = jwt.verify(adminCheckToken, JWT_SECRET) as JwtPayload;
-      if (decoded?.role === "Admin") isRequestingAdmin = true;
-      if (decoded?.id) requestingUserId = decoded.id;
-    }
-  } catch {
-    // Yaroqsiz/eskirgan token — mehmon sifatida davom etiladi (xato tashlanmaydi)
-  }
-
-  try {
-    const filter: any = {};
-    const andConditions: any[] = [];
-    if (category) filter.category = category as string;
-    if (status && isRequestingAdmin) {
-      filter.status = status as string;
-    } else if (!isRequestingAdmin) {
-      // 45-MUAMMO: yuqoridagi (4/5-bosqich) fix "o'ziniki" e'lonlarni HAR QANDAY
-      // /api/startups chaqiruviga (parametrsiz ham) qo'shib yuborardi — bu
-      // Profilga mo'ljallangan edi, lekin BrowsePage.tsx ham xuddi shu
-      // endpointdan (o'z sahifalash/filtrlari bilan) foydalanganda, tizimga
-      // kirgan sotuvchining hali tasdiqlanmagan/rad etilgan e'loni hech qanday
-      // belgisiz umumiy ommaviy katalogga (va totalCount/totalPages'ga ham)
-      // aralashib qolardi. Endi "o'ziniki"ni qo'shish faqat aniq so'ralganda
-      // (includeMine=true — App.tsx buni Profil uchun yuboradi) ishlaydi;
-      // BrowsePage kabi ommaviy so'rovlar hamon faqat "active"ni ko'radi.
-      if (includeMine === "true" && requestingUserId) {
-        andConditions.push({
-          OR: [{ status: "active" }, { userId: requestingUserId }],
-        });
-      } else {
-        filter.status = "active";
-      }
-    }
-    if (listingType && listingType !== "All") filter.listingType = listingType as string;
-    if (onlyActive === "true") {
-      filter.soldStatus = "sotuvda";
-    }
-
-    if (isTop === "true") {
-      filter.isTop = true;
-      filter.topExpiresAt = { gt: new Date() };
-    } else if (isTop === "false") {
-      filter.isTop = false;
-    }
-
-    if (search && typeof search === 'string' && search.trim().length > 0) {
-      // 1. Limit length for performance and DOS prevention
-      const rawSearch = search.trim().substring(0, 100);
-      
-      // 2. Sanitize XSS/injection characters (keep only alphanumeric, spaces, hyphens, Uzbek/Cyrillic letters)
-      const sanitized = rawSearch.replace(/[^a-zA-Z0-9\s\-\u0400-\u04FFʻʼ'’]/g, '').trim();
-      
-      // 3. Prevent tiny empty string or whitespace queries
-      if (sanitized.length >= 2) {
-        const mode = isPostgres ? "insensitive" : undefined;
-        andConditions.push({
-          OR: [
-            { name: { contains: sanitized, mode } },
-            { description: { contains: sanitized, mode } },
-            { category: { contains: sanitized, mode } },
-            { id: { contains: sanitized, mode } },
-          ],
-        });
-      }
-    }
-
-    if (andConditions.length > 0) filter.AND = andConditions;
-
-    const parsedPage = parseInt(page as string, 10);
-    const pageNum = isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage;
-    const parsedLimit = parseInt(limit as string, 10);
-    let limitNum = isNaN(parsedLimit) || parsedLimit < 1 ? 50 : parsedLimit;
-    if (limitNum > 100) limitNum = 100; // Max limit 100 for security
-    const skip = (pageNum - 1) * limitNum;
-
-    const totalCount = await prisma.startup.count({ where: filter });
-    const totalPages = Math.ceil(totalCount / limitNum);
-
-    const startupsList = await prisma.startup.findMany({
-      where: filter,
-      orderBy: [
-        { isTop: "desc" },
-        { id: "desc" }
-      ],
-      skip,
-      take: limitNum,
-      include: { user: { select: { name: true, isVip: true, avatarUrl: true } } }
-    });
-
-    // XATO: formatStartup() deliveryUrl'ni HAMMA uchun (hatto egasi uchun ham)
-    // o'chirib tashlaydi — natijada SellPage'da "Tahrirlash" ochilganda sotuvchi
-    // o'zining saqlangan maxfiy yetkazish havolasini ko'ra olmasdi. Egasi yoki
-    // admin uchun bu maydon qaytarib tiklanadi.
-    const formatted = startupsList.map((s: any) => {
-      const f = formatStartup(s);
-      if (isRequestingAdmin || (requestingUserId && s.userId === requestingUserId)) {
-        f.deliveryUrl = s.deliveryUrl || '';
-      }
-      return f;
-    });
-    res.json({ startups: formatted, totalCount, totalPages });
-  } catch (err: any) {
-    console.error("GET /api/startups error:", err);
-    res.status(500).json({ error: "Startaplarni yuklashda xatolik yuz berdi." });
-  }
-});
-
-// GET /api/startups/:id - bitta startap tafsiloti
-app.get("/api/startups/:id", async (req: Request, res: Response) => {
-  const { id } = req.params;
-
-  try {
-    const startupRecord = await prisma.startup.findUnique({
-      where: { id },
-    });
-
-    if (!startupRecord) {
-      return res.status(404).json({ error: "Startap topilmadi." });
-    }
-
-    let currentUser = null;
-    let token = req.cookies?.token;
-    if (!token) {
-      const authHeader = req.headers["authorization"];
-      token = authHeader && authHeader.split(" ")[1];
-    }
-    if (token) {
-      try {
-        const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
-        currentUser = await prisma.user.findUnique({ where: { id: decoded.id } });
-      } catch (err) {}
-    }
-
-    const isOwner = !!(currentUser && currentUser.id === startupRecord.userId);
-    const isAdmin = !!(currentUser && currentUser.role === "Admin");
-
-    // Visibility Check
-    if (startupRecord.status !== "active") {
-      if (!isOwner && !isAdmin) {
-        return res.status(404).json({ error: "Startap topilmadi." }); // Return 404 for privacy
-      }
-    }
-
-    // XATO: formatStartup() deliveryUrl'ni hamma uchun o'chiradi — egasi/admin
-    // uchun tiklanadi (Tahrirlash sahifasida ko'rinishi kerak).
-    const formatted = formatStartup(startupRecord);
-    if (isOwner || isAdmin) {
-      formatted.deliveryUrl = startupRecord.deliveryUrl || '';
-      formatted.contactEmail = startupRecord.contactEmail || '';
-      formatted.contactPhone = startupRecord.contactPhone || '';
-      formatted.contactTelegram = startupRecord.contactTelegram || '';
-    }
-
-    res.json(formatted);
-  } catch (err: any) {
-    console.error("GET /api/startups/:id error:", err);
-    res.status(500).json({ error: "Startapni yuklashda xatolik yuz berdi." });
-  }
-});
+// 127-bosqich: startup CRUD va ideas/upvote route'lari src/routes/startups.ts'ga ko'chirildi.
+app.use("/api", startupsRouter);
 
 // 115-bosqich: top-boost/vip route'lari src/routes/top-boost-vip.ts'ga ko'chirildi.
-import topBoostVipRouter from "./src/routes/top-boost-vip";
 app.use("/api", topBoostVipRouter);
-
-// Startups validation schemas
-const techStackPreprocess = z.preprocess((val) => {
-  if (typeof val === 'string') {
-    try { return JSON.parse(val); } catch { return val; }
-  }
-  return val;
-}, z.array(z.string()).max(100, "Texnologiyalar soni juda ko'p").optional().nullable());
-
-const galleryPreprocess = z.preprocess((val) => {
-  if (typeof val === 'string') {
-    try { return JSON.parse(val); } catch { return val; }
-  }
-  return val;
-}, z.array(z.string()).max(10, "Galereya ko'pi bilan 10 ta rasm bo'lishi kerak").optional().nullable());
-
-const teamPreprocess = z.preprocess((val) => {
-  if (typeof val === 'string') {
-    try { return JSON.parse(val); } catch { return val; }
-  }
-  return val;
-}, z.array(z.any()).max(10, "Jamoa a'zolari ko'pi bilan 10 ta bo'lishi kerak").optional().nullable());
-
-const milestonesPreprocess = z.preprocess((val) => {
-  if (typeof val === 'string') {
-    try { return JSON.parse(val); } catch { return val; }
-  }
-  return val;
-}, z.array(z.any()).max(20, "Bosqichlar ko'pi bilan 20 ta bo'lik bo'lishi kerak").optional().nullable());
-
-// Faqat http/https protokolli URL'larni qabul qiladi (javascript:, data: va h.k. XSS vektorlarini bloklaydi)
-const safeUrl = z.string().max(2000).refine((val) => {
-  if (!val) return true;
-  try {
-    const parsed = new URL(val);
-    return parsed.protocol === "http:" || parsed.protocol === "https:";
-  } catch {
-    return false;
-  }
-}, { message: "Havola http:// yoki https:// bilan boshlanishi va to'g'ri formatda bo'lishi kerak." }).optional().nullable().or(z.literal(""));
-
-const createStartupSchema = z.object({
-  name: z.string().min(1, "Nomi kamida 1 ta belgidan iborat bo'lishi kerak").max(150, "Nomi ko'pi bilan 150 ta belgidan iborat bo'lishi kerak"),
-  
-  slogan: z.string().max(200, "Slogan ko'pi bilan 200 ta belgidan iborat bo'lishi kerak").optional().nullable().or(z.literal("")),
-  
-  description: z.string().min(1, "Tavsifi kamida 1 ta belgidan iborat bo'lishi kerak").max(500, "Tavsifi ko'pi bilan 500 ta belgidan iborat bo'lishi kerak"),
-  
-  longDescription: z.string().max(5000, "Batafsil tavsif ko'pi bilan 5000 ta belgidan iborat bo'lishi kerak").optional().nullable().or(z.literal("")),
-  
-  category: z.string().min(1, "Kategoriya kiritilishi shart"),
-  
-  price: z.union([z.number(), z.string()]).refine((val) => {
-    const parsed = parseFloat(String(val));
-    return !isNaN(parsed) && parsed > 0;
-  }, {
-    message: "Narx musbat son bo'lishi shart."
-  }).refine((val) => {
-    const parsed = parseFloat(String(val));
-    return parsed <= 1000000;
-  }, {
-    message: "Narx 1000000 dan oshmasligi kerak."
-  }).transform((val) => parseFloat(String(val))),
-  
-  listingType: z.string().optional().nullable(),
-  techStack: techStackPreprocess,
-  demoUrl: safeUrl,
-  deliveryUrl: safeUrl,
-  githubUrl: safeUrl,
-  repoIncluded: z.union([z.boolean(), z.string()]).optional().nullable().transform((val) => val === true || val === "true"),
-  image: z.string().optional().nullable(),
-  gallery: galleryPreprocess,
-  team: teamPreprocess,
-  milestones: milestonesPreprocess,
-  contactEmail: z.string().optional().nullable().or(z.literal("")),
-  contactPhone: z.string().optional().nullable().or(z.literal("")),
-  contactTelegram: z.string().optional().nullable().or(z.literal("")),
-  attributes: z.string().optional().nullable(),
-});
-
-const patchStartupSchema = createStartupSchema.partial();
-
-// POST /api/startups — yangi startap qo'shish
-app.post("/api/startups", authenticateToken, async (req: AuthRequest, res: Response) => {
-  const parsed = createStartupSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.issues[0].message });
-  }
-
-  const {
-    name,
-    slogan,
-    description,
-    longDescription,
-    category,
-    price: parsedPrice,
-    listingType,
-    techStack,
-    demoUrl,
-    githubUrl,
-    repoIncluded,
-    image,
-    gallery,
-    team,
-    milestones,
-    contactEmail,
-    contactPhone,
-    contactTelegram,
-    deliveryUrl,
-    attributes,
-  } = parsed.data;
-
-  const validCategory = await prisma.category.findFirst({
-    where: { id: category }
-  });
-  if (!validCategory) {
-    return res.status(400).json({ error: "Yaroqsiz kategoriya tanlandi." });
-  }
-
-  try {
-    const user = await prisma.user.findUnique({ where: { id: req.user?.id } });
-    if (user && !user.emailVerified) {
-      return res.status(403).json({ error: "Startap e'lon qilish uchun iltimos avval email manzilingizni tasdiqlang." });
-    }
-
-    // Generate unique slug (optimized high-performance generation)
-    let baseSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-    if (!baseSlug) baseSlug = 'startup';
-    
-    let slug = baseSlug;
-    const existing = await prisma.startup.findUnique({ where: { id: slug } });
-    if (existing) {
-      slug = `${baseSlug}-${crypto.randomBytes(3).toString('hex')}`;
-      const existingSecond = await prisma.startup.findUnique({ where: { id: slug } });
-      if (existingSecond) {
-        slug = `${baseSlug}-${crypto.randomBytes(4).toString('hex')}`;
-      }
-    }
-
-    const newStartup = await prisma.startup.create({
-      data: {
-        id: slug,
-        name,
-        slogan: slogan || "",
-        description,
-        longDescription: longDescription || description,
-        category,
-        price: parsedPrice,
-        listingType: listingType || "To'liq loyiha (manba kodi bilan)",
-        techStack: JSON.stringify(techStack || []),
-        demoUrl: demoUrl || "",
-        githubUrl: githubUrl || "",
-        deliveryUrl: deliveryUrl || "",
-        repoIncluded: repoIncluded === true,
-        soldStatus: "sotuvda",
-        status: "pending", // default is pending
-        proposalsCount: 0,
-        image: image || "https://images.unsplash.com/photo-1559136555-9303baea8ebd?w=800",
-        gallery: JSON.stringify(gallery || []),
-        team: JSON.stringify(team || []),
-        milestones: JSON.stringify(milestones || []),
-        contactEmail: contactEmail || req.user?.email || "",
-        contactPhone: contactPhone || "",
-        contactTelegram: contactTelegram || "",
-        attributes: attributes || "{}",
-        dateCreated: new Date().toISOString().split("T")[0],
-        userId: req.user?.id,
-      },
-    });
-
-    res.status(201).json(formatStartup(newStartup));
-  } catch (err: any) {
-    console.error("POST /api/startups error:", err);
-    res.status(500).json({ error: "Loyiha yaratishda xatolik yuz berdi." });
-  }
-});
-
-// PATCH /api/startups/:id — startapni tahrirlash
-app.patch("/api/startups/:id", authenticateToken, async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-
-  const parsed = patchStartupSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.issues[0].message });
-  }
-  const validatedData = parsed.data;
-
-  if (validatedData.category) {
-    const validCategory = await prisma.category.findFirst({
-      where: { id: validatedData.category }
-    });
-    if (!validCategory) {
-      return res.status(400).json({ error: "Yaroqsiz kategoriya tanlandi." });
-    }
-  }
-
-  try {
-    const startup = await prisma.startup.findUnique({ where: { id } });
-    if (!startup) {
-      return res.status(404).json({ error: "Startap topilmadi." });
-    }
-
-    if (startup.userId !== req.user?.id && req.user?.role !== "Admin") {
-      return res.status(403).json({ error: "Siz faqat o'z startaplaringizni tahrirlashingiz mumkin." });
-    }
-
-    const updatedData: any = {};
-    if (validatedData.name !== undefined) updatedData.name = validatedData.name;
-    if (validatedData.price !== undefined) updatedData.price = validatedData.price;
-    if (validatedData.description !== undefined) updatedData.description = validatedData.description;
-    if (validatedData.longDescription !== undefined) updatedData.longDescription = validatedData.longDescription;
-    if (validatedData.category !== undefined) updatedData.category = validatedData.category;
-    if (validatedData.listingType !== undefined) updatedData.listingType = validatedData.listingType;
-    if (validatedData.demoUrl !== undefined) updatedData.demoUrl = validatedData.demoUrl;
-    if (validatedData.githubUrl !== undefined) updatedData.githubUrl = validatedData.githubUrl;
-    if (validatedData.image !== undefined) updatedData.image = validatedData.image;
-    if (validatedData.gallery !== undefined) {
-      updatedData.gallery = JSON.stringify(validatedData.gallery || []);
-    }
-    if (validatedData.techStack !== undefined) {
-      updatedData.techStack = JSON.stringify(validatedData.techStack || []);
-    }
-    if (validatedData.team !== undefined) {
-      updatedData.team = JSON.stringify(validatedData.team || []);
-    }
-    if (validatedData.milestones !== undefined) {
-      updatedData.milestones = JSON.stringify(validatedData.milestones || []);
-    }
-    if (validatedData.contactEmail !== undefined) updatedData.contactEmail = validatedData.contactEmail;
-    if (validatedData.contactPhone !== undefined) updatedData.contactPhone = validatedData.contactPhone;
-    if (validatedData.contactTelegram !== undefined) updatedData.contactTelegram = validatedData.contactTelegram;
-    if (validatedData.deliveryUrl !== undefined) updatedData.deliveryUrl = validatedData.deliveryUrl;
-    if (validatedData.attributes !== undefined) updatedData.attributes = validatedData.attributes;
-    // 43-MUAMMO: SellPage.tsx tahrirlashda repoIncluded'ni ham yuborardi
-    // (listingType'dan hisoblanadi), lekin bu yerda updatedData'ga
-    // qo'shilmagani uchun bazada eskirgan qiymat qolib ketardi — listingType
-    // o'zgarsa ham "Repo + Kod" / "Faqat litsenziya" ko'rsatkichi eskicha
-    // qolardi (BrowsePage/DetailPage).
-    if (validatedData.repoIncluded !== undefined) updatedData.repoIncluded = validatedData.repoIncluded;
-    
-    // Agar faol bo'lsa, moderatsiyaga qaytarsin (Xavfsizlik)
-    if (startup.status === "active") {
-        updatedData.status = "pending";
-    }
-
-    const updated = await prisma.startup.update({
-      where: { id },
-      data: updatedData,
-    });
-
-    res.json(formatStartup(updated));
-  } catch (err: any) {
-    console.error("PATCH /api/startups/:id error:", err);
-    res.status(500).json({ error: "Startapni tahrirlashda xatolik yuz berdi." });
-  }
-});
-
-// PATCH /api/startups/:id/status — admin tomonidan tasdiqlash/rad etish
-app.patch("/api/startups/:id/status", authenticateToken, async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  const { status } = req.body; // active, pending, sold, rejected etc.
-
-  if (!status) {
-    return res.status(400).json({ error: "Status taqdim etilishi shart." });
-  }
-
-  // Check if admin
-  if (req.user?.role !== "Admin") {
-    // Only allow founders to mark their own startups as sold
-    if (status !== "sold") {
-      return res.status(403).json({ error: "Siz faqat o'z startapingizni 'sold' holatiga o'tkaza olasiz." });
-    }
-    const startup = await prisma.startup.findUnique({ where: { id } });
-    if (!startup || startup.userId !== req.user?.id) {
-      return res.status(403).json({ error: "Ushbu amalni bajarish uchun sizda ruxsat yo'q." });
-    }
-  }
-
-  try {
-    const updated = await prisma.startup.update({
-      where: { id },
-      data: { status },
-    });
-
-    // Notify founder
-    if (updated.userId) {
-      const title = status === "active" ? "Loyiha tasdiqlandi" : "Loyiha rad etildi";
-      const message = status === "active" 
-        ? `Sizning "${updated.name}" loyihangiz adminlar tomonidan tasdiqlandi va sotuvga qo'yildi.`
-        : `Sizning "${updated.name}" loyihangiz rad etildi. Iltimos qoidalarni qayta ko'ring.`;
-      await createNotification(updated.userId, "SYSTEM", title, message, `/startup/${id}`);
-      
-      const user = await prisma.user.findUnique({ where: { id: updated.userId } });
-      if (user && status === "active") {
-        await sendEmail(
-          user.email,
-          "Loyihangiz tasdiqlandi!",
-          `<p>Tabriklaymiz! <b>${escapeHtml(updated.name)}</b> loyihangiz admin tomonidan ko'rib chiqildi va tasdiqlandi.</p><p>Endi u platformada sotuvda ko'rinadi.</p>`
-        );
-      }
-    }
-
-    if (req.user?.role === "Admin") {
-      await prisma.auditLog.create({
-        data: {
-          adminId: req.user?.id || 0,
-          adminEmail: req.user?.email,
-          action: status === "active" ? "approve_startup" : "reject_startup",
-          targetId: id,
-          details: `Startup status updated to ${status}`
-        }
-      }).catch((e: any) => console.error("Audit log error:", e));
-    }
-
-    res.json(formatStartup(updated));
-  } catch (err: any) {
-    console.error("PATCH /api/startups/:id/status error:", err);
-    res.status(500).json({ error: "Statusni yangilashda xatolik yuz berdi." });
-  }
-});
-
-// GET /api/ideas/top — barcha elonlar bo'yicha eng yuqori reytingli g'oyalar ro'yxati (startap nomi bilan birga), sahifalash bilan (?limit=20&page=1)
-app.get("/api/ideas/top", async (req: Request, res: Response) => {
-  try {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 20;
-    const skip = (page - 1) * limit;
-    const { category, time } = req.query;
-
-    const where: any = {
-      // XAVFSIZLIK: bu endpoint auth'siz ochiq — faqat tasdiqlangan (active)
-      // e'lonlarga tegishli g'oyalar ko'rsatiladi, aks holda pending/rejected
-      // startap nomi/kategoriyasi ommaviy reytingda oshkor bo'lib qolardi.
-      startup: { status: "active" },
-    };
-
-    if (category && category !== "all") {
-      where.startup = {
-        ...where.startup,
-        category: category as string,
-      };
-    }
-
-    if (time && time !== "all") {
-      const now = new Date();
-      let startDate: Date | null = null;
-      if (time === "today") {
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      } else if (time === "week") {
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      }
-
-      if (startDate) {
-        where.createdAt = {
-          gte: startDate,
-        };
-      }
-    }
-
-    const [ideas, total] = await Promise.all([
-      prisma.idea.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: [
-          { upvotes: "desc" },
-          { createdAt: "desc" }
-        ],
-        include: {
-          startup: {
-            select: {
-              name: true,
-              category: true,
-            }
-          }
-        }
-      }),
-      prisma.idea.count({ where })
-    ]);
-
-    res.json({
-      ideas,
-      pagination: {
-        total,
-        page,
-        limit,
-        pages: Math.ceil(total / limit)
-      }
-    });
-  } catch (err: any) {
-    console.error("GET top ideas error:", err);
-    res.status(500).json({ error: "Yuqori reytingli g'oyalarni yuklashda xatolik yuz berdi." });
-  }
-});
-
-// GET /api/startups/:id/ideas — shu elonga tegishli barcha g'oyalarni olish (eng ko'p ovoz olgani birinchi bo'lib chiqsin)
-app.get("/api/startups/:id/ideas", async (req: Request, res: Response) => {
-  const { id } = req.params;
-  try {
-    const ideas = await prisma.idea.findMany({
-      where: { startupId: id },
-      orderBy: [
-        { upvotes: "desc" },
-        { createdAt: "desc" }
-      ],
-    });
-    res.json(ideas);
-  } catch (err: any) {
-    console.error("GET ideas error:", err);
-    res.status(500).json({ error: "G'oyalarni yuklashda xatolik yuz berdi." });
-  }
-});
-
-// POST /api/startups/:id/ideas — yangi g'oya qo'shish (mehmon yoki login qilgan foydalanuvchi)
-app.post("/api/startups/:id/ideas", ideaLimiter, async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const { content, authorName } = req.body;
-
-  if (!content || !content.trim()) {
-    return res.status(400).json({ error: "G'oya matni bo'sh bo'lmasligi kerak." });
-  }
-
-  if (content.length > 500) {
-    return res.status(400).json({ error: "G'oya matni 500 belgidan oshmasligi kerak." });
-  }
-
-  try {
-    let userId: number | undefined = undefined;
-    let finalAuthorName = authorName?.trim();
-
-    let token = req.cookies?.token;
-    if (!token) {
-      const authHeader = req.headers["authorization"];
-      token = authHeader && authHeader.split(" ")[1];
-    }
-
-    if (token) {
-      try {
-        const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
-        userId = decoded.id;
-        if (!finalAuthorName) {
-          finalAuthorName = decoded.name;
-        }
-      } catch (authErr) {
-        // Token validation failed, fallback to guest
-      }
-    }
-
-    if (!finalAuthorName) {
-      finalAuthorName = "Mehmon";
-    }
-
-    const newIdea = await prisma.idea.create({
-      data: {
-        content: content.trim(),
-        startupId: id,
-        userId,
-        authorName: finalAuthorName,
-        upvotes: 0,
-      },
-    });
-
-    res.status(201).json(newIdea);
-  } catch (err: any) {
-    console.error("POST idea error:", err);
-    res.status(500).json({ error: "Xatolik yuz berdi, keyinroq qayta urinib ko'ring." });
-  }
-});
-
-// POST /api/ideas/:id/upvote — g'oyaga ovoz berish (+1)
-app.post("/api/ideas/:id/upvote", upvoteLimiter, async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const ideaIdNum = parseInt(id);
-
-  if (isNaN(ideaIdNum)) {
-    return res.status(400).json({ error: "Noto'g'ri g'oya ID si." });
-  }
-
-  // Identify voter
-  let voterKey = "";
-  let token = req.cookies?.token;
-  if (!token) {
-    const authHeader = req.headers["authorization"];
-    token = authHeader && authHeader.split(" ")[1];
-  }
-  if (token) {
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as any;
-      if (decoded && decoded.id) {
-        voterKey = "user-" + decoded.id;
-      }
-    } catch (err) {
-      // ignore decoding error and fallback to guest
-    }
-  }
-
-  if (!voterKey) {
-    let guestId = req.cookies?.guest_id;
-    if (!guestId) {
-      guestId = crypto.randomUUID();
-      res.cookie("guest_id", guestId, { maxAge: 365 * 24 * 60 * 60 * 1000, httpOnly: true, sameSite: "lax" });
-    }
-    const ip = req.ip || req.socket.remoteAddress || "unknown";
-    const userAgent = req.headers["user-agent"] || "unknown";
-    const rawKey = `guest-${guestId}-${ip}-${userAgent}`;
-    voterKey = crypto.createHash("sha256").update(rawKey).digest("hex");
-  }
-
-  try {
-    // Check if voter already voted
-    const existingVote = await prisma.ideaVote.findUnique({
-      where: {
-        ideaId_voterKey: {
-          ideaId: ideaIdNum,
-          voterKey: voterKey,
-        }
-      }
-    });
-
-    if (existingVote) {
-      return res.status(409).json({ error: "Siz allaqachon ovoz bergansiz" });
-    }
-
-    // Try to record the vote
-    try {
-      await prisma.ideaVote.create({
-        data: {
-          ideaId: ideaIdNum,
-          voterKey: voterKey,
-        }
-      });
-    } catch (createErr: any) {
-      if (createErr.code === 'P2002' || createErr.message?.includes('Unique constraint failed')) {
-        return res.status(409).json({ error: "Siz allaqachon ovoz bergansiz" });
-      }
-      throw createErr;
-    }
-
-    const updatedIdea = await prisma.idea.update({
-      where: { id: ideaIdNum },
-      data: {
-        upvotes: { increment: 1 }
-      }
-    });
-    res.json(updatedIdea);
-  } catch (err: any) {
-    console.error("Upvote idea error:", err);
-    res.status(500).json({ error: "Ovoz berishda xatolik yuz berdi." });
-  }
-});
 
 // --- FILE UPLOAD (TELEGRAM STORAGE) ---
 app.post("/api/upload", authenticateToken, uploadLimiter, upload.single("file"), async (req: AuthRequest, res: Response) => {
@@ -1932,7 +1400,7 @@ app.post("/api/upload", authenticateToken, uploadLimiter, upload.single("file"),
     try {
       metadata = await sharp(req.file.buffer).metadata();
     } catch (err) {
-      console.error("Fayl tarkibini tekshirishda xatolik (Sharp metadata):", err);
+      logger.error({ err: err }, "Fayl tarkibini tekshirishda xatolik (Sharp metadata)");
       return res.status(400).json({ error: "Fayl formati noto'g'ri yoki buzilgan." });
     }
 
@@ -1957,51 +1425,24 @@ app.post("/api/upload", authenticateToken, uploadLimiter, upload.single("file"),
         finalContentType = "image/jpeg";
         finalExt = ".jpg";
       } catch (err) {
-        console.error("Sharp processing error:", err);
+        logger.error({ err: err }, "Sharp processing error");
         return res.status(400).json({ error: "Fayl formati noto'g'ri yoki buzilgan." });
       }
     }
 
-    const telegramBotToken = await getSetting("TELEGRAM_BOT_TOKEN");
-    const storageChannelId = await getSetting("TELEGRAM_STORAGE_CHANNEL_ID");
-
-    if (!telegramBotToken || !storageChannelId) {
-      return res.status(500).json({ error: "Telegram storage sozlamalari (TOKEN yoki CHANNEL_ID) kiritilmagan." });
-    }
-
-    // Telegram'ga fayl yuborish with secured/generic filename
-    const formData = new FormData();
-    formData.append('chat_id', storageChannelId);
-    
-    // Create Blob for FormData with unique randomized filename
+    // Faylni serverning o'z diskidagi persistent /uploads papkasiga yozamiz
+    // (ilgari Telegram kanaliga yuborilardi — endi shart emas).
     const genericFilename = `file_${Date.now()}_${Math.random().toString(36).substring(2, 9)}${finalExt}`;
-    const blob = new Blob([finalBuffer], { type: finalContentType });
-    formData.append('document', blob, genericFilename);
+    await fs.promises.writeFile(path.join(UPLOADS_DIR, genericFilename), finalBuffer);
 
-    const tgResponse = await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendDocument`, {
-      method: 'POST',
-      body: formData
-    });
-
-    const tgData: any = await tgResponse.json();
-    if (!tgData.ok) {
-      console.error("Telegram upload error:", tgData);
-      return res.status(500).json({ error: "Xatolik yuz berdi, keyinroq qayta urinib ko'ring." });
-    }
-
-    const fileId = tgData.result.document?.file_id || tgData.result.photo?.[tgData.result.photo.length - 1]?.file_id;
-    if (!fileId) {
-      return res.status(500).json({ error: "Telegram'dan File ID olib bo'lmadi." });
-    }
-
-    const publicUrl = `/api/files/${fileId}`;
+    const publicUrl = `/uploads/${genericFilename}`;
 
     return res.json({
       url: publicUrl,
-      message: "Rasm Telegram'ga muvaffaqiyatli yuklandi."
+      message: "Rasm muvaffaqiyatli yuklandi."
     });
-  } catch (err: any) {
-    console.error("POST /api/upload error:", err);
+  } catch (err: unknown) {
+    logger.error({ err: err }, "POST /api/upload error");
     res.status(500).json({ error: "Xatolik yuz berdi, keyinroq qayta urinib ko'ring." });
   }
 });
@@ -2066,857 +1507,49 @@ app.get("/api/files/:fileId", async (req, res) => {
   }
 });
 
-// Internal helper to create a payment order (used by web and telegram)
-async function createPaymentOrder(userId: number, startupId: string, referralCode?: string, source: string = "web") {
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (user && !user.emailVerified && source === "web") {
-    throw new Error("Xaridni amalga oshirish uchun iltimos avval email manzilingizni tasdiqlang.");
-  }
-
-  const startupRecord = await prisma.startup.findUnique({ where: { id: startupId } });
-  if (!startupRecord || !startupRecord.price) {
-    throw new Error("Loyiha topilmadi yoki narx belgilanmagan.");
-  }
-  if (startupRecord.soldStatus === "sotildi") {
-    throw new Error("Bu loyiha allaqachon sotilgan.");
-  }
-  // 91-band: o'z loyihasini sotib olishni oldini olish (soxta "sotilgan" holat/pul aylanishi)
-  if (startupRecord.userId === userId) {
-    throw new Error("O'z loyihangizni sotib ololmaysiz.");
-  }
-
-  let basePrice = Number(startupRecord.price);
-  let realAmount = basePrice;
-  let discountApplied = 0;
-  let referralId = null;
-
-  // 1) B2B hisobni tekshirish (verified === true bo'lsa)
-  const b2bAccount = await prisma.b2BAccount.findUnique({ where: { userId } });
-  let b2bDiscountPercent = 0;
-  if (b2bAccount && b2bAccount.verified) {
-    b2bDiscountPercent = Number(b2bAccount.discount) || 0;
-  }
-
-  // 2) Referral kodni tekshirish
-  let referralDiscountPercent = 0;
-  let referralObj: any = null;
-
-  if (referralCode) {
-    const referral = await prisma.referral.findUnique({
-      where: { code: referralCode.trim().toUpperCase(), isActive: true }
-    });
-    
-    if (!referral) {
-      throw new Error("Referral code topilmadi yoki faol emas.");
-    }
-    
-    // Prevent self-referral
-    if (referral.referrerId === userId) {
-      throw new Error("O'zingizning referral kodingizdan foydalana olmaysiz.");
-    }
-    
-    // Prevent repeat use
-    const alreadyUsed = await prisma.referral.findFirst({
-      where: { 
-        code: referralCode.trim().toUpperCase(),
-        refereeId: userId 
-      }
-    });
-    
-    if (alreadyUsed) {
-      throw new Error("Siz bu referral koddan allaqachon foydalangansiz.");
-    }
-    
-    // Check referrer is not banned
-    const referrer = await prisma.user.findUnique({
-      where: { id: referral.referrerId }
-    });
-    
-    if (!referrer || referrer.isBanned) {
-      throw new Error("Ushbu referral kodning egasi faol emas.");
-    }
-
-    referralDiscountPercent = Number(referral.discountPercent) || 0;
-    referralObj = referral;
-  }
-
-  // 3) Kattaroq chegirmani tanlash (B2B vs Referral)
-  let chosenDiscountPercent = 0;
-  let discountType: "b2b" | "referral" | null = null;
-
-  if (referralDiscountPercent > b2bDiscountPercent && referralDiscountPercent > 0) {
-    chosenDiscountPercent = referralDiscountPercent;
-    discountType = "referral";
-    referralId = referralObj ? referralObj.id : null;
-  } else if (b2bDiscountPercent > 0) {
-    chosenDiscountPercent = b2bDiscountPercent;
-    discountType = "b2b";
-    referralId = null;
-  }
-
-  if (chosenDiscountPercent > 0) {
-    discountApplied = (basePrice * chosenDiscountPercent) / 100;
-    realAmount = basePrice - discountApplied;
-  }
-
-  let paymentSource = source;
-  if (discountType === "b2b") {
-    paymentSource = "b2b_discount";
-  } else if (discountType === "referral") {
-    paymentSource = "referral_discount";
-  }
-
-  const orderId = "CG-" + crypto.randomBytes(4).toString('hex').toUpperCase();
-  const secureToken = crypto.randomBytes(24).toString('hex');
-
-  // MUHIM: har safar checkout sahifasi qayta ochilsa yoki referral kod
-  // qo'llanganda payment qayta yaratilsa, oldingi "pending" buyurtma
-  // hech qachon yopilmasdi — bazada abadiy "pending" holatda qolib
-  // ketardi (agar kimdir eski CoinGate havolasini keyinroq to'lasa,
-  // finalizeCompletedPayment uni "refund_required"ga o'tkazadi, ammo
-  // bu qo'lda qaytarish talab qiladi). Endi shu userId+startupId uchun
-  // eski "pending" buyurtmalar yangisi yaratilishidan oldin "cancelled"
-  // qilinadi.
-  await prisma.$transaction([
-    prisma.payment.updateMany({
-      where: { userId, startupId, status: "pending" },
-      data: { status: "cancelled" }
-    }),
-    prisma.payment.create({
-      data: {
-        id: orderId,
-        amount: realAmount,
-        status: "pending",
-        currency: "USDT",
-        userId: userId,
-        startupId: startupId,
-        callbackToken: secureToken,
-        gateway: "coingate",
-        source: paymentSource,
-        referralId: referralId
-      },
-    })
-  ]);
-
-  let paymentUrl = "";
-  let useStripe = false;
-  let usedGateway = "coingate";
-
-  const coingateToken = await getSetting("COINGATE_API_TOKEN");
-  const appUrlSetting = await getSetting("APP_URL") || "http://localhost:3000";
-
-  if (coingateToken) {
-    try {
-      const response = await fetch("https://api.coingate.com/v2/orders", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "Authorization": `Token ${coingateToken}`,
-        },
-        body: new URLSearchParams({
-          order_id: orderId,
-          price_amount: realAmount.toFixed(2),
-          price_currency: "USD",
-          receive_currency: "USDT",
-          callback_url: `${appUrlSetting}/api/payments/webhook?token=${secureToken}`,
-          success_url: `${appUrlSetting}/checkout/success`,
-          cancel_url: `${appUrlSetting}/checkout/cancel`,
-          title: startupRecord.name,
-        }),
-      });
-
-      if (response.ok) {
-        const orderData: any = await response.json();
-        paymentUrl = orderData.payment_url;
-      } else {
-        useStripe = true;
-      }
-    } catch (coinGateErr: any) {
-      useStripe = true;
-    }
-  } else {
-    useStripe = true;
-  }
-
-  if (useStripe) {
-    const stripe = await getStripe();
-    if (stripe) {
-      try {
-        const session = await stripe.checkout.sessions.create({
-          payment_method_types: ["card"],
-          line_items: [{
-            price_data: {
-              currency: "usd",
-              product_data: { name: startupRecord.name },
-              unit_amount: Math.round(realAmount * 100),
-            },
-            quantity: 1,
-          }],
-          mode: "payment",
-          success_url: `${appUrlSetting}/checkout/success?paymentId=${orderId}`,
-          cancel_url: `${appUrlSetting}/checkout/cancel`,
-          metadata: { orderId, secureToken }
-        });
-        
-        paymentUrl = session.url!;
-        await prisma.payment.update({
-          where: { id: orderId },
-          // NOTE: previously this also set `id: session.id`, which overwrote the
-          // payment's primary key. That broke /api/payments/status/:id polling on
-          // the frontend (CheckoutPage.tsx polls using the original orderId, so the
-          // lookup returned 404 the moment this ran). Keep orderId as the stable id;
-          // metadata.orderId already carries it through to Stripe for correlation.
-          data: { gateway: "stripe" }
-        });
-        usedGateway = "stripe";
-      } catch (stripeErr) {
-        console.error("Stripe fallback error:", stripeErr);
-      }
-    }
-  }
-
-  let apiKeysMissing = false;
-  if (!paymentUrl) {
-    const stripeKey = await getSetting("STRIPE_SECRET_KEY") || process.env.STRIPE_SECRET_KEY;
-    if (!coingateToken && !stripeKey && process.env.NODE_ENV === "production") {
-      throw new Error("To'lov tizimi vaqtincha mavjud emas, keyinroq urinib ko'ring.");
-    }
-    apiKeysMissing = true;
-    paymentUrl = `${appUrlSetting}/api/payments/coingate-simulator?orderId=${orderId}&token=${secureToken}&amount=${realAmount.toFixed(2)}&title=${encodeURIComponent(startupRecord.name)}`;
-  }
-
-  return {
-    orderId,
-    paymentUrl,
-    amount: realAmount,
-    apiKeysMissing,
-    gateway: usedGateway,
-    discountPercent: chosenDiscountPercent,
-    discountType
-  };
-}
-
-// POST /api/payments/create — to'lov buyurtmasi yaratish
-app.post("/api/payments/create", authenticateToken, async (req: AuthRequest, res: Response) => {
-  const { startupId, referralCode } = req.body;
-
-  if (!startupId) {
-    return res.status(400).json({ error: "Loyiha ID si ko'rsatilishi shart." });
-  }
-
-  try {
-    const { orderId, paymentUrl, amount, apiKeysMissing, gateway, discountPercent, discountType } = await createPaymentOrder(req.user!.id, startupId, referralCode, "web");
-
-    res.status(201).json({
-      id: orderId,
-      amount: amount,
-      status: "pending",
-      currency: "USDT",
-      paymentUrl,
-      api_keys_missing: apiKeysMissing,
-      gateway,
-      discountPercent: discountPercent || 0,
-      discountType: discountType || null
-    });
-  } catch (err: any) {
-    console.error("POST /api/payments/create error:", err);
-    res.status(err.message.includes("tasdiqlang") ? 403 : 400).json({ error: err.message || "To'lov buyurtmasini yaratib bo'lmadi." });
-  }
-});
-
-// Telegram-specific payment endpoint
-app.post("/api/telegram/create-payment", async (req: Request, res: Response) => {
-  // Ichki maxfiy kalitni tekshir (faqat bot chaqira olishi uchun)
-  const secret = req.headers["x-telegram-bot-secret"];
-  const internalSecret = await getSetting("TELEGRAM_BOT_INTERNAL_SECRET") || process.env.TELEGRAM_BOT_INTERNAL_SECRET;
-  
-  if (!internalSecret || !secret || typeof secret !== "string" || !safeCompare(secret, internalSecret)) {
-    return res.status(403).json({ error: "Ruxsat berilmagan." });
-  }
-
-  const { telegramUserId, startupId } = req.body;
-  if (!telegramUserId || !startupId) {
-    return res.status(400).json({ error: "Majburiy maydonlar to'ldirilmagan." });
-  }
-
-  try {
-    // telegramUserId orqali bog'langan foydalanuvchini top
-    const user = await prisma.user.findFirst({ where: { telegramUserId: telegramUserId.toString() } });
-    if (!user) {
-      return res.status(404).json({
-        error: "Hisobingiz Telegram bilan bog'lanmagan. Avval /bogla {kod} buyrug'ini ishlating."
-      });
-    }
-
-    const { orderId, paymentUrl } = await createPaymentOrder(user.id, startupId, undefined, "telegram");
-
-    // QR-kod yaratish
-    const qrCodeDataUrl = await QRCode.toDataURL(paymentUrl, { width: 400, margin: 2 });
-
-    res.json({ paymentUrl, orderId, qrCode: qrCodeDataUrl });
-  } catch (err: any) {
-    console.error("POST /api/telegram/create-payment error:", err);
-    res.status(400).json({ error: err.message || "To'lov yaratishda xatolik." });
-  }
-});
-
-// Mock Interactive Payment gateway to test Webhook easily
-
-app.get("/api/payments/my", authenticateToken, async (req: AuthRequest, res: Response) => {
-  if (!req.user) return res.status(401).json({ error: "Unauthorized" });
-
-  try {
-    const payments = await prisma.payment.findMany({
-      where: {
-        userId: req.user.id,
-        status: "completed",
-      },
-      include: {
-        startup: true,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
-    return res.json({ payments });
-  } catch (err) {
-    console.error("GET /api/payments/my error:", err);
-    return res.status(500).json({ error: "Xatolik yuz berdi" });
-  }
-});
-
-app.get("/api/payments/coingate-simulator", async (req: Request, res: Response) => {
-  if (process.env.NODE_ENV === "production") {
-    return res.status(403).json({ error: "Forbidden: Mock gateway is only available in development mode." });
-  }
-
-  const { orderId, token, amount, title } = req.query;
-
-  if (!orderId || !token) {
-    return res.status(400).send("Buyurtma ID si yoki token yo'q.");
-  }
-
-  const safeOrderId = JSON.stringify(String(orderId));
-  const safeToken = JSON.stringify(String(token));
-  const safeAmount = JSON.stringify(String(amount || ""));
-
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>Savdo24 CoinGate Simulator</title>
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-        <style>
-          body {
-            font-family: 'Inter', sans-serif;
-            background: #0d131a;
-            color: #ffffff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-          }
-          .card {
-            background: #18202c;
-            border-radius: 20px;
-            padding: 36px;
-            text-align: center;
-            max-width: 440px;
-            width: 100%;
-            border: 1px solid #2d3848;
-            box-shadow: 0 15px 40px rgba(0,0,0,0.6);
-          }
-          h2 { color: #10b981; margin-top: 0; font-size: 24px; font-weight: 800; }
-          .logo { color: #10b981; font-size: 32px; font-weight: 900; margin-bottom: 20px; letter-spacing: -1px; }
-          .order-id { font-size: 13px; color: #a0aec0; margin-bottom: 12px; font-family: monospace; }
-          .amount { font-size: 36px; font-weight: 900; color: #ffffff; margin: 20px 0; }
-          .currency { font-size: 18px; color: #10b981; }
-          .info-text { font-size: 13px; color: #718096; line-height: 1.6; margin-bottom: 30px; }
-          button {
-            background: #10b981;
-            color: #ffffff;
-            border: none;
-            padding: 14px 28px;
-            font-weight: 700;
-            font-size: 16px;
-            border-radius: 12px;
-            cursor: pointer;
-            width: 100%;
-            transition: all 0.2s;
-            box-shadow: 0 4px 12px rgba(16,185,129,0.2);
-          }
-          button:hover {
-            background: #059669;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(16,185,129,0.3);
-          }
-          button:active {
-            transform: translateY(0);
-          }
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <div class="logo">CoinGate</div>
-          <h2>To'lov Shlyuzi (Simulyator)</h2>
-          <p class="order-id">Buyurtma ID: <strong>${escapeHtml(String(orderId))}</strong></p>
-          <p style="color: #cbd5e0; font-size: 15px; font-weight: 600; margin-bottom: 4px;">${escapeHtml(String(title || "Loyiha xaridi"))}</p>
-          <div class="amount">${escapeHtml(String(amount || ""))} <span class="currency">USDT</span></div>
-          <p class="info-text">Bu CoinGate to'lov tizimining integratsiyasini va webhook qayta qo'ng'iroqlarini tekshirish uchun maxsus simulyatordir.</p>
-          <button onclick="pay()">To'lovni tasdiqlash</button>
-        </div>
-        <script>
-          async function pay() {
-            try {
-              const params = new URLSearchParams();
-              params.append('order_id', ${safeOrderId});
-              params.append('status', 'paid');
-              params.append('price_amount', ${safeAmount});
-              params.append('price_currency', 'USD');
-              params.append('id', 'CG-' + Math.floor(Math.random() * 1000000));
-
-              const res = await fetch('/api/payments/webhook?token=' + encodeURIComponent(${safeToken}), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: params
-              });
-
-              if (res.ok) {
-                alert("To'lov muvaffaqiyatli amalga oshirildi! CoinGate Webhook yuborildi.");
-                window.close();
-                document.body.innerHTML = \`
-                  <div class="card">
-                    <div class="logo">CoinGate</div>
-                    <h2 style="color: #10b981;">✓ To'lov tasdiqlandi!</h2>
-                    <p style="color: #cbd5e0;">Muvaffaqiyatli yakunlandi. Endi ushbu oynani yopishingiz mumkin.</p>
-                  </div>
-                \`;
-              } else {
-                const text = await res.text();
-                alert("To'lov webhook xatosi: " + text);
-              }
-            } catch(err) {
-              alert("Xatolik: " + err.message);
-            }
-          }
-        </script>
-      </body>
-    </html>
-  `);
-});
-
-// POST /api/payments/webhook — CoinGate webhook callback qabul qilish
-async function finalizeCompletedPayment(payment: any): Promise<string> {
-    let updatedStatus = "completed";
-
-    if (payment.startupId) {
-      const startup = await prisma.startup.findUnique({ where: { id: payment.startupId } });
-      if (startup && startup.soldStatus === "sotildi") {
-        updatedStatus = "refund_required";
-        console.log(`Startup ${payment.startupId} is already sold. Setting payment ${payment.id} to 'refund_required'.`);
-      }
-    }
-
-    const numAmount = Number(payment.amount);
-    let platformFeeAmount = null;
-    let sellerPayoutAmount = null;
-    if (updatedStatus === "completed") {
-      const { fee, payout } = splitAmount(numAmount, PLATFORM_FEE_PERCENT);
-      platformFeeAmount = fee;
-      sellerPayoutAmount = payout;
-    }
-
-    await prisma.payment.update({
-      where: { id: payment.id },
-      data: { 
-        status: updatedStatus,
-        platformFeeAmount,
-        sellerPayoutAmount
-      },
-    });
-
-    if (updatedStatus === "completed" && payment.referralId) {
-      const referral = await prisma.referral.findUnique({
-        where: { id: payment.referralId }
-      });
-      if (referral) {
-        // Eslatma: refereeId shu yerda faqat "oxirgi referal qilingan
-        // foydalanuvchi" sifatida ma'lumot uchun yoziladi — bitta doimiy
-        // referral qatori ko'p marta ishlatilishi mumkinligi sabab, haqiqiy
-        // referal soni endi getReferralCount() (ReferralReward asosida)
-        // orqali hisoblanadi, bu maydon orqali emas.
-        await prisma.referral.update({
-          where: { id: referral.id },
-          data: { refereeId: payment.userId || 0 }
-        });
-        
-        const rewardAmount = roundToCents((numAmount * Number(referral.commissionPercent)) / 100);
-        await prisma.referralReward.create({
-          data: {
-            referralId: referral.id,
-            paymentId: payment.id,
-            rewardAmount,
-            status: "earned"
-          }
-        });
-        
-        await createNotification(
-          referral.referrerId,
-          "SYSTEM",
-          "Referral mukofoti!",
-          `Tabriklaymiz! Sizning referralingiz orqali xarid amalga oshirildi. Sizga $${rewardAmount.toFixed(2)} miqdorida mukofot hisoblandi.`,
-          `/profile`
-        );
-
-        // 96-band: referralCount endi to'g'ri hisoblanadi (yuqoriga qarang),
-        // lekin referral qatoridagi discountPercent/commissionPercent hali ham
-        // faqat kod BIRINCHI marta yaratilganda (referralCount=0, Tier 1)
-        // o'rnatilib, keyin hech qachon yangilanmasdi — ya'ni 6/21+ referaldan
-        // keyin ham foydalanuvchi abadiy Tier 1 (5%) da qolib ketardi. Endi har
-        // bir muvaffaqiyatli referaldan so'ng daraja qayta hisoblanadi va
-        // o'zgargan bo'lsa (keyingi referallar uchun) yangilanadi.
-        const newReferralCount = await getReferralCount(referral.referrerId);
-        const newTier = getReferralTier(newReferralCount);
-        if (newTier.discount !== Number(referral.discountPercent) || newTier.commission !== Number(referral.commissionPercent)) {
-          await prisma.referral.update({
-            where: { id: referral.id },
-            data: { discountPercent: newTier.discount, commissionPercent: newTier.commission }
-          }).catch((tierErr: any) => console.error("Referral tier update error:", tierErr));
-        }
-      }
-    }
-
-    if (updatedStatus === "completed" && payment.startupId && !payment.id.startsWith("TOP-") && !payment.id.startsWith("UPG-")) {
-      // Create Escrow Payment
-      await prisma.escrowPayment.upsert({
-        where: { paymentId: payment.id },
-        update: {},
-        create: {
-          paymentId: payment.id,
-          status: "held",
-          holdEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-        }
-      });
-    }
-
-    // FIX: TOP-/UPG- to'lovlarida ham startupId bor (boost/upgrade o'zi shu startap uchun),
-    // lekin bu "startapni sotib oldim" emas — email faqat haqiqiy xariddan keyin yuborilishi kerak.
-    if (updatedStatus === "completed" && !payment.id.startsWith("TOP-") && !payment.id.startsWith("UPG-")) {
-      const buyer = await prisma.user.findUnique({ where: { id: payment.userId } });
-      const startup = await prisma.startup.findUnique({ where: { id: payment.startupId }, include: { user: true } });
-      
-      if (buyer && startup) {
-        // To Buyer
-        await sendEmail(
-          buyer.email,
-          "Xarid muvaffaqiyatli yakunlandi",
-          `<p>Tabriklaymiz! Siz <b>${escapeHtml(startup.name)}</b> loyihasini muvaffaqiyatli sotib oldingiz.</p><p>Loyiha fayllari va tafsilotlari tez orada sizga yetkaziladi.</p>`,
-          true
-        );
-        // To Seller
-        if (startup.user) {
-          await sendEmail(
-            startup.user.email,
-            "Loyihangiz sotildi!",
-            `<p>Tabriklaymiz! Sizning <b>${escapeHtml(startup.name)}</b> loyihangiz sotib olindi.</p><p>To'lov qabul qilindi. Tafsilotlar uchun dashboardni ko'ring.</p>`,
-            true
-          );
-        }
-      }
-    }
-
-    if (updatedStatus === "completed" && payment.startupId && !payment.id.startsWith("TOP-") && !payment.id.startsWith("UPG-")) {
-      await prisma.telegramDelivery.create({
-        data: {
-          token: crypto.randomBytes(24).toString('hex'),
-          paymentId: payment.id,
-          startupId: payment.startupId,
-          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
-        }
-      });
-    }
-
-    // If successful payment, dynamically update soldStatus on the specific startup (ikki marta sotilishning oldini olgan holda)
-    if (updatedStatus === "completed" && payment.startupId && !payment.id.startsWith("TOP-") && !payment.id.startsWith("UPG-")) {
-      const startup = await prisma.startup.findUnique({ where: { id: payment.startupId } });
-      if (startup && startup.soldStatus !== "sotildi") {
-        await prisma.startup.update({
-          where: { id: payment.startupId },
-          data: {
-            soldStatus: "sotildi",
-            proposalsCount: { increment: 1 },
-          },
-        });
-        console.log(`Updated soldStatus for startup ${payment.startupId} to 'sotildi'`);
-
-        // If from telegram, notify user via bot
-        if (payment.source === "telegram" && payment.userId) {
-          const buyer = await prisma.user.findUnique({ where: { id: payment.userId } });
-          const startup = await prisma.startup.findUnique({ where: { id: payment.startupId } });
-          if (buyer && buyer.telegramUserId && startup) {
-            await sendTelegramMessage(
-              buyer.telegramUserId, 
-              `✅ To'lovingiz muvaffaqiyatli qabul qilindi! "${startup.name}" endi sizniki.`
-            );
-          }
-        }
-      }
-    }
-
-    // Listing Tier Upgrade logic
-    if (updatedStatus === "completed" && payment.id.startsWith("UPG-")) {
-      const subscription = await prisma.listingSubscription.findFirst({
-        where: { paymentId: payment.id },
-        include: { tier: true }
-      });
-      if (subscription && payment.startupId) {
-        // MUHIM: eski expiresAt to'lov "pending" holatda yaratilgan paytda
-        // hisoblangan edi — to'lov (ayniqsa CoinGate) tasdiqlanishi soatlab
-        // cho'zilsa, sotib olingan muddat jimgina qisqarib qolardi. Endi
-        // muddat aynan to'lov tasdiqlangan shu paytdan hisoblanadi.
-        const realExpiresAt = new Date(Date.now() + subscription.tier.durationDays * 24 * 60 * 60 * 1000);
-        await prisma.listingSubscription.update({
-          where: { id: subscription.id },
-          data: { expiresAt: realExpiresAt }
-        });
-        await prisma.startup.update({
-          where: { id: payment.startupId },
-          data: { 
-            currentTier: subscription.tier.tier,
-            isTop: subscription.tier.tier !== "standard",
-            topExpiresAt: realExpiresAt
-          }
-        });
-        console.log(`Upgraded startup ${payment.startupId} to ${subscription.tier.tier}`);
-        
-        await createNotification(
-          payment.userId || 0,
-          "SYSTEM",
-          "Loyiha upgrade qilindi!",
-          `Sizning loyihangiz muvaffaqiyatli ${subscription.tier.displayName} darajasiga ko'tarildi.`,
-          `/startup/${payment.startupId}`
-        );
-      }
-    }
-
-    // TOP and VIP activations
-    if (updatedStatus === "completed") {
-      if (payment.id.startsWith("TOP-") && payment.startupId && payment.userId) {
-        const days = parseInt(payment.id.split("-")[1]);
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + days);
-        
-        await prisma.startup.update({
-          where: { id: payment.startupId },
-          data: {
-            isTop: true,
-            topExpiresAt: expiresAt
-          }
-        });
-        
-        await prisma.topBoost.create({
-          data: {
-            startupId: payment.startupId,
-            userId: payment.userId,
-            days,
-            pricePaid: payment.amount,
-            expiresAt
-          }
-        });
-      } else if (payment.id.startsWith("VIP-") && payment.userId) {
-        const days = parseInt(payment.id.split("-")[1]);
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + days);
-        
-        await prisma.user.update({
-          where: { id: payment.userId },
-          data: {
-            isVip: true,
-            vipExpiresAt: expiresAt
-          }
-        });
-        
-        await prisma.vipSubscription.create({
-          data: {
-            userId: payment.userId,
-            days,
-            pricePaid: payment.amount,
-            expiresAt
-          }
-        });
-      }
-    }
-
-  return updatedStatus;
-}
-
-app.post("/api/payments/webhook", async (req: Request, res: Response) => {
-  const token = req.query.token as string;
-  const { order_id, status, price_amount, price_currency, id } = req.body;
-
-  if (!order_id || !status) {
-    return res.status(400).json({ error: "Missing required webhook parameters." });
-  }
-
-  try {
-    const payment = await prisma.payment.findUnique({ where: { id: order_id } });
-    if (!payment) {
-      return res.status(404).json({ error: "Payment order not found." });
-    }
-
-    // Kelgan token query parametrini bazadagi saqlangan callbackToken bilan constant-time solishtir
-    const savedToken = payment.callbackToken;
-    if (!token || !savedToken || !safeCompare(token, savedToken)) {
-      console.warn("Secure token verification failed for order_id:", order_id);
-      return res.status(401).json({ error: "Unauthorized: Token mismatch or missing." });
-    }
-
-    // IDEMPOTENTLIK: to'lov tizimlari (CoinGate/Stripe) bir xil webhook'ni bir necha marta
-    // qayta yuborishi mumkin (retry). Agar bu buyurtma allaqachon yakuniy holatga o'tgan
-    // bo'lsa, butun jarayonni qayta ishlamasdan darhol muvaffaqiyatli javob qaytaramiz —
-    // aks holda referral mukofoti, email/bildirishnomalar va TOP/VIP muddati har safar
-    // qayta hisoblanib, foydalanuvchiga bir necha marta pul/bonus berilib ketishi mumkin edi.
-    if (payment.status === "completed" || payment.status === "refund_required") {
-      return res.json({ success: true, orderId: order_id, status: payment.status, idempotent: true });
-    }
-
-    // Token mos kelsa ham, CoinGate'ning GET Order endpointiga qo'shimcha so'rov yuborib qayta tekshir
-    let verifiedStatus = status;
-    let verifiedAmount = price_amount;
-
-    const coingateToken = await getSetting("COINGATE_API_TOKEN");
-
-    if (coingateToken && id) {
-      try {
-        const checkResponse = await fetch(`https://api.coingate.com/v2/orders/${id}`, {
-          method: "GET",
-          headers: {
-            "Authorization": `Token ${coingateToken}`
-          }
-        });
-        if (checkResponse.ok) {
-          const checkData: any = await checkResponse.json();
-          verifiedStatus = checkData.status;
-          verifiedAmount = checkData.price_amount;
-          console.log("Verified Order via CoinGate API GET check:", checkData);
-        } else {
-          console.error("CoinGate GET Order check failed with status:", checkResponse.status);
-          return res.status(400).json({ error: "CoinGate API verification failed." });
-        }
-      } catch (apiErr: any) {
-        console.error("Failed to connect to CoinGate GET Order API:", apiErr.message);
-        return res.status(500).json({ error: "CoinGate API connection failed." });
-      }
-    }
-
-    if (!coingateToken || !id) {
-      logger.warn({ order_id }, "Webhook COINGATE_API_TOKEN yoki id yo'qligi sababli mustaqil tasdiqlanmadi — faqat callback token bilan cheklanmoqda.");
-    }
-
-    // CoinGate statuses: paid or completed mean successful payment
-    const isCompleted = verifiedStatus === "paid" || verifiedStatus === "completed";
-
-    if (!isCompleted) {
-      const localStatus = (verifiedStatus === "expired" || verifiedStatus === "canceled" || verifiedStatus === "invalid") ? "failed" : "pending";
-      await prisma.payment.update({
-        where: { id: order_id },
-        data: { status: localStatus }
-      });
-      return res.json({ success: true, orderId: order_id, status: localStatus });
-    }
-
-    // Qayta tekshirilgan summa to'g'ri kelishini solishtir
-    if (Math.abs(parseFloat(verifiedAmount) - payment.amount) > 0.01) {
-      console.warn(`Payment amount mismatch. Expected: ${payment.amount}, Got: ${verifiedAmount}`);
-      return res.status(400).json({ error: "Payment amount mismatch." });
-    }
-
-    const updatedStatus = await finalizeCompletedPayment(payment);
-
-    res.json({ success: true, orderId: order_id, status: updatedStatus });
-  } catch (err: any) {
-    console.error("Webhook processing error:", err);
-    res.status(500).json({ error: "Webhook processing failed." });
-  }
-});
+// 128-bosqich (server.ts modullashtirish davomi): createPaymentOrder() va
+// finalizeCompletedPayment() src/lib/payments.ts'ga, ularni ishlatgan barcha
+// to'lov route'lari (create, telegram/create-payment, my, coingate-simulator,
+// webhook, status) src/routes/payments.ts'ga ko'chirildi. finalizeCompletedPayment
+// bu yerda ham import qilinadi, chunki uni /api/payments/stripe-webhook (pastda)
+// ham chaqiradi — u xom (raw) so'rov tanasi kerakligi sabab global express.json()'dan
+// OLDIN shu faylda qolishi shart.
+app.use("/api", paymentsRouter);
 
 // 116-bosqich: telegram-integratsiya route'lari
 // src/routes/telegram-integration.ts'ga ko'chirildi.
-import telegramIntegrationRouter from "./src/routes/telegram-integration";
 app.use("/api/telegram", telegramIntegrationRouter);
 
 
 // 117-bosqich: conversations/messaging route'lari
 // src/routes/conversations.ts'ga ko'chirildi.
-import conversationsRouter from "./src/routes/conversations";
 app.use("/api/conversations", conversationsRouter);
 
-// GET /api/payments/status/:id — to'lov holatini tekshirish
-app.get("/api/payments/status/:id", authenticateToken, paymentStatusLimiter, async (req: AuthRequest, res: Response) => {
-  try {
-    const { id } = req.params;
-    const payment = await prisma.payment.findUnique({
-      where: { id },
-      include: { startup: true }
-    });
-    if (!payment) {
-      return res.status(404).json({ error: "To'lov topilmadi." });
-    }
-
-    // Ownership check
-    if (payment.userId !== req.user?.id && req.user?.role !== "Admin") {
-      return res.status(403).json({ error: "Ruxsat etilmagan. Faqat o'z to'lovlaringizni ko'rishingiz mumkin." });
-    }
-    
-    if (payment.status === "completed" && payment.startup) {
-      const delivery = await prisma.telegramDelivery.findFirst({ where: { paymentId: id } });
-      return res.json({
-        id: payment.id,
-        status: payment.status,
-        amount: payment.amount,
-        deliveryUrl: payment.startup.deliveryUrl || "",
-        sellerContact: payment.startup.contactTelegram || payment.startup.contactEmail || payment.startup.contactPhone || "Sotuvchi aloqa ma'lumoti kiritilmagan",
-        repoUrl: payment.startup.deliveryUrl || "",
-        telegramToken: delivery?.token
-      });
-    }
-    
-    res.json({ id: payment.id, status: payment.status, amount: payment.amount });
-  } catch (err: any) {
-    console.error("Get payment status error:", err);
-    res.status(500).json({ error: "To'lov holatini olishda xatolik yuz berdi." });
-  }
-});
-
 // 113-bosqich: reviews route'lari src/routes/reviews.ts'ga ko'chirildi.
-import reviewsRouter from "./src/routes/reviews";
 app.use("/api", reviewsRouter);
 
 // 112-bosqich: disputes route'lari src/routes/disputes.ts'ga ko'chirildi.
-import disputesRouter from "./src/routes/disputes";
 app.use("/api/disputes", disputesRouter);
 
 // 120-bosqich: audit-logs+stats route'lari src/routes/admin-audit.ts'ga ko'chirildi.
-import adminAuditRouter from "./src/routes/admin-audit";
 app.use("/api/admin", adminAuditRouter);
 
 
 // DELETE /api/admin/startups/:id — E'lonni o'chirish (Admin)
 // 121-bosqich: admin startup/idea delete route'lari src/routes/admin-delete.ts'ga
 // ko'chirildi (sponsor-channels.ts naqshi bilan bir xil).
-import adminDeleteRouter from "./src/routes/admin-delete";
 app.use("/api/admin", adminDeleteRouter);
 
 // 119-bosqich: admin/settings route'lari src/routes/admin-settings.ts'ga
 // ko'chirildi.
-import adminSettingsRouter from "./src/routes/admin-settings";
 app.use("/api/admin/settings", adminSettingsRouter);
 
 // 110-bosqich: sponsor-channels routes src/routes/sponsor-channels.ts'ga
 // ko'chirildi (auth.ts/support.ts naqshi bilan bir xil).
-import sponsorChannelsRouter from "./src/routes/sponsor-channels";
 app.use("/api/admin/sponsor-channels", sponsorChannelsRouter);
+app.use("/api/telegram/exchange", exchangeChannelsRouter);
+app.use("/api/admin/exchange-channels", exchangeAdminRouter);
+app.use("/api/exchange", exchangeSiteRouter);
 
 async function seedSettings() {
   const defaults = [
@@ -2925,8 +1558,7 @@ async function seedSettings() {
     { key: "VIP_PRICE_PER_DAY", value: "0.5" },
     { key: "VIP_DISCOUNT_PERCENT", value: "40" },
     { key: "TELEGRAM_STORAGE_CHANNEL_ID", value: "" },
-    { key: "TELEGRAM_ADMIN_CHAT_ID", value: "" },
-    { key: "TELEGRAM_BOT_INTERNAL_SECRET", value: "" }
+    { key: "TELEGRAM_ADMIN_CHAT_ID", value: "" }
   ];
 
   for (const s of defaults) {
@@ -2939,40 +1571,135 @@ async function seedSettings() {
             value: encryptSecret(s.value)
           }
         });
-        console.log(`Seeded setting: ${s.key}`);
+        logger.info({ key: s.key }, "Seeded setting");
+        continue;
+      }
+
+      // TUZATILDI (foydalanuvchi talabi — admin panelda "⚠️ SHIFRLASHDA
+      // XATOLIK — qiymatni qayta kiriting" ko'rinishi tuzatildi): agar
+      // qator ALLAQACHON mavjud bo'lsa, avval bu yerda HECH NARSA
+      // tekshirilmasdi. Lekin ba'zi eski qatorlar (odatda ENCRYPTION_KEY
+      // avval boshqacha bo'lgan yoki .env'da umuman sozlanmagan paytda,
+      // vaqtinchalik tasodifiy dev-kalit bilan shifrlangan) hozirgi
+      // ENCRYPTION_KEY bilan DESHIFRLANMAY qoladi — admin panelda doimiy
+      // xato ko'rsatib turadi, garchi bu FAQAT standart (seedSettings)
+      // sozlamalar bo'lsa ham (ya'ni admin hali qo'lda maxsus qiymat
+      // kiritmagan). Endi shu holat avtomatik ANIQLANADI va standart
+      // qiymat bilan JORIY kalit ostida QAYTA shifrlab qo'yiladi — admin
+      // keyin xohlasa buni oddiy tahrirlaydi, lekin doimiy xato ko'rinib
+      // turmaydi.
+      try {
+        decryptSecret(exists.value);
+      } catch (decryptErr) {
+        await prisma.setting.update({
+          where: { key: s.key },
+          data: { value: encryptSecret(s.value) }
+        });
+        logger.warn(
+          { key: s.key },
+          "Sozlama eski/mos kelmaydigan ENCRYPTION_KEY bilan shifrlangan edi — standart qiymat bilan joriy kalit ostida qayta shifrlandi."
+        );
       }
     } catch (err) {
-      console.error(`Error seeding ${s.key}:`, err);
+      logger.error({ err: err }, `Error seeding ${s.key}`);
     }
+  }
+
+  // Tozalash: TELEGRAM_BOT_INTERNAL_SECRET ilgari bazada (admin panel
+  // orqali) saqlanardi va bu qiymat telegram-bot processi ko'radigan
+  // .env qiymatidan farq qilib qolsa, botning HAR BIR so'rovi doimiy
+  // "403 Ruxsat etilmagan" xatosi bilan rad etilardi (chunki server
+  // bazadagi qiymatni ustun qo'yardi, bot esa umuman bazani ko'rmaydi).
+  // Endi bu kalit FAQAT src/lib/context.ts'dagi getSecret() orqali
+  // (.env yoki avto-generatsiya qilingan umumiy fayldan) olinadi, shu
+  // sabab bazada qolib ketgan har qanday eski qiymat endi zararli —
+  // uni har server ishga tushganda avtomatik o'chirib tashlaymiz.
+  try {
+    const stale = await prisma.setting.findUnique({ where: { key: "TELEGRAM_BOT_INTERNAL_SECRET" } });
+    if (stale) {
+      await prisma.setting.delete({ where: { key: "TELEGRAM_BOT_INTERNAL_SECRET" } });
+      logger.warn(
+        "🔧 Bazada eskirgan TELEGRAM_BOT_INTERNAL_SECRET topildi va avtomatik o'chirildi " +
+        "(bot bilan mos kelmay, doimiy \"Ruxsat etilmagan\" xatosiga sabab bo'lishi mumkin edi)."
+      );
+    }
+  } catch (err) {
+    logger.error({ err }, "Error cleaning up stale TELEGRAM_BOT_INTERNAL_SECRET setting");
   }
 }
 
 // Initialize Express + Vite Setup
 async function start() {
-  console.log(isPostgres ? "✅ PostgreSQL bazasiga ulanildi (production)" : "⚠️  SQLite (dev.db) ishlatilyapti — bu faqat lokal rivojlantirish uchun!");
-  
+  logger.info(isPostgres ? "PostgreSQL bazasiga ulanildi (production)" : "SQLite (dev.db) ishlatilyapti — bu faqat lokal rivojlantirish uchun!");
+
+  // MUHIM ("qayta build qilinganda foydalanuvchilar yo'qoladi" muammosi):
+  // DATABASE_URL sozlanmagan bo'lsa (SQLite rejimi), pastdagi kod
+  // `prisma db push --accept-data-loss` orqali dev.db faylini qayta
+  // yaratadi. Ko'pchilik hosting platformalarida (Render, Railway va h.k.)
+  // doimiy disk ulanmagan bo'lsa, konteyner har bir qayta build/deploy'da
+  // TOZA fayl tizimidan boshlanadi — ya'ni dev.db har safar bo'shdan
+  // yaratiladi va barcha foydalanuvchilar/e'lonlar YO'QOLADI. Bundan ham
+  // yomoni: butun backup/auto-restore tizimi (backup-db.ts, restore-db.ts,
+  // admin-backup.ts) ATAYLAB faqat PostgreSQL (DATABASE_URL) bilan ishlaydi
+  // — SQLite rejimida na zaxira olinadi, na tiklash ishlaydi, shuning uchun
+  // pastdagi checkAndAutoRestore() ham yordam bera olmaydi. Oldin bu holat
+  // faqat bitta log qatorida ("faqat lokal rivojlantirish uchun") jim
+  // aytilardi — production'da buni ko'rish deyarli mumkin emas edi. Endi
+  // production-o'xshash muhitda (NODE_ENV=production yoki hosting
+  // platformasi belgilaydigan standart o'zgaruvchilar mavjud bo'lsa) bu
+  // holat KRITIK deb belgilanadi va adminga Telegram orqali darhol
+  // ogohlantirish yuboriladi — HAQIQIY YECHIM esa DATABASE_URL'ni haqiqiy
+  // PostgreSQL ulanish satriga sozlash (masalan Render Postgres, Neon,
+  // yoki Supabase) va qayta deploy qilishdir.
+  if (!isPostgres) {
+    const looksLikeProduction = !!(
+      process.env.NODE_ENV === "production" ||
+      process.env.RENDER ||
+      process.env.RAILWAY_ENVIRONMENT ||
+      process.env.FLY_APP_NAME
+    );
+    if (looksLikeProduction) {
+      const criticalMsg =
+        "🔴 KRITIK: DATABASE_URL sozlanmagan — server SQLite (dev.db) rejimida " +
+        "ishlamoqda! Bu muhit vaqtinchalik (ephemeral) diskka ega bo'lsa, HAR " +
+        "BIR qayta build/deploy'da barcha foydalanuvchilar va e'lonlar " +
+        "YO'QOLADI, chunki: (1) SQLite fayli doimiy diskda saqlanmaydi va " +
+        "(2) zaxira/tiklash tizimi (Telegram/S3/Google Drive backup) faqat " +
+        "PostgreSQL bilan ishlaydi, SQLite'da hech narsa zaxiralanmaydi. " +
+        "YECHIM: hosting platformangizda (Render/Railway/Fly va h.k.) " +
+        "DATABASE_URL muhit o'zgaruvchisini haqiqiy PostgreSQL ulanish " +
+        "satriga sozlang va qayta deploy qiling.";
+      logger.error(criticalMsg);
+      try {
+        await notifyAdminTelegram(criticalMsg);
+      } catch (notifyErr) {
+        logger.error({ err: notifyErr }, "SQLite production ogohlantirishini Telegram orqali yuborib bo'lmadi");
+      }
+    }
+  }
+
   if (isPostgres) {
     try {
-      console.log("DATABASE_URL found. Deploying PostgreSQL migrations...");
+      logger.info("DATABASE_URL found. Deploying PostgreSQL migrations...");
       execSync("npx prisma migrate deploy --schema=prisma/schema.prisma", { stdio: "inherit" });
-      console.log("PostgreSQL migrations deployed successfully.");
+      logger.info("PostgreSQL migrations deployed successfully.");
     } catch (migrateErr) {
-      console.error("PostgreSQL migration deployment failed on startup:", migrateErr);
+      logger.error({ err: migrateErr }, "PostgreSQL migration deployment failed on startup");
     }
     try {
-      console.log("DATABASE_URL found. Syncing PostgreSQL schema with db push...");
+      logger.info("DATABASE_URL found. Syncing PostgreSQL schema with db push...");
       execSync("npx prisma db push --schema=prisma/schema.prisma --accept-data-loss", { stdio: "inherit" });
-      console.log("PostgreSQL schema synced successfully.");
+      logger.info("PostgreSQL schema synced successfully.");
     } catch (pushErr) {
-      console.error("PostgreSQL db push failed on startup:", pushErr);
+      logger.error({ err: pushErr }, "PostgreSQL db push failed on startup");
     }
   } else {
     try {
-      console.log("Using SQLite. Syncing database schema...");
+      logger.info("Using SQLite. Syncing database schema...");
       execSync("npx prisma db push --schema=prisma/schema.sqlite.prisma --accept-data-loss", { stdio: "inherit" });
-      console.log("SQLite database synced successfully.");
+      logger.info("SQLite database synced successfully.");
     } catch (pushErr) {
-      console.error("SQLite database sync failed on startup:", pushErr);
+      logger.error({ err: pushErr }, "SQLite database sync failed on startup");
     }
   }
 
@@ -2981,7 +1708,7 @@ async function start() {
     try {
       const userCount = await prisma.user.count();
       if (userCount === 0) {
-        console.warn("⚠️ Database is empty - attempting auto-restore from backup...");
+        logger.warn("⚠️ Database is empty - attempting auto-restore from backup...");
         
         const lastBackupFileId = await getSetting("last_backup_file_id");
         const fallbackPath = path.join(process.cwd(), 'last_backup.json');
@@ -2993,9 +1720,14 @@ async function start() {
         // o'rnatish" deb xato xulosaga kelinardi. Endi S3 sozlamalari ham
         // tekshiriladi.
         const hasS3Config = !!(await getSetting("CONTABO_S3_ENDPOINT")) && !!(await getSetting("CONTABO_BUCKET_NAME"));
+        // MUHIM: Google Drive orqali ham zaxira sozlangan bo'lishi mumkin —
+        // avval bu yerda tekshirilmasdi, ya'ni faqat Google Drive sozlangan
+        // (Telegram va S3 sozlanmagan) loyihalarda ham noto'g'ri "toza
+        // o'rnatish" deb xulosaga kelinardi.
+        const hasGDriveConfig = !!(await getSetting("GOOGLE_DRIVE_CLIENT_EMAIL")) && !!(await getSetting("GOOGLE_DRIVE_PRIVATE_KEY"));
 
-        if (!lastBackupFileId && !hasFallback && !hasS3Config) {
-          console.log("ℹ️ No previous backup file ID found in settings or fallback. This is a clean installation. Proceeding with clean database.");
+        if (!lastBackupFileId && !hasFallback && !hasS3Config && !hasGDriveConfig) {
+          logger.info("No previous backup file ID found in settings or fallback. This is a clean installation. Proceeding with clean database.");
           return;
         }
 
@@ -3008,22 +1740,22 @@ async function start() {
           if (verifyCount === 0) {
             throw new Error("Restore completed but database is still empty");
           }
-          console.log("✅ Database restored successfully from backup!");
-        } catch (restoreErr: any) {
-          const errorMsg = `🔴 CRITICAL: Database restore FAILED\n${restoreErr?.message || String(restoreErr)}`;
-          console.error(errorMsg);
+          logger.info("Database restored successfully from backup!");
+        } catch (restoreErr: unknown) {
+          const errorMsg = `🔴 CRITICAL: Database restore FAILED\n${getErrorMessage(restoreErr)}`;
+          logger.error(errorMsg);
           
           try {
             await notifyAdminTelegram(errorMsg);
           } catch (notifyErr) {
-            console.error("Also failed to notify admin:", notifyErr);
+            logger.error({ err: notifyErr }, "Also failed to notify admin");
           }
           
-          console.error("❌ Server warning: empty/broken database restore attempted with errors.");
+          logger.error("❌ Server warning: empty/broken database restore attempted with errors.");
         }
       }
-    } catch (checkErr: any) {
-      console.error("⚠️ Database check warning:", checkErr);
+    } catch (checkErr: unknown) {
+      logger.error({ err: checkErr }, "⚠️ Database check warning");
     }
   }
 
@@ -3032,6 +1764,31 @@ async function start() {
   await seedSettings();
 
   await seedDatabase();
+
+  // "Obunachi yig'ish" (ExchangeChannel/ExchangeSubscription) jadvallari
+  // migratsiya qilinganini serverni ISHGA TUSHIRISH paytida tekshiramiz —
+  // avval bu faqat foydalanuvchi kanal qo'shishga uringanda, jim
+  // ("Kanalni qo'shishda xatolik yuz berdi") aniqlanardi. Endi muammo
+  // bo'lsa DARHOL (deploy paytidayoq) loglanadi va adminga xabar boradi,
+  // shunda "ishladimi-yo'qmi" deb kutish shart emas.
+  try {
+    await prisma.exchangeChannel.count();
+    logger.info("✅ Obuna almashish (ExchangeChannel) jadvali bazada mavjud.");
+  } catch (schemaErr: unknown) {
+    const errMsg = schemaErr instanceof Error ? schemaErr.message : String(schemaErr);
+    logger.error(
+      { err: schemaErr },
+      "❌ KRITIK: ExchangeChannel jadvali bazada topilmadi — obuna almashish (kanal qo'shish) ishlamaydi!"
+    );
+    notifyAdminTelegram(
+      "🚨 <b>Obuna almashish jadvali topilmadi!</b>\n\n" +
+      "Server ishga tushdi, lekin ExchangeChannel jadvali bazada yo'q. " +
+      "\"Kanal qo'shish\" funksiyasi ishlamaydi. Sabab: migratsiya " +
+      "(\"prisma db push\" / \"prisma migrate deploy\") hali ishga tushmagan yoki " +
+      "eskirgan build ishlatilmoqda — qayta deploy qiling.\n\n" +
+      `Xato: <code>${errMsg.substring(0, 500).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code>`
+    ).catch(() => {});
+  }
 
 // --- NOTIFICATIONS ---
 app.get("/api/notifications", authenticateToken, async (req: AuthRequest, res: Response) => {
@@ -3074,12 +1831,85 @@ app.patch("/api/notifications/read-all", authenticateToken, async (req: AuthRequ
   }
 });
 
-// --- CATEGORIES (ADMIN) ---
+// --- CATEGORIES ---
+// Ommaviy ro'yxat — faqat admin tasdiqlagan ("active") kategoriyalar ko'rinadi,
+// "pending" (tasdiq kutayotgan) kategoriyalar bu yerda oshkor bo'lmaydi.
+// QULAYLIK: har bir kategoriyaga shu kategoriyadagi FAOL e'lonlar soni
+// (listingCount) ham qo'shib yuboriladi — shunda foydalanuvchi (sayt yoki
+// bot) hali qaysi kategoriya bo'sh, qaysi biri to'la ekanini kategoriyaga
+// kirmasdan turib ko'ra oladi.
 app.get("/api/categories", async (req, res) => {
   try {
-    const categories = await prisma.category.findMany();
+    const [categories, counts] = await Promise.all([
+      prisma.category.findMany({ where: { status: "active" } }),
+      prisma.startup.groupBy({
+        by: ["category"],
+        where: { status: "active" },
+        _count: { _all: true }
+      })
+    ]);
+    const countByCategory: Record<string, number> = {};
+    for (const c of counts) {
+      countByCategory[c.category] = c._count._all;
+    }
+    res.json(categories.map((c: any) => ({
+      ...c,
+      fields: JSON.parse(c.fields || "[]"),
+      listingCount: countByCategory[c.id] || 0
+    })));
+  } catch (err) {
+    res.status(500).json({ error: "Kategoriyalarni yuklashda xatolik." });
+  }
+});
+
+// POST /api/categories/propose — login qilgan foydalanuvchi yangi kategoriya
+// taklif qiladi. Darhol ro'yxatga qo'shilmaydi, "pending" holatda admin
+// tasdig'ini kutadi (AdminCategoriesTab orqali).
+app.post("/api/categories/propose", authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id, name, icon } = req.body;
+    if (!id || !String(id).trim() || !name || !String(name).trim()) {
+      return res.status(400).json({ error: "ID va nom majburiy." });
+    }
+    const cleanId = String(id).trim().toLowerCase().replace(/[^a-z0-9-]/g, "-");
+    if (!cleanId) {
+      return res.status(400).json({ error: "Yaroqli ID kiriting (faqat lotin harflari, raqamlar va chiziqchalar)." });
+    }
+
+    const existing = await prisma.category.findUnique({ where: { id: cleanId } });
+    if (existing) {
+      return res.status(409).json({ error: "Bunday ID'li kategoriya allaqachon mavjud yoki taklif qilingan." });
+    }
+
+    const category = await prisma.category.create({
+      data: {
+        id: cleanId,
+        name: String(name).trim(),
+        icon: icon && String(icon).trim() ? String(icon).trim() : "category",
+        fields: "[]",
+        status: "pending",
+        proposedByUserId: req.user?.id,
+      }
+    });
+    res.json({ success: true, category, message: "Taklifingiz qabul qilindi. Admin tasdiqlagach kategoriya ro'yxatda ko'rinadi." });
+  } catch (err) {
+    logger.error({ err: err }, "POST /api/categories/propose error");
+    res.status(500).json({ error: "Kategoriya taklif qilishda xatolik." });
+  }
+});
+
+// --- CATEGORIES (ADMIN) ---
+// Admin panel uchun to'liq ro'yxat — "active" va "pending" barchasi ko'rinadi,
+// shunda admin foydalanuvchilar taklif qilgan kategoriyalarni tasdiqlashi mumkin.
+app.get("/api/admin/categories", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const categories = await prisma.category.findMany({
+      orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+      include: { proposedByUser: { select: { id: true, name: true, email: true } } }
+    });
     res.json(categories.map((c: any) => ({ ...c, fields: JSON.parse(c.fields || "[]") })));
   } catch (err) {
+    logger.error({ err: err }, "GET /api/admin/categories error");
     res.status(500).json({ error: "Kategoriyalarni yuklashda xatolik." });
   }
 });
@@ -3088,11 +1918,26 @@ app.post("/api/admin/categories", authenticateToken, requireAdmin, async (req: A
   try {
     const { id, name, icon, fields } = req.body;
     const category = await prisma.category.create({
-      data: { id, name, icon, fields: JSON.stringify(fields || []) }
+      data: { id, name, icon, fields: JSON.stringify(fields || []), status: "active" }
     });
     res.json(category);
   } catch (err) {
     res.status(500).json({ error: "Kategoriya yaratishda xatolik." });
+  }
+});
+
+// PATCH /api/admin/categories/:id/approve — foydalanuvchi taklif qilgan
+// "pending" kategoriyani "active" holatga o'tkazadi (ommaviy ro'yxatda paydo bo'ladi).
+app.patch("/api/admin/categories/:id/approve", authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const category = await prisma.category.update({
+      where: { id: req.params.id },
+      data: { status: "active" }
+    });
+    res.json(category);
+  } catch (err) {
+    logger.error({ err: err }, "PATCH /api/admin/categories/:id/approve error");
+    res.status(500).json({ error: "Kategoriyani tasdiqlashda xatolik." });
   }
 });
 
@@ -3126,7 +1971,7 @@ app.delete("/api/admin/categories/:id", authenticateToken, requireAdmin, async (
     await prisma.category.delete({ where: { id } });
     res.json({ success: true });
   } catch (err) {
-    console.error("DELETE /api/admin/categories/:id error:", err);
+    logger.error({ err: err }, "DELETE /api/admin/categories/:id error");
     res.status(500).json({ error: "Kategoriyani o'chirishda xatolik." });
   }
 });
@@ -3215,7 +2060,7 @@ app.get("/sitemap.xml", async (req: Request, res: Response) => {
     res.header("Content-Type", "application/xml");
     res.send(xml);
   } catch (err) {
-    console.error("Sitemap generation error:", err);
+    logger.error({ err: err }, "Sitemap generation error");
     res.status(500).end();
   }
 });
@@ -3231,8 +2076,27 @@ app.get("/startup/:id", createBotMetaHandler(prisma, getSetting));
     app.use(vite.middlewares);
   } else if (process.env.NODE_ENV === "production") {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
+    // Kesh siyosati: /assets ostidagi fayllar (masalan ProfilePage-BJLJ0JpP.js)
+    // nomida build-hash bor — mazmuni o'zgarsa nomi ham o'zgaradi, shuning
+    // uchun ularni CHEKSIZ uzoq va "immutable" qilib keshlash xavfsiz va
+    // tavsiya etiladi. index.html esa har doim ENG YANGI holatda bo'lishi
+    // kerak (aks holda brauzer eski index.html'ni uzoq vaqt keshda saqlab,
+    // u orqali endi mavjud bo'lmagan eski chunk fayllarni so'rayveradi —
+    // "Failed to fetch dynamically imported module" xatosining asosiy
+    // sabablaridan biri shu edi, ilgari hech qanday Cache-Control
+    // ko'rsatilmagan edi).
+    app.use(express.static(distPath, {
+      index: false,
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith(".html")) {
+          res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        } else {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        }
+      }
+    }));
     app.get("*", (req, res) => {
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
@@ -3273,6 +2137,13 @@ app.get("/startup/:id", createBotMetaHandler(prisma, getSetting));
     checkPendingRefunds();
   });
 
+  // 2-so'rov: har kuni soat 10:00 da VIP/TOP muddati tugayotgan/tugagan
+  // foydalanuvchilarga Telegram orqali eslatma yuborish
+  cron.schedule("0 10 * * *", () => {
+    logger.info("[CRON] Running notifyExpiringVipAndTop...");
+    notifyExpiringVipAndTop();
+  });
+
   // Har haftalik newsletter yuborish (Dushanba kuni 09:00)
   cron.schedule("0 9 * * 1", () => {
     logger.info("[CRON] Running sendWeeklyNewsletter...");
@@ -3294,16 +2165,54 @@ app.get("/startup/:id", createBotMetaHandler(prisma, getSetting));
     }
   });
 
+  // `scripts/backup-db.ts`ni asosiy server event loop'idan mustaqil,
+  // alohida Node protsessi sifatida ishga tushiradi (qarang: pastdagi
+  // "0 4 * * *" cron izohi). Chiqishi (stdout/stderr) mavjud `logger`
+  // orqali yoziladi, shunda pm2 loglarida hamon ko'rinadi.
+  function runDailyBackupInChildProcess() {
+    const tsxBin = path.join(process.cwd(), "node_modules", ".bin", "tsx");
+    const scriptPath = path.join(process.cwd(), "scripts", "backup-db.ts");
+
+    const child = spawn(tsxBin, [scriptPath], {
+      cwd: process.cwd(),
+      env: process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    child.stdout?.on("data", (data: Buffer) => {
+      logger.info(`[Backup] ${data.toString().trim()}`);
+    });
+    child.stderr?.on("data", (data: Buffer) => {
+      logger.error(`[Backup] ${data.toString().trim()}`);
+    });
+    child.on("error", (err) => {
+      logger.error({ err }, "[CRON] Daily backup child process'ni ishga tushirib bo'lmadi");
+    });
+    child.on("exit", (code) => {
+      if (code === 0) {
+        logger.info("[CRON] Daily backup child process muvaffaqiyatli tugadi.");
+      } else {
+        logger.error({ code }, "[CRON] Daily backup child process xato kod bilan tugadi");
+      }
+    });
+  }
+
   // Har kuni soat 04:00 da tunda ma'lumotlar bazasini zaxiralash
-  cron.schedule("0 4 * * *", async () => {
-    logger.info("[CRON] Running daily database backup...");
-    try {
-      const { runBackup } = await import("./scripts/backup-db");
-      await runBackup();
-      logger.info("[CRON] Daily backup completed successfully.");
-    } catch (err) {
-      logger.error({ err }, "[CRON] Daily backup failed");
-    }
+  // TUZATISH (production'da "Health-check javob bermadi" +
+  // "[NODE-CRON] missed execution ... Possible blocking IO or high CPU"
+  // ogohlantirishlari kuzatilgach): ilgari `scripts/backup-db.ts` shu
+  // ASOSIY server protsessining ICHIDA (`dynamic import` + `await
+  // runBackup()`) ishga tushirilardi. Fallback rejimida bu butun bazani
+  // xotiraga o'qib (30 jadval), `JSON.stringify()` qilib, so'ng SINXRON
+  // AES-256-GCM bilan shifrlaydi — bularning barchasi event loop'ni bir
+  // necha soniyaga bloklaydigan CPU ishi, shu jumladan `/api/health`
+  // so'roviga ham javob berilmay qolardi. Endi backup ALOHIDA child
+  // process (`tsx scripts/backup-db.ts`) sifatida ishga tushiriladi —
+  // qancha og'ir bo'lmasin, u asosiy server event loop'ini HECH QACHON
+  // bloklamaydi.
+  cron.schedule("0 4 * * *", () => {
+    logger.info("[CRON] Running daily database backup (alohida child process sifatida)...");
+    runDailyBackupInChildProcess();
   });
 
   // 70-MUAMMO: export-to-github.ts o'zini "Weekly Data Export" deb atardi va

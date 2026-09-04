@@ -10,6 +10,11 @@ interface ConfirmDialogProps {
   onConfirm: () => void;
   onCancel: () => void;
   variant?: 'danger' | 'default';
+  // YANGI: ixtiyoriy — so'rov davom etayotganda tasdiqlash tugmasini
+  // disable qilish va matnini o'zgartirish uchun (masalan "Bajarilmoqda...").
+  // Standart holatda false — mavjud chaqiruvchilarga ta'sir qilmaydi.
+  isConfirming?: boolean;
+  confirmingText?: string;
 }
 
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
@@ -21,6 +26,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onConfirm,
   onCancel,
   variant = 'default',
+  isConfirming = false,
+  confirmingText = 'Bajarilmoqda...',
 }) => {
   if (!isOpen) return null;
 
@@ -43,20 +50,22 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2.5 bg-surface-container hover:bg-surface-container-high text-on-surface font-semibold text-xs rounded-xl transition-all cursor-pointer"
+            disabled={isConfirming}
+            className="px-4 py-2.5 bg-surface-container hover:bg-surface-container-high disabled:opacity-50 text-on-surface font-semibold text-xs rounded-xl transition-all cursor-pointer"
           >
             {cancelText}
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className={`px-5 py-2.5 font-extrabold text-xs rounded-xl transition-all shadow-md cursor-pointer ${
+            disabled={isConfirming}
+            className={`px-5 py-2.5 font-extrabold text-xs rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
               isDanger
                 ? 'bg-red-600 hover:bg-red-500 text-white'
                 : 'bg-secondary-container text-on-secondary-container hover:brightness-110'
             }`}
           >
-            {confirmText}
+            {isConfirming ? confirmingText : confirmText}
           </button>
         </div>
       </div>

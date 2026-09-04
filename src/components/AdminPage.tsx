@@ -18,7 +18,8 @@ import {
   Headphones, 
   Receipt, 
   Briefcase, 
-  Settings 
+  Settings, 
+  Repeat,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import { Startup, UserProfileData, Category } from '../types';
@@ -33,6 +34,7 @@ import { AdminListingsTab } from './admin/AdminListingsTab';
 import { AdminDisputesTab } from './admin/AdminDisputesTab';
 import { AdminReportsTab } from './admin/AdminReportsTab';
 import { AdminSponsorsTab } from './admin/AdminSponsorsTab';
+import { AdminExchangeTab } from './admin/AdminExchangeTab';
 import { AdminAuditTab } from './admin/AdminAuditTab';
 import { AdminSupportTab } from './admin/AdminSupportTab';
 import { AdminRefundsTab } from './admin/AdminRefundsTab';
@@ -74,6 +76,10 @@ export default function AdminPage({
   const [isDeletingStartupId, setIsDeletingStartupId] = useState<string | null>(null);
 
   const [reportDeleteConfirm, setReportDeleteConfirm] = useState<{ reportId: number; targetType: string; targetId: string } | null>(null);
+  // TUZATILDI: bu yerda native confirm() ishlatilardi — sahifadagi
+  // boshqa o'chirish/tasdiqlash amallari (report, startup) ConfirmDialog
+  // ishlatgani uchun izchillik yo'q edi.
+  const [refundConfirmPaymentId, setRefundConfirmPaymentId] = useState<string | null>(null);
   const [startupDeleteConfirm, setStartupDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
 
   // 88-band: "Barcha e'lonlar" ilgari App.tsx'ning umumiy `startups`
@@ -87,7 +93,6 @@ export default function AdminPage({
   const [allListingsPage, setAllListingsPage] = useState(1);
   const [allListingsTotalPages, setAllListingsTotalPages] = useState(1);
   const [isLoadingAllListings, setIsLoadingAllListings] = useState(false);
-  const listingsSearchDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestAllListingsRequestIdRef = React.useRef(0);
 
   const fetchAllListingsAdmin = async (page = 1, search = '') => {
@@ -145,7 +150,7 @@ export default function AdminPage({
   // bir necha marta yuborilishi mumkin edi.
   const [updatingReportId, setUpdatingReportId] = useState<number | null>(null);
   const [isDeletingReportedItem, setIsDeletingReportedItem] = useState<number | null>(null);
-  const [updatingTicketId, setUpdatingTicketId] = useState<number | null>(null);
+  const [updatingTicketId, setUpdatingTicketId] = useState<string | null>(null);
 
   // Sponsor channels state
   const [sponsorChannels, setSponsorChannels] = useState<any[]>([]);
@@ -162,7 +167,7 @@ export default function AdminPage({
   const [isAddingSponsor, setIsAddingSponsor] = useState(false);
 
   // Active view tab state & Audit Logs state
-  const ADMIN_TABS = ['dashboard', 'analytics', 'listings', 'users', 'categories', 'disputes', 'reports', 'sponsors', 'audit', 'settings', 'support', 'refunds', 'b2b'] as const;
+  const ADMIN_TABS = ['dashboard', 'analytics', 'listings', 'users', 'categories', 'disputes', 'reports', 'sponsors', 'exchange', 'audit', 'settings', 'support', 'refunds', 'b2b'] as const;
   type AdminTab = typeof ADMIN_TABS[number];
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [escrowRefunds, setEscrowRefunds] = useState<any[]>([]);
@@ -193,13 +198,9 @@ export default function AdminPage({
   const [auditLogsPage, setAuditLogsPage] = useState(1);
   const [auditLogsTotalPages, setAuditLogsTotalPages] = useState(1);
 
-  // Settings tab states
-  const [settings, setSettings] = useState<any[]>([]);
-  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
-  const [settingsValues, setSettingsValues] = useState<{[key: string]: string}>({});
-  const [visibleSecrets, setVisibleSecrets] = useState<{[key: string]: boolean}>({});
-  const [savingKey, setSavingKey] = useState<string | null>(null);
-  const [settingsStatus, setSettingsStatus] = useState<{[key: string]: string}>({});
+  // Settings tab state moved into AdminSettingsTab itself (self-contained,
+  // matching the AdminB2BTab/AdminCategoriesTab pattern already used
+  // elsewhere in this file) — see src/components/admin/AdminSettingsTab.tsx
 
   // 46-MUAMMO: "Kutilayotganlar" navbati App.tsx'ning umumiy `startups`
   // ro'yxatidan (standart limit=50, isTop/id bo'yicha eng yangilari)
@@ -297,8 +298,14 @@ export default function AdminPage({
     }
   };
 
-  const handleCompleteRefund = async (paymentId: string) => {
-    if (!confirm("Haqiqatan ham CoinGate orqali pul qaytarilganini tasdiqlaysizmi?")) return;
+  const handleCompleteRefund = (paymentId: string) => {
+    setRefundConfirmPaymentId(paymentId);
+  };
+
+  const executeCompleteRefund = async () => {
+    const paymentId = refundConfirmPaymentId;
+    setRefundConfirmPaymentId(null);
+    if (!paymentId) return;
     try {
       const res = await fetch(`/api/admin/escrow-refunds/${paymentId}/complete`, {
         method: "POST"
@@ -366,7 +373,7 @@ export default function AdminPage({
         <button
           disabled={currentPage <= 1}
           onClick={() => onPageChange(currentPage - 1)}
-          className="p-2 bg-white/5 hover:bg-white/10 disabled:opacity-40 text-white rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed"
+          className="p-2 bg-white/5 hover:bg-white/10 disabled:opacity-40 text-on-primary-container rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed"
         >
           <ChevronLeft className="w-4 h-4 block" />
         </button>
@@ -376,7 +383,7 @@ export default function AdminPage({
         <button
           disabled={currentPage >= totalPages}
           onClick={() => onPageChange(currentPage + 1)}
-          className="p-2 bg-white/5 hover:bg-white/10 disabled:opacity-40 text-white rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed"
+          className="p-2 bg-white/5 hover:bg-white/10 disabled:opacity-40 text-on-primary-container rounded-lg transition-all cursor-pointer disabled:cursor-not-allowed"
         >
           <ChevronRight className="w-4 h-4 block" />
         </button>
@@ -398,67 +405,7 @@ export default function AdminPage({
     }
   };
 
-  const fetchSettings = async () => {
-    try {
-      const res = await fetch('/api/admin/settings');
-      if (res.ok) {
-        const data = await res.json();
-        setSettings(data);
-        const vals: {[key: string]: string} = {};
-        data.forEach((s: any) => {
-          vals[s.key] = s.isSecret ? '' : (s.value || '');
-        });
-        setSettingsValues(vals);
-      }
-    } catch (err) {
-      console.error("Fetch settings error:", err);
-    } finally {
-      setIsLoadingSettings(false);
-    }
-  };
-
-  const handleSaveSetting = async (key: string) => {
-    const val = settingsValues[key] || '';
-    const existing = settings.find(s => s.key === key);
-    if (!val && existing?.hasValue && existing?.isSecret) {
-      setSettingsStatus(prev => ({ ...prev, [key]: 'error' }));
-      onActionToast("Avval yangi qiymat kiriting — bo'sh maydon saqlanmadi (mavjud qiymat o'zgarishsiz qoldi).");
-      setTimeout(() => {
-        setSettingsStatus(prev => ({ ...prev, [key]: '' }));
-      }, 3000);
-      return;
-    }
-    setSavingKey(key);
-    setSettingsStatus(prev => ({ ...prev, [key]: '' }));
-    try {
-      const res = await fetch(`/api/admin/settings/${key}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ value: val })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSettings(prev => prev.map(s => s.key === key ? { ...s, value: data.value, hasValue: !!val } : s));
-        if (existing?.isSecret) {
-          setSettingsValues(prev => ({ ...prev, [key]: '' }));
-        }
-        setSettingsStatus(prev => ({ ...prev, [key]: 'success' }));
-        fetchAuditLogs();
-        setTimeout(() => {
-          setSettingsStatus(prev => ({ ...prev, [key]: '' }));
-        }, 3000);
-      } else {
-        setSettingsStatus(prev => ({ ...prev, [key]: 'error' }));
-      }
-    } catch (err) {
-      console.error("Save setting error:", err);
-      setSettingsStatus(prev => ({ ...prev, [key]: 'error' }));
-    } finally {
-      setSavingKey(null);
-    }
-  };
+  // fetchSettings / handleSaveSetting moved into AdminSettingsTab.tsx
 
   // Support tickets management state
 
@@ -500,7 +447,6 @@ export default function AdminPage({
       fetchEscrowRefunds();
       fetchReports();
       fetchAuditLogs();
-      fetchSettings();
       fetchSponsorChannels();
       fetchAnalytics(analyticsPeriod);
       fetchSupportTickets();
@@ -727,7 +673,7 @@ export default function AdminPage({
     return (
       <div className="max-w-2xl mx-auto p-8 bg-red-500/10 border border-red-500/30 rounded-2xl text-center space-y-4 animate-fade-in text-left">
         <ShieldAlert className="text-red-500 w-12 h-12 mx-auto" />
-        <h2 className="text-xl font-black text-white">Kirish taqiqlangan</h2>
+        <h2 className="text-xl font-black text-on-primary-container">Kirish taqiqlangan</h2>
         <p className="text-sm text-on-primary-container leading-relaxed">
           Kechirasiz, ushbu sahifaga kirish faqat adminlar uchun ruxsat etilgan. Tizimga admin hisobi orqali kiring.
         </p>
@@ -771,7 +717,7 @@ export default function AdminPage({
   return (
     <div className="space-y-8 animate-fade-in text-left">
       <div>
-        <h1 className="text-2xl md:text-3xl font-extrabold text-white mb-2 flex items-center gap-2">
+        <h1 className="text-2xl md:text-3xl font-extrabold text-on-primary-container mb-2 flex items-center gap-2">
           <Shield className="text-secondary w-8 h-8" />
           Admin boshqaruv paneli
         </h1>
@@ -797,6 +743,90 @@ export default function AdminPage({
         </div>
       )}
 
+      {/* Tabs selectors — ixchamlashtirish: 14 ta tab endi mazmuniga ko'ra
+          guruhlarga bo'lingan (Umumiy / Kontent / Foydalanuvchilar va nazorat /
+          Marketing / Tizim), har bir guruh o'z qatorida, kichik sarlavha bilan.
+          Bu yerda faqat "diqqat talab qiladigan" tablarda son-belgi (badge)
+          ko'rsatiladi — shu bilan admin bir qarashda qayerga e'tibor berish
+          kerakligini ko'radi, boshqa tablar esa ortiqcha shovqin qilmaydi. */}
+      {(() => {
+        const TAB_GROUPS: { label: string; tabs: { id: AdminTab; label: string; icon: any; count?: number }[] }[] = [
+          {
+            label: 'Umumiy',
+            tabs: [
+              { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+              { id: 'analytics', label: 'Analytics', icon: TrendingUp },
+            ],
+          },
+          {
+            label: 'Kontent',
+            tabs: [
+              { id: 'listings', label: "E'lonlar", icon: ClipboardList, count: pendingStartups.length },
+              { id: 'categories', label: 'Kategoriyalar', icon: FolderTree },
+            ],
+          },
+          {
+            label: 'Foydalanuvchilar va nazorat',
+            tabs: [
+              { id: 'users', label: 'Foydalanuvchilar', icon: Users },
+              { id: 'disputes', label: 'Nizolar', icon: Gavel, count: disputes.filter(d => d.status === 'open').length + escrowDisputes.length },
+              { id: 'reports', label: 'Shikoyatlar', icon: Flag, count: reports.filter(r => r.status === 'pending').length },
+              { id: 'refunds', label: 'Qaytarishlar', icon: Receipt, count: escrowRefunds.length },
+            ],
+          },
+          {
+            label: 'Marketing va hamkorlik',
+            tabs: [
+              { id: 'sponsors', label: 'Sponsorlar', icon: Megaphone, count: sponsorChannels.length },
+              { id: 'exchange', label: 'Obuna almashish', icon: Repeat },
+              { id: 'b2b', label: "B2B so'rovlar", icon: Briefcase },
+            ],
+          },
+          {
+            label: 'Tizim',
+            tabs: [
+              { id: 'audit', label: 'Audit', icon: History },
+              { id: 'support', label: 'Murojaatlar', icon: Headphones },
+              { id: 'settings', label: 'Sozlamalar', icon: Settings },
+            ],
+          },
+        ];
+        return (
+          <div className="space-y-2.5 p-3 bg-surface-container-low border border-white/5 rounded-2xl">
+            {TAB_GROUPS.map(group => (
+              <div key={group.label} className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-on-primary-container/40 w-full sm:w-auto sm:min-w-[128px] shrink-0">
+                  {group.label}
+                </span>
+                {group.tabs.map(tab => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
+                        isActive
+                          ? 'bg-secondary text-on-secondary shadow-md'
+                          : 'bg-surface-container text-on-primary-container hover:bg-white/10 border border-white/5'
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      {tab.label}
+                      {!!tab.count && (
+                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] leading-none ${isActive ? 'bg-on-secondary/20' : 'bg-secondary/20 text-secondary'}`}>
+                          {tab.count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
       {/* Platform Statistics */}
       {activeTab === 'dashboard' && (
         <AdminDashboardTab stats={stats} setActiveTab={setActiveTab} />
@@ -811,157 +841,6 @@ export default function AdminPage({
           fetchAuditLogs={fetchAuditLogs}
         />
       )}
-
-      {/* Tabs selectors */}
-      <div className="flex border-b border-white/10 gap-2 md:gap-6 overflow-x-auto no-scrollbar scroll-smooth pb-0.5">
-        <button
-          onClick={() => setActiveTab('dashboard')}
-          className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
-            activeTab === 'dashboard'
-              ? 'text-secondary border-secondary'
-              : 'text-on-primary-container border-transparent hover:text-white'
-          }`}
-        >
-          <LayoutDashboard className="w-4 h-4" />
-          Dashboard
-        </button>
-        <button
-          onClick={() => setActiveTab('analytics')}
-          className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
-            activeTab === 'analytics'
-              ? 'text-secondary border-secondary'
-              : 'text-on-primary-container border-transparent hover:text-white'
-          }`}
-        >
-          <TrendingUp className="w-4 h-4" />
-          Analytics
-        </button>
-        <button
-          onClick={() => setActiveTab('listings')}
-          className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
-            activeTab === 'listings'
-              ? 'text-secondary border-secondary'
-              : 'text-on-primary-container border-transparent hover:text-white'
-          }`}
-        >
-          <ClipboardList className="w-4 h-4" />
-          Elonlar ({pendingStartups.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('users')}
-          className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
-            activeTab === 'users'
-              ? 'text-secondary border-secondary'
-              : 'text-on-primary-container border-transparent hover:text-white'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          Foydalanuvchilar
-        </button>
-        <button
-          onClick={() => setActiveTab('categories')}
-          className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
-            activeTab === 'categories'
-              ? 'text-secondary border-secondary'
-              : 'text-on-primary-container border-transparent hover:text-white'
-          }`}
-        >
-          <FolderTree className="w-4 h-4" />
-          Kategoriyalar
-        </button>
-        <button
-          onClick={() => setActiveTab('disputes')}
-          className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
-            activeTab === 'disputes'
-              ? 'text-secondary border-secondary'
-              : 'text-on-primary-container border-transparent hover:text-white'
-          }`}
-        >
-          <Gavel className="w-4 h-4" />
-          Nizolar ({disputes.filter(d => d.status === 'open').length + escrowDisputes.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('reports')}
-          className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
-            activeTab === 'reports'
-              ? 'text-secondary border-secondary'
-              : 'text-on-primary-container border-transparent hover:text-white'
-          }`}
-        >
-          <Flag className="w-4 h-4" />
-          Shikoyatlar ({reports.filter(r => r.status === 'pending').length})
-        </button>
-        <button
-          onClick={() => setActiveTab('sponsors')}
-          className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
-            activeTab === 'sponsors'
-              ? 'text-secondary border-secondary'
-              : 'text-on-primary-container border-transparent hover:text-white'
-          }`}
-        >
-          <Megaphone className="w-4 h-4" />
-          Sponsorlar ({sponsorChannels.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('audit')}
-          className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
-            activeTab === 'audit'
-              ? 'text-secondary border-secondary'
-              : 'text-on-primary-container border-transparent hover:text-white'
-          }`}
-        >
-          <History className="w-4 h-4" />
-          Audit
-        </button>
-        
-        <button
-          onClick={() => setActiveTab('support')}
-          className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
-            activeTab === 'support'
-              ? 'text-secondary border-secondary'
-              : 'text-on-primary-container border-transparent hover:text-white'
-          }`}
-        >
-          <Headphones className="w-4 h-4" />
-          Murojaatlar
-        </button>
-
-        <button
-          onClick={() => setActiveTab('refunds')}
-          className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
-            activeTab === 'refunds'
-              ? 'text-secondary border-secondary'
-              : 'text-on-primary-container border-transparent hover:text-white'
-          }`}
-        >
-          <Receipt className="w-4 h-4" />
-          Qaytarishlar ({escrowRefunds.length})
-        </button>
-
-        <button
-          onClick={() => setActiveTab('b2b')}
-          className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
-            activeTab === 'b2b'
-              ? 'text-secondary border-secondary'
-              : 'text-on-primary-container border-transparent hover:text-white'
-          }`}
-        >
-          <Briefcase className="w-4 h-4" />
-          B2B So'rovlar
-        </button>
-
-        <button
-          onClick={() => setActiveTab('settings')}
-          className={`pb-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer bg-transparent border-none whitespace-nowrap px-2 ${
-            activeTab === 'settings'
-              ? 'text-secondary border-secondary'
-              : 'text-on-primary-container border-transparent hover:text-white'
-          }`}
-        >
-          <Settings className="w-4 h-4" />
-          Sozlamalar
-        </button>
-      </div>
 
       {activeTab === 'categories' && (
         <AdminCategoriesTab 
@@ -986,7 +865,6 @@ export default function AdminPage({
           setListingsView={setListingsView}
           listingsSearch={listingsSearch}
           setListingsSearch={setListingsSearch}
-          listingsSearchDebounceRef={listingsSearchDebounceRef}
           fetchAllListingsAdmin={fetchAllListingsAdmin}
           pendingStartups={pendingStartups}
           isLoadingPending={isLoadingPending}
@@ -1061,6 +939,10 @@ export default function AdminPage({
         />
       )}
 
+      {activeTab === 'exchange' && (
+        <AdminExchangeTab />
+      )}
+
       {activeTab === 'audit' && (
         <AdminAuditTab
           auditLogs={auditLogs}
@@ -1085,15 +967,8 @@ export default function AdminPage({
 
       {activeTab === 'settings' && (
         <AdminSettingsTab
-          settings={settings}
-          isLoadingSettings={isLoadingSettings}
-          settingsValues={settingsValues}
-          setSettingsValues={setSettingsValues}
-          visibleSecrets={visibleSecrets}
-          setVisibleSecrets={setVisibleSecrets}
-          savingKey={savingKey}
-          settingsStatus={settingsStatus}
-          handleSaveSetting={handleSaveSetting}
+          onActionToast={onActionToast}
+          onSettingSaved={fetchAuditLogs}
         />
       )}
 
@@ -1121,6 +996,16 @@ export default function AdminPage({
         cancelText="Bekor qilish"
         onConfirm={executeDeleteStartup}
         onCancel={() => setStartupDeleteConfirm(null)}
+      />
+      <ConfirmDialog
+        isOpen={!!refundConfirmPaymentId}
+        title="Pul qaytarishni tasdiqlash"
+        message="Haqiqatan ham CoinGate orqali pul qaytarilganini tasdiqlaysizmi?"
+        variant="danger"
+        confirmText="Ha, tasdiqlash"
+        cancelText="Bekor qilish"
+        onConfirm={executeCompleteRefund}
+        onCancel={() => setRefundConfirmPaymentId(null)}
       />
     </div>
   );

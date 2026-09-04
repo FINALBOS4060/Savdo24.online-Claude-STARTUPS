@@ -15,6 +15,7 @@ import ForgotPasswordPage from './components/ForgotPasswordPage';
 import ResetPasswordPage from './components/ResetPasswordPage';
 import Footer from './components/Footer';
 import { apiFetch as fetch } from './lib/api';
+import { TELEGRAM_BOT_URL } from './lib/constants';
 import { io } from 'socket.io-client';
 
 const AdminPage = lazy(() => import('./components/AdminPage'));
@@ -62,7 +63,7 @@ export default function App() {
     }
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
-  const [checkoutAmount, setCheckoutAmount] = useState<number>(1250.00);
+  const [checkoutAmount, setCheckoutAmount] = useState<number>(0);
   const [isLoadingStartups, setIsLoadingStartups] = useState<boolean>(true);
   const shouldReduceMotion = useReducedMotion();
   const pageAnim = shouldReduceMotion ? {} : {
@@ -95,7 +96,7 @@ export default function App() {
     role: 'Xaridor',
     verified: false,
     joinDate: 'bugun',
-    avatarUrl: '/default-avatar.jpg',
+    avatarUrl: '/default-avatar.svg',
   });
 
   const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
@@ -105,6 +106,12 @@ export default function App() {
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authName, setAuthName] = useState('');
+  const [authConfirmPassword, setAuthConfirmPassword] = useState('');
+  const [authAgreedToTerms, setAuthAgreedToTerms] = useState(false);
+  const [authPhone, setAuthPhone] = useState('');
+  const [authReferralCode, setAuthReferralCode] = useState('');
+  const [showAuthPassword, setShowAuthPassword] = useState(false);
+  const [showAuthConfirmPassword, setShowAuthConfirmPassword] = useState(false);
   // 87-band: Kirish/Ro'yxatdan o'tish formalarida submit paytida
   // disabled/loading holati yo'q edi (ProfilePage/BrowsePage/SellPage'dagi
   // 60/74/76/83/84-band bilan bir xil muammo turi) — butun saytdagi ENG
@@ -194,7 +201,7 @@ export default function App() {
     if (toast.visible) {
       const timer = setTimeout(() => {
         setToast((prev) => ({ ...prev, visible: false }));
-      }, 4000);
+      }, 6000);
       return () => clearTimeout(timer);
     }
     // MUHIM: bu yerda avval faqat [toast.visible] ga bog'liq edi. Agar bitta
@@ -215,7 +222,7 @@ export default function App() {
           role: 'Xaridor',
           verified: false,
           joinDate: 'bugun',
-          avatarUrl: '/default-avatar.jpg',
+          avatarUrl: '/default-avatar.svg',
         });
         setView('browse');
       }
@@ -466,7 +473,7 @@ export default function App() {
           showToast(data.error || "Kirishda xatolik yuz berdi");
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Login error:", err);
       if (err instanceof TypeError) {
         showToast("Serverga ulanib bo'lmadi");
@@ -482,6 +489,29 @@ export default function App() {
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isAuthSubmitting) return;
+
+    // Client-side validatsiya — serverga so'rov yuborishdan oldin tezkor fikr-mulohaza
+    if (!authName.trim()) {
+      showToast("Iltimos, to'liq ismingizni kiriting.");
+      return;
+    }
+    if (!authEmail.trim()) {
+      showToast("Iltimos, email manzilingizni kiriting.");
+      return;
+    }
+    if (authPassword.length < 8) {
+      showToast("Parol kamida 8 ta belgidan iborat bo'lishi kerak.");
+      return;
+    }
+    if (authPassword !== authConfirmPassword) {
+      showToast("Parollar bir-biriga mos kelmadi.");
+      return;
+    }
+    if (!authAgreedToTerms) {
+      showToast("Davom etish uchun foydalanish shartlariga rozilik bildiring.");
+      return;
+    }
+
     setIsAuthSubmitting(true);
     try {
       const res = await fetch('/api/auth/register', {
@@ -491,6 +521,8 @@ export default function App() {
           email: authEmail.trim().toLowerCase(),
           password: authPassword,
           name: authName,
+          phone: authPhone.trim(),
+          referralCode: authReferralCode.trim(),
         }),
       });
 
@@ -504,6 +536,10 @@ export default function App() {
         setAuthEmail('');
         setAuthPassword('');
         setAuthName('');
+        setAuthConfirmPassword('');
+        setAuthAgreedToTerms(false);
+        setAuthPhone('');
+        setAuthReferralCode('');
       } else {
         const err = await res.json();
         showToast(err.error || "Ro'yxatdan o'tishda xatolik.");
@@ -530,7 +566,7 @@ export default function App() {
       role: 'Xaridor',
       verified: false,
       joinDate: 'bugun',
-      avatarUrl: '/default-avatar.jpg',
+      avatarUrl: '/default-avatar.svg',
     });
     showToast("Tizimdan chiqdingiz.");
     setView('browse');
@@ -570,11 +606,11 @@ export default function App() {
           <div className="max-w-7xl mx-auto px-4 md:px-8">
             {/* Warning and Pages */}
             {user.name !== 'Mehmon' && !user.emailVerified && (
-            <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-in text-left">
+            <div className="mb-6 p-4 bg-secondary/10 border border-secondary/20 rounded-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-in text-left">
               <div className="flex items-start gap-3">
-                <span className="material-symbols-outlined text-yellow-500 text-2xl mt-0.5">warning</span>
+                <span className="material-symbols-outlined text-secondary text-2xl mt-0.5">warning</span>
                 <div>
-                  <h4 className="text-yellow-500 font-extrabold text-sm">Hisobingiz tasdiqlanmagan!</h4>
+                  <h4 className="text-secondary font-extrabold text-sm">Hisobingiz tasdiqlanmagan!</h4>
                   <p className="text-xs text-on-primary-container leading-relaxed mt-1">
                     Loyihalarni sotib olish yoki yangi startap e'lon qilish uchun hisobingizni tasdiqlashingiz shart. Buning uchun shaxsiy tasdiqlash kodingizni oling va <b>@Savdo24_Official_bot</b> botiga <b>/start [kodingiz]</b> deb yozing.
                   </p>
@@ -582,7 +618,7 @@ export default function App() {
               </div>
               <button
                 onClick={() => { setProfileTab('settings'); setView('profile'); }}
-                className="px-4 py-2.5 bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/40 text-yellow-500 font-bold text-xs rounded-xl transition-all whitespace-nowrap active:scale-95 cursor-pointer self-start sm:self-center"
+                className="px-4 py-2.5 bg-secondary/20 hover:bg-secondary/30 border border-secondary/40 text-secondary font-bold text-xs rounded-xl transition-all whitespace-nowrap active:scale-95 cursor-pointer self-start sm:self-center"
               >
                 Kodni olish
               </button>
@@ -592,7 +628,7 @@ export default function App() {
           <AnimatePresence mode="wait">
             <Routes location={location} key={location.pathname}>
               <Route path="/" element={
-                <Suspense fallback={<div className="text-white p-8 text-center">Yuklanmoqda...</div>}>
+                <Suspense fallback={<div className="text-on-primary-container p-8 text-center">Yuklanmoqda...</div>}>
                   <motion.div
                     initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -613,7 +649,7 @@ export default function App() {
               } />
 
               <Route path="/profile" element={
-                <Suspense fallback={<div className="text-white p-8 text-center">Yuklanmoqda...</div>}>
+                <Suspense fallback={<div className="text-on-primary-container p-8 text-center">Yuklanmoqda...</div>}>
                   <motion.div
                     initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -622,19 +658,19 @@ export default function App() {
                     className="space-y-6"
                   >
                     {!isAuthenticated && (
-                      <div className="bg-[#f0b90b]/10 border border-[#f0b90b]/30 rounded-2xl p-6 text-left flex flex-col md:flex-row items-center justify-between gap-4">
+                      <div className="bg-secondary/10 border border-secondary/30 rounded-2xl p-6 text-left flex flex-col md:flex-row items-center justify-between gap-4">
                         <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-full bg-[#f0b90b]/20 flex items-center justify-center text-[#f0b90b]">
+                          <div className="w-12 h-12 rounded-full bg-secondary/20 flex items-center justify-center text-secondary">
                             <span className="material-symbols-outlined">warning</span>
                           </div>
                           <div>
-                            <h4 className="text-white font-extrabold text-base">Siz tizimga kirmagansiz</h4>
+                            <h4 className="text-on-primary-container font-extrabold text-base">Siz tizimga kirmagansiz</h4>
                             <p className="text-xs text-on-primary-container">Profilni ko'rish, xatcho'plarni saqlash va o'z startaplaringizni joylashtirish uchun tizimga kiring.</p>
                           </div>
                         </div>
                         <button
                           onClick={() => { setAuthTab('login'); setAuthModalOpen(true); }}
-                          className="px-6 py-2.5 bg-[#f0b90b] text-black font-extrabold text-xs rounded-xl hover:brightness-110 transition-all active:scale-95"
+                          className="px-6 py-2.5 bg-secondary-container text-on-secondary-container font-extrabold text-xs rounded-xl hover:brightness-110 transition-all active:scale-95"
                         >
                           Kirish / Ro'yxatdan o'tish
                         </button>
@@ -670,7 +706,7 @@ export default function App() {
               } />
 
               <Route path="/startup/:id" element={
-                <Suspense fallback={<div className="text-white p-8 text-center">Yuklanmoqda...</div>}>
+                <Suspense fallback={<div className="text-on-primary-container p-8 text-center">Yuklanmoqda...</div>}>
                   <motion.div
                     initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -713,7 +749,7 @@ export default function App() {
               } />
 
               <Route path="/checkout" element={
-                <Suspense fallback={<div className="text-white p-8 text-center">Yuklanmoqda...</div>}>
+                <Suspense fallback={<div className="text-on-primary-container p-8 text-center">Yuklanmoqda...</div>}>
                   <motion.div
                     initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -734,7 +770,7 @@ export default function App() {
               } />
 
               <Route path="/sell" element={
-                <Suspense fallback={<div className="text-white p-8 text-center">Yuklanmoqda...</div>}>
+                <Suspense fallback={<div className="text-on-primary-container p-8 text-center">Yuklanmoqda...</div>}>
                   <motion.div
                     initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -752,7 +788,7 @@ export default function App() {
               } />
 
               <Route path="/admin" element={
-                <Suspense fallback={<div className="text-white p-8 text-center">Yuklanmoqda...</div>}>
+                <Suspense fallback={<div className="text-on-primary-container p-8 text-center">Yuklanmoqda...</div>}>
                   <motion.div
                     initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -892,11 +928,11 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="relative w-full max-w-md bg-primary-container border border-outline-variant/30 rounded-3xl p-8 shadow-2xl z-10 text-left"
+              className="relative w-full max-w-md bg-primary-container border border-outline-variant/30 rounded-3xl p-8 shadow-2xl z-10 text-left max-h-[90vh] overflow-y-auto"
             >
               <button
                 onClick={() => setAuthModalOpen(false)}
-                className="absolute top-4 right-4 text-on-primary-container hover:text-white transition-colors"
+                className="absolute top-4 right-4 text-on-primary-container hover:text-on-primary-container transition-colors"
               >
                 <span className="material-symbols-outlined">close</span>
               </button>
@@ -904,20 +940,20 @@ export default function App() {
               {/* Tabs */}
               <div className="flex border-b border-outline-variant/20 mb-6">
                 <button
-                  onClick={() => setAuthTab('login')}
+                  onClick={() => { setAuthTab('login'); setShowAuthPassword(false); }}
                   className={`flex-1 pb-3 text-center font-bold text-sm border-b-2 transition-all ${
                     authTab === 'login'
-                      ? 'text-[#f0b90b] border-[#f0b90b]'
+                      ? 'text-secondary border-secondary'
                       : 'text-on-primary-container border-transparent'
                   }`}
                 >
                   Kirish
                 </button>
                 <button
-                  onClick={() => setAuthTab('register')}
+                  onClick={() => { setAuthTab('register'); setShowAuthPassword(false); setShowAuthConfirmPassword(false); }}
                   className={`flex-1 pb-3 text-center font-bold text-sm border-b-2 transition-all ${
                     authTab === 'register'
-                      ? 'text-[#f0b90b] border-[#f0b90b]'
+                      ? 'text-secondary border-secondary'
                       : 'text-on-primary-container border-transparent'
                   }`}
                 >
@@ -929,15 +965,18 @@ export default function App() {
                 <form onSubmit={handleLoginSubmit} className="space-y-4">
                   <div className="space-y-1.5">
                     <label htmlFor="login-email" className="text-xs font-bold text-on-primary-container">Email manzili</label>
-                    <input
-                      type="email"
-                      id="login-email"
-                      required
-                      placeholder="email@example.com"
-                      value={authEmail}
-                      onChange={(e) => setAuthEmail(e.target.value)}
-                      className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-3 text-sm focus:outline-none focus:border-[#f0b90b] transition-all"
-                    />
+                    <div className="relative">
+                      <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-primary-container text-lg opacity-60 pointer-events-none">mail</span>
+                      <input
+                        type="email"
+                        id="login-email"
+                        required
+                        placeholder="email@example.com"
+                        value={authEmail}
+                        onChange={(e) => setAuthEmail(e.target.value)}
+                        className="w-full bg-surface-container-low border border-outline-variant/30 text-on-surface rounded-xl p-3 pl-10 text-sm focus:outline-none focus:border-secondary transition-all"
+                      />
+                    </div>
                   </div>
                   <div className="space-y-1.5">
                     <div className="flex justify-between items-center">
@@ -954,21 +993,35 @@ export default function App() {
                         Parolni unutdingizmi?
                       </button>
                     </div>
-                    <input
-                      type="password"
-                      id="login-password"
-                      required
-                      placeholder="••••••••"
-                      value={authPassword}
-                      onChange={(e) => setAuthPassword(e.target.value)}
-                      className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-3 text-sm focus:outline-none focus:border-[#f0b90b] transition-all"
-                    />
+                    <div className="relative">
+                      <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-primary-container text-lg opacity-60 pointer-events-none">lock</span>
+                      <input
+                        type={showAuthPassword ? 'text' : 'password'}
+                        id="login-password"
+                        required
+                        placeholder="••••••••"
+                        value={authPassword}
+                        onChange={(e) => setAuthPassword(e.target.value)}
+                        className="w-full bg-surface-container-low border border-outline-variant/30 text-on-surface rounded-xl p-3 pl-10 pr-10 text-sm focus:outline-none focus:border-secondary transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowAuthPassword((prev) => !prev)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-on-primary-container opacity-60 hover:opacity-100 transition-opacity focus:outline-none"
+                        aria-label={showAuthPassword ? "Parolni yashirish" : "Parolni ko'rsatish"}
+                      >
+                        <span className="material-symbols-outlined text-lg">
+                          {showAuthPassword ? 'visibility_off' : 'visibility'}
+                        </span>
+                      </button>
+                    </div>
                   </div>
                   <button
                     type="submit"
                     disabled={isAuthSubmitting}
-                    className="w-full py-3 bg-[#f0b90b] text-black font-bold text-sm rounded-xl hover:brightness-110 active:scale-95 transition-all mt-6 shadow-lg shadow-[#f0b90b]/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full py-3 bg-secondary-container text-on-secondary-container font-bold text-sm rounded-xl hover:brightness-110 active:scale-95 transition-all mt-6 shadow-lg shadow-secondary/10 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
+                    {isAuthSubmitting && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
                     {isAuthSubmitting ? 'Kuting...' : 'Tizimga kirish'}
                   </button>
                   <div className="text-center text-xs text-on-primary-container my-4">yoki</div>
@@ -978,49 +1031,180 @@ export default function App() {
                 <form onSubmit={handleRegisterSubmit} className="space-y-4">
                   <div className="space-y-1.5">
                     <label htmlFor="register-name" className="text-xs font-bold text-on-primary-container">To'liq ism</label>
-                    <input
-                      type="text"
-                      id="register-name"
-                      required
-                      placeholder="Toshmatov Eshmat"
-                      value={authName}
-                      onChange={(e) => setAuthName(e.target.value)}
-                      className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-3 text-sm focus:outline-none focus:border-[#f0b90b] transition-all"
-                    />
+                    <div className="relative">
+                      <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-primary-container text-lg opacity-60 pointer-events-none">person</span>
+                      <input
+                        type="text"
+                        id="register-name"
+                        required
+                        placeholder="Toshmatov Eshmat"
+                        value={authName}
+                        onChange={(e) => setAuthName(e.target.value)}
+                        className="w-full bg-surface-container-low border border-outline-variant/30 text-on-surface rounded-xl p-3 pl-10 text-sm focus:outline-none focus:border-secondary transition-all"
+                      />
+                    </div>
                   </div>
                   <div className="space-y-1.5">
                     <label htmlFor="register-email" className="text-xs font-bold text-on-primary-container">Email manzili</label>
-                    <input
-                      type="email"
-                      id="register-email"
-                      required
-                      placeholder="email@example.com"
-                      value={authEmail}
-                      onChange={(e) => setAuthEmail(e.target.value)}
-                      className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-3 text-sm focus:outline-none focus:border-[#f0b90b] transition-all"
-                    />
+                    <div className="relative">
+                      <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-primary-container text-lg opacity-60 pointer-events-none">mail</span>
+                      <input
+                        type="email"
+                        id="register-email"
+                        required
+                        placeholder="email@example.com"
+                        value={authEmail}
+                        onChange={(e) => setAuthEmail(e.target.value)}
+                        className="w-full bg-surface-container-low border border-outline-variant/30 text-on-surface rounded-xl p-3 pl-10 text-sm focus:outline-none focus:border-secondary transition-all"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="register-phone" className="text-xs font-bold text-on-primary-container">
+                      Telefon raqami <span className="font-normal text-on-primary-container opacity-50">(ixtiyoriy)</span>
+                    </label>
+                    <div className="relative">
+                      <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-primary-container text-lg opacity-60 pointer-events-none">call</span>
+                      <input
+                        type="tel"
+                        id="register-phone"
+                        placeholder="+998 90 123 45 67"
+                        value={authPhone}
+                        onChange={(e) => setAuthPhone(e.target.value)}
+                        className="w-full bg-surface-container-low border border-outline-variant/30 text-on-surface rounded-xl p-3 pl-10 text-sm focus:outline-none focus:border-secondary transition-all"
+                      />
+                    </div>
                   </div>
                   <div className="space-y-1.5">
                     <label htmlFor="register-password" className="text-xs font-bold text-on-primary-container">Parol</label>
-                    <input
-                      type="password"
-                      id="register-password"
-                      required
-                      placeholder="••••••••"
-                      value={authPassword}
-                      onChange={(e) => setAuthPassword(e.target.value)}
-                      className="w-full bg-[#0b1426] border border-outline-variant/30 text-white rounded-xl p-3 text-sm focus:outline-none focus:border-[#f0b90b] transition-all"
-                    />
+                    <div className="relative">
+                      <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-primary-container text-lg opacity-60 pointer-events-none">lock</span>
+                      <input
+                        type={showAuthPassword ? 'text' : 'password'}
+                        id="register-password"
+                        required
+                        placeholder="••••••••"
+                        value={authPassword}
+                        onChange={(e) => setAuthPassword(e.target.value)}
+                        className="w-full bg-surface-container-low border border-outline-variant/30 text-on-surface rounded-xl p-3 pl-10 pr-10 text-sm focus:outline-none focus:border-secondary transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowAuthPassword((prev) => !prev)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-on-primary-container opacity-60 hover:opacity-100 transition-opacity focus:outline-none"
+                        aria-label={showAuthPassword ? "Parolni yashirish" : "Parolni ko'rsatish"}
+                      >
+                        <span className="material-symbols-outlined text-lg">
+                          {showAuthPassword ? 'visibility_off' : 'visibility'}
+                        </span>
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-1.5 pt-0.5">
+                      <span className={`material-symbols-outlined text-sm ${authPassword.length >= 8 ? 'text-emerald-400' : 'text-on-primary-container opacity-40'}`}>
+                        {authPassword.length >= 8 ? 'check_circle' : 'radio_button_unchecked'}
+                      </span>
+                      <p className={`text-xs ${authPassword.length >= 8 ? 'text-emerald-400' : 'text-on-primary-container opacity-60'}`}>
+                        Kamida 8 ta belgi
+                      </p>
+                    </div>
                   </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="register-confirm-password" className="text-xs font-bold text-on-primary-container">Parolni tasdiqlang</label>
+                    <div className="relative">
+                      <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-primary-container text-lg opacity-60 pointer-events-none">lock</span>
+                      <input
+                        type={showAuthConfirmPassword ? 'text' : 'password'}
+                        id="register-confirm-password"
+                        required
+                        placeholder="••••••••"
+                        value={authConfirmPassword}
+                        onChange={(e) => setAuthConfirmPassword(e.target.value)}
+                        className={`w-full bg-surface-container-low border rounded-xl p-3 pl-10 pr-10 text-sm focus:outline-none transition-all text-on-surface ${
+                          authConfirmPassword && authConfirmPassword !== authPassword
+                            ? 'border-red-400 focus:border-red-400'
+                            : 'border-outline-variant/30 focus:border-secondary'
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowAuthConfirmPassword((prev) => !prev)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-on-primary-container opacity-60 hover:opacity-100 transition-opacity focus:outline-none"
+                        aria-label={showAuthConfirmPassword ? "Parolni yashirish" : "Parolni ko'rsatish"}
+                      >
+                        <span className="material-symbols-outlined text-lg">
+                          {showAuthConfirmPassword ? 'visibility_off' : 'visibility'}
+                        </span>
+                      </button>
+                    </div>
+                    {authConfirmPassword && authConfirmPassword !== authPassword && (
+                      <p className="text-xs text-red-400 flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-sm">cancel</span>
+                        Parollar mos kelmadi
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="register-referral" className="text-xs font-bold text-on-primary-container">
+                      Referal kodi <span className="font-normal text-on-primary-container opacity-50">(ixtiyoriy)</span>
+                    </label>
+                    <div className="relative">
+                      <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-primary-container text-lg opacity-60 pointer-events-none">redeem</span>
+                      <input
+                        type="text"
+                        id="register-referral"
+                        placeholder="Masalan: ABC123"
+                        value={authReferralCode}
+                        onChange={(e) => setAuthReferralCode(e.target.value.toUpperCase())}
+                        className="w-full bg-surface-container-low border border-outline-variant/30 text-on-surface rounded-xl p-3 pl-10 text-sm uppercase tracking-wide focus:outline-none focus:border-secondary transition-all"
+                      />
+                    </div>
+                  </div>
+                  <label htmlFor="register-terms" className="flex items-start gap-2.5 pt-1 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      id="register-terms"
+                      checked={authAgreedToTerms}
+                      onChange={(e) => setAuthAgreedToTerms(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-outline-variant/30 accent-secondary shrink-0"
+                    />
+                    <span className="text-xs text-on-primary-container leading-relaxed">
+                      Men{' '}
+                      <button
+                        type="button"
+                        onClick={() => { setAuthModalOpen(false); setView('terms'); }}
+                        className="text-secondary font-bold hover:underline"
+                      >
+                        foydalanish shartlari
+                      </button>
+                      {' '}bilan tanishdim va roziman
+                    </span>
+                  </label>
                   <button
                     type="submit"
                     disabled={isAuthSubmitting}
-                    className="w-full py-3 bg-[#f0b90b] text-black font-bold text-sm rounded-xl hover:brightness-110 active:scale-95 transition-all mt-6 shadow-lg shadow-[#f0b90b]/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full py-3 bg-secondary-container text-on-secondary-container font-bold text-sm rounded-xl hover:brightness-110 active:scale-95 transition-all mt-6 shadow-lg shadow-secondary/10 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
+                    {isAuthSubmitting && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
                     {isAuthSubmitting ? 'Kuting...' : "Ro'yxatdan o'tish"}
                   </button>
                   <div className="text-center text-xs text-on-primary-container my-4">yoki</div>
                   <div id="google-signin-button-register" className="flex justify-center"></div>
+                  {/* MUHIM: saytda ro'yxatdan o'tish joyida Telegram botimiz
+                      haqida umuman eslatma yo'q edi — foydalanuvchilar
+                      Telegram orqali ham mahsulot xarid qilish mumkinligini
+                      bilmasdan qolishardi. Kod jihatidan hisobni ulash
+                      ro'yxatdan o'tgandan KEYIN (Profil → Sozlamalar) amalga
+                      oshadi, shu sababli bu yerda faqat botni tanishtiruvchi
+                      informatsion havola beriladi — ulash keyinroq bo'ladi. */}
+                  <a
+                    href={TELEGRAM_BOT_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 flex items-center justify-center gap-2 text-xs text-on-primary-container hover:text-secondary transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-base">smart_toy</span>
+                    Telegram bot orqali ham xarid qilish mumkin
+                  </a>
                 </form>
               )}
             </motion.div>
@@ -1046,7 +1230,7 @@ export default function App() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-            className="fixed bottom-24 md:bottom-8 right-4 md:right-8 z-50 flex items-center gap-3 bg-primary-container text-white px-5 py-4 rounded-xl border border-secondary-container/40 shadow-2xl glass-panel max-w-sm"
+            className="fixed bottom-24 md:bottom-8 right-4 md:right-8 z-[200] flex items-center gap-3 bg-primary-container text-on-primary-container px-5 py-4 rounded-xl border border-secondary-container/40 shadow-2xl glass-panel max-w-sm"
           >
             <div className="w-8 h-8 rounded-full bg-secondary-container/20 text-secondary-container flex items-center justify-center border border-secondary-container/30">
               <span className="material-symbols-outlined text-sm">notifications_active</span>

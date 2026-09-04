@@ -39,19 +39,24 @@ Bu Telegram-zaxira tizimi faqat qo'shimcha himoya qatlami (safety net) hisoblana
 
 ## Avtomatik testlar
 Loyihada `node:test` (Node.js'ning o'zida o'rnatilgan, tashqi paket kerak
-emas) asosida boshlang'ich test to'plami bor — hozircha faqat DB'ga
-bog'liq bo'lmagan sof funksiyalar (`escapeHtml`, `getReferralTier`,
-`safeCompare`, `encryptSecret`/`decryptSecret`) qamrab olingan.
+emas) asosida ikki xil test bor:
+- **Sof funksiyalar** — DB'siz, tez ishlaydigan (`escapeHtml`, `getReferralTier`,
+  `safeCompare`, `encryptSecret`/`decryptSecret`, `money.ts` dagi
+  `splitAmount`/`roundToCents`).
+- **Integratsion testlar** (`escrow.test.ts`, `payment.test.ts`,
+  `auth.test.ts`, `referrals.test.ts` va h.k.) — bular haqiqiy test bazasini
+  (`setupTestDatabase`) ko'tarib, HTTP endpointlarga so'rov yuboradi va
+  javoblarni tekshiradi. Shu sababli bu testlarni ishga tushirish uchun DB
+  kerak bo'ladi (tarmoqsiz muhitda emas).
 
 ```bash
 npm run test
 ```
 
-Bu server.ts'ni to'liq ishga tushirmaydi (DB/tarmoq kerak emas), shu sabab
-CI'da yoki tarmoqsiz muhitda ham ishlaydi. `tests/` papkasiga yangi test
-qo'shishda: agar tekshiriladigan funksiya DB/Express'ga bog'liq bo'lsa,
-avval uni sof (DB'siz) qismga ajratib olish tavsiya etiladi (`escapeHtml`
-va h.k. `src/lib/pure-helpers.ts`ga ko'chirilgani kabi).
+`tests/` papkasiga yangi test qo'shishda: agar tekshiriladigan funksiya
+DB/Express'ga bog'liq bo'lmasa, uni sof (DB'siz) qismga ajratib olish
+tavsiya etiladi (`escapeHtml` va h.k. `src/lib/pure-helpers.ts`ga
+ko'chirilgani kabi) — shunda tegishli test tezroq va barqarorroq bo'ladi.
 
 ## Versiyalash (Git)
 124-bosqichgacha loyiha faqat zip fayllar orqali uzatilardi — `.git`

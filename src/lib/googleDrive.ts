@@ -1,6 +1,7 @@
 import { google } from "googleapis";
 import { Readable } from "stream";
 import { logger } from "./logger";
+import { getErrorMessage } from "./pure-helpers";
 
 interface GoogleDriveConfig {
   clientEmail?: string | null;
@@ -63,8 +64,8 @@ export async function uploadToGoogleDrive(
       );
       return response.data.id;
     }
-  } catch (err: any) {
-    logger.error({ err: err?.message || err }, "[Google Drive] Upload failed");
+  } catch (err: unknown) {
+    logger.error({ err: getErrorMessage(err) }, "[Google Drive] Upload failed");
   }
   return null;
 }
@@ -92,8 +93,33 @@ export async function listBackupsFromGoogleDrive(
       name: f.name || "",
       createdTime: f.createdTime || ""
     }));
-  } catch (err: any) {
-    logger.error({ err: err?.message || err }, "[Google Drive] List backups failed");
+  } catch (err: unknown) {
+    logger.error({ err: getErrorMessage(err) }, "[Google Drive] List backups failed");
     return [];
+  }
+}
+
+// MUHIM: avval faqat listBackupsFromGoogleDrive() bor edi (fayllarni sanab
+// chiqadi), lekin haqiqiy faylni yuklab olish funksiyasi umuman yo'q edi —
+// ya'ni Google Drive'ga zaxira yuklanardi, lekin undan HECH QACHON tiklab
+// bo'lmasdi (restore-db.ts bu manbani umuman ko'rmasdi). Endi shu funksiya
+// orqali kerakli faylni Buffer sifatida yuklab olish mumkin.
+export async function downloadFromGoogleDrive(
+  fileId: string,
+  config: GoogleDriveConfig
+): Promise<Buffer | null> {
+  try {
+    const drive = await getDriveClient(config);
+    if (!drive) return null;
+
+    const res = await drive.files.get(
+      { fileId, alt: "media" },
+      { responseType: "arraybuffer" }
+    );
+
+    return Buffer.from(res.data as ArrayBuffer);
+  } catch (err: unknown) {
+    logger.error({ err: getErrorMessage(err), fileId }, "[Google Drive] Download failed");
+    return null;
   }
 }

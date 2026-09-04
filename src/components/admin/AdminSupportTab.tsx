@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { Headphones, MailOpen } from 'lucide-react';
 import { LoadingState } from '../LoadingState';
 import { formatDateTime } from '../../lib/formatDate';
+// apiFetch: qolgan admin sahifalar kabi 401-refresh/retry mantig'idan foydalanish uchun.
+import { apiFetch as fetch } from '../../lib/api';
 
 interface AdminSupportTabProps {
   supportTickets: any[];
   isLoadingSupport: boolean;
-  updatingTicketId: number | null;
-  setUpdatingTicketId: React.Dispatch<React.SetStateAction<number | null>>;
+  updatingTicketId: string | null;
+  setUpdatingTicketId: React.Dispatch<React.SetStateAction<string | null>>;
   setSupportTickets: React.Dispatch<React.SetStateAction<any[]>>;
   onActionToast: (message: string) => void;
 }
@@ -20,9 +22,9 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
   setSupportTickets,
   onActionToast,
 }) => {
-  const [replies, setReplies] = useState<Record<number, string>>({});
+  const [replies, setReplies] = useState<Record<string, string>>({});
 
-  const handleReply = async (ticketId: number) => {
+  const handleReply = async (ticketId: string) => {
     const text = replies[ticketId];
     if (!text || !text.trim()) return;
 
@@ -36,10 +38,21 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
       if (res.ok) {
         onActionToast("Javob yuborildi");
         setReplies(prev => ({ ...prev, [ticketId]: '' }));
-        setSupportTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: 'closed' } : t));
+        // TUZATISH: optimistik yangilanish faqat `status`'ni 'closed'ga
+        // o'zgartirardi, `adminReply`'ni EMAS — natijada javob muvaffaqiyatli
+        // yuborilgandan keyin ham ("Javob yuborildi" xabari ko'rinsa ham)
+        // "Sizning javobingiz" bloki paydo bo'lmasdi (sahifa qayta
+        // yuklanmaguncha), chunki lokal holatda `adminReply` hali bo'sh edi —
+        // admin javobi haqiqatda yuborilgan-yubormaganini shubha ostida
+        // qoldirardi. Endi yozilgan matn ham darhol lokal holatga qo'shiladi.
+        setSupportTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: 'closed', adminReply: text } : t));
+      } else {
+        const data = await res.json().catch(() => ({}));
+        onActionToast(data.error || "Javob yuborishda xatolik yuz berdi");
       }
     } catch (err) {
       console.error("Support reply error:", err);
+      onActionToast("Javob yuborishda xatolik yuz berdi");
     } finally {
       setUpdatingTicketId(null);
     }
@@ -47,7 +60,7 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
 
   return (
     <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
-      <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/5 pb-4">
+      <h2 className="text-lg font-bold text-on-primary-container flex items-center gap-2 border-b border-white/5 pb-4">
         <Headphones className="text-secondary w-5 h-5" />
         Murojaatlar ({supportTickets.length})
       </h2>
@@ -65,27 +78,34 @@ export const AdminSupportTab: React.FC<AdminSupportTabProps> = ({
             <div key={ticket.id} className="bg-surface-container-low border border-white/5 rounded-2xl p-5 space-y-4">
               <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-white/5 pb-3">
                 <div>
-                  <h4 className="text-white font-bold text-sm">{ticket.subject || ticket.title || "Murojaat"}</h4>
+                  <h4 className="text-on-primary-container font-bold text-sm">{ticket.subject || ticket.title || "Murojaat"}</h4>
                   <p className="text-xs text-on-primary-container">
-                    Foydalanuvchi: <span className="text-white font-semibold">{ticket.user?.name || ticket.user?.email || ticket.userId}</span> • {formatDateTime(ticket.createdAt)}
+                    Foydalanuvchi: <span className="text-on-primary-container font-semibold">{ticket.user?.name || ticket.user?.email || ticket.userId}</span> • {formatDateTime(ticket.createdAt)}
                   </p>
                 </div>
                 <span className={`px-2.5 py-1 rounded-full text-xs font-extrabold uppercase border w-max ${
-                  ticket.status === 'open' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-success-container/10 text-success border-success/20'
+                  ticket.status === 'closed' || ticket.status === 'resolved' ? 'bg-success-container/10 text-success border-success/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
                 }`}>
-                  {ticket.status === 'open' ? 'Ochiq' : 'Yopilgan'}
+                  {ticket.status === 'closed' || ticket.status === 'resolved' ? 'Yopilgan' : 'Ochiq'}
                 </span>
               </div>
               <p className="text-xs text-gray-300 leading-relaxed bg-white/5 p-3 rounded-xl">{ticket.message || ticket.content}</p>
 
-              {ticket.status === 'open' && (
+              {ticket.adminReply && (
+                <div className="text-xs text-emerald-300 leading-relaxed bg-emerald-500/5 border border-emerald-500/10 p-3 rounded-xl">
+                  <p className="font-extrabold uppercase tracking-wider text-[10px] mb-1 text-emerald-400">Sizning javobingiz</p>
+                  {ticket.adminReply}
+                </div>
+              )}
+
+              {ticket.status !== 'closed' && ticket.status !== 'resolved' && (
                 <div className="space-y-2 pt-2">
                   <textarea
                     rows={2}
                     placeholder="Javobingizni yozing..."
                     value={replies[ticket.id] || ''}
                     onChange={(e) => setReplies({ ...replies, [ticket.id]: e.target.value })}
-                    className="w-full p-3 bg-surface-container border border-white/10 rounded-xl text-xs text-white placeholder-on-primary-container/50 focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/50"
+                    className="w-full p-3 bg-surface-container border border-white/10 rounded-xl text-xs text-on-primary-container placeholder-on-primary-container/50 focus:border-secondary focus:outline-none focus:ring-2 focus:ring-secondary/50"
                   />
                   <div className="flex justify-end">
                     <button

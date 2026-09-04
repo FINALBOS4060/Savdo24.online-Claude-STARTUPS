@@ -7,6 +7,12 @@ echo "🚀 Deploying Savdo24 to production..."
 echo "📥 Pulling latest changes from Git..."
 git pull origin main || git pull origin master
 
+# 1.5. Majburiy .env kalitlarini tekshirish (JWT_SECRET, ENCRYPTION_KEY va h.k.)
+#      Agar yo'q yoki bo'sh bo'lsa — avtomatik generatsiya qilinadi va .env'ga
+#      yoziladi; agar allaqachon mavjud bo'lsa — tegilmaydi (sessiyalar buzilmasin).
+echo "🔑 .env kalitlari tekshirilmoqda..."
+bash scripts/ensure-env-secrets.sh .env
+
 # 2. Install dependencies
 echo "📦 Installing dependencies..."
 # MUHIM: NODE_ENV=production o'rnatilgan bo'lsa npm devDependencies'ni
@@ -46,9 +52,29 @@ fi
 # schema.prisma'dan orqada qolgani uchun "db push" ishlatilardi — bu
 # migrationsiz to'g'ridan-to'g'ri bazaga tegadigan, qaytarib bo'lmaydigan
 # xavfli operatsiya edi. Baza bo'sh ekanligi tasdiqlangach yangi to'liq
-# baseline migration yaratildi (bir martalik, qo'lda, SSH orqali).
-# Shundan buyon "migrate deploy" ishlatiladi: bu faqat YANGI migration
-# fayllarini qo'llaydi, mavjud ustun/jadvalga tegmaydi — xavfsizroq.
+# baseline migration yaratilgan DEB O'YLANGAN edi — lekin 2026-08-14'da
+# server butunlay tozalanganda (baza haqiqatan bo'sh holatda) ma'lum
+# bo'ldiki, bu baseline hech qachon prisma/migrations/ papkasiga
+# qo'shilmagan: papka haliyam faqat 6/30 modelni yaratadi (batafsil:
+# prisma/migrations/README_MIGRATIONS.md). Shu sababli "migrate deploy"
+# "Review"/"Dispute" kabi hech qachon migratsiyada yaratilmagan
+# jadvallarga tayangan keyingi migratsiyada P3009 bilan to'xtab qolgan.
+#
+# Shuning uchun endi "migrate deploy"ga ishonishdan OLDIN, migratsiya
+# tarixi haqiqatan HAM schema.prisma'dagi barcha modellarni qamrab
+# olishini avtomatik tekshiramiz. Bu ayniqsa bo'sh (yangi/tozalangan)
+# serverlarda muhim — eski, hech qachon tozalanmagan serverda "db push"
+# bilan yashiringan bo'lishi mumkin bo'lgan farqni ham fosh qiladi.
+echo "🔎 Migratsiya tarixi schema.prisma'ni to'liq qamrab olishini tekshirilmoqda..."
+if ! bash scripts/verify-migrations-cover-schema.sh prisma/schema.prisma prisma/migrations; then
+  echo ""
+  echo "❌ DEPLOY TO'XTATILDI: migratsiya tarixi to'liq emas (yuqoridagi ro'yxatga qarang)."
+  echo "   Bu holatda 'migrate deploy' bo'sh yoki qisman bo'sh bazada muvaffaqiyatsiz"
+  echo "   tugaydi (yoki eski bazada muammoni yanada yashiradi) — shuning uchun avval"
+  echo "   qo'lda hal qilinishi shart (qarang: prisma/migrations/README_MIGRATIONS.md)."
+  exit 1
+fi
+
 echo "🗄️ Applying database migrations (migrate deploy)..."
 npx prisma migrate deploy --schema=prisma/schema.prisma
 

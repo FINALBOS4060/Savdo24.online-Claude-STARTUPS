@@ -1,4 +1,10 @@
 import React from 'react';
+import { ShoppingCart, Receipt, Wallet, CalendarDays } from 'lucide-react';
+// apiFetch: qolgan sahifalar (ProfilePage, DetailPage va h.k.) singari 401-refresh
+// va xavfsiz retry mantig'idan foydalanish uchun — bu yerda oldin xom `fetch` ishlatilardi,
+// ya'ni escrow'ni bo'shatish/nizo ochish paytida access token muddati tugasa (15 daqiqa),
+// avtomatik yangilanish o'rniga foydalanuvchiga to'g'ridan-to'g'ri xato ko'rsatilardi.
+import { apiFetch as fetch } from '../../lib/api';
 
 interface ProfilePurchasesTabProps {
   myPurchases: any[];
@@ -21,13 +27,13 @@ export const ProfilePurchasesTab: React.FC<ProfilePurchasesTabProps> = ({
 }) => {
   return (
     <section className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6">
-      <h3 className="text-lg font-bold text-white border-b border-outline-variant/15 pb-4 mb-6 flex items-center gap-2">
-        <span className="material-symbols-outlined text-secondary-container">shopping_cart</span>
+      <h3 className="text-lg font-bold text-on-primary-container border-b border-outline-variant/15 pb-4 mb-6 flex items-center gap-2">
+        <ShoppingCart className="w-6 h-6 text-secondary-container" />
         Mening xaridlarim
       </h3>
       {myPurchases.length === 0 ? (
         <div className="text-center py-10 border border-dashed border-outline-variant/20 rounded-2xl">
-          <span className="material-symbols-outlined text-5xl text-on-primary-container/30 mb-3 block">receipt_long</span>
+          <Receipt className="w-12 h-12 text-on-primary-container/30 mb-3 mx-auto block" />
           <p className="text-on-primary-container font-medium">Hozircha xaridlar yo'q</p>
         </div>
       ) : (
@@ -35,10 +41,10 @@ export const ProfilePurchasesTab: React.FC<ProfilePurchasesTabProps> = ({
           {myPurchases.map(payment => (
             <div key={payment.id} className="bg-background border border-outline-variant/20 rounded-xl p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:border-outline-variant/40 transition-colors">
               <div>
-                <h4 className="font-bold text-white text-lg">{payment.startup?.name || 'Noma\'lum loyiha'}</h4>
+                <h4 className="font-bold text-on-primary-container text-lg">{payment.startup?.name || 'Noma\'lum loyiha'}</h4>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2 text-sm text-on-primary-container">
-                  <span className="flex items-center gap-1"><span className="material-symbols-outlined text-base">payments</span>{payment.amount} {payment.currency}</span>
-                  <span className="flex items-center gap-1"><span className="material-symbols-outlined text-base">calendar_today</span>{new Date(payment.createdAt).toLocaleDateString()}</span>
+                  <span className="flex items-center gap-1"><Wallet className="w-4 h-4" />{payment.amount} {payment.currency}</span>
+                  <span className="flex items-center gap-1"><CalendarDays className="w-4 h-4" />{new Date(payment.createdAt).toLocaleDateString()}</span>
                   {payment.status === 'refund_required' && (
                     <span className="px-2 py-0.5 bg-amber-500/15 text-amber-400 text-xs rounded-lg font-bold">Qaytarish jarayonda (Refund in progress)</span>
                   )}
@@ -129,7 +135,7 @@ export const ProfilePurchasesTab: React.FC<ProfilePurchasesTabProps> = ({
                     </span>
                   )}
                   {escrows.find(e => e.paymentId === payment.id)?.status === 'disputed' && (
-                    <span className="px-4 py-2 bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 rounded-lg font-bold text-sm">
+                    <span className="px-4 py-2 bg-secondary/10 text-secondary border border-secondary/20 rounded-lg font-bold text-sm">
                       Nizoda
                     </span>
                   )}

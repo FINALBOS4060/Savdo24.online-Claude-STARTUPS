@@ -1,0 +1,13 @@
+[Unit]
+Description=Savdo24 avtomatik deploy kuzatuvchisi
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+ExecStart=/bin/bash /root/deploy-scripts/watch-deploy.sh
+Restart=always
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target

@@ -11,26 +11,26 @@ export default function RefundPolicyPage({ setView }: RefundPolicyPageProps) {
       <div className="flex items-center gap-3 border-b border-white/10 pb-4">
         <button
           onClick={() => setView('browse')}
-          className="p-2 bg-white/5 hover:bg-white/10 text-white rounded-xl transition-all cursor-pointer flex items-center justify-center"
+          className="p-2 bg-white/5 hover:bg-white/10 text-on-primary-container rounded-xl transition-all cursor-pointer flex items-center justify-center"
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
         <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-white">Qaytarish va nizolar siyosati</h1>
+          <h1 className="text-2xl md:text-3xl font-extrabold text-on-primary-container">Qaytarish va nizolar siyosati</h1>
           <p className="text-xs text-on-primary-container">Oxirgi yangilanish: 2026-yil 11-iyul</p>
         </div>
       </div>
 
       <div className="space-y-6 text-sm text-gray-300 leading-relaxed font-medium">
         <section className="space-y-3">
-          <h2 className="text-base font-bold text-white uppercase tracking-wider text-secondary">1. Raqamli mahsulotlar xususiyati</h2>
+          <h2 className="text-base font-bold text-on-primary-container uppercase tracking-wider text-secondary">1. Raqamli mahsulotlar xususiyati</h2>
           <p>
             Savdo24 platformasida sotiladigan loyihalar, startaplar, SaaS tizimlari, API kodlari va domenlar "Raqamli mahsulotlar" toifasiga kiradi. Ushbu mahsulotlar nusxalanadigan va qaytarib olib bo'lmaydigan xususiyatga ega bo'lganligi sababli, muvaffaqiyatli yetkazib berilgandan so'ng <strong>to'lovlar mutlaqo qaytarib berilmaydi</strong>.
           </p>
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-base font-bold text-white uppercase tracking-wider text-secondary">2. Qachon pul qaytarilishi mumkin?</h2>
+          <h2 className="text-base font-bold text-on-primary-container uppercase tracking-wider text-secondary">2. Qachon pul qaytarilishi mumkin?</h2>
           <p>
             Xaridor sotib olingan loyiha uchun pulni qaytarib olish huquqiga faqat quyidagi holatlarda ega bo'ladi:
           </p>
@@ -42,7 +42,7 @@ export default function RefundPolicyPage({ setView }: RefundPolicyPageProps) {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-base font-bold text-white uppercase tracking-wider text-secondary">3. Nizo (Dispute) ochish tartibi</h2>
+          <h2 className="text-base font-bold text-on-primary-container uppercase tracking-wider text-secondary">3. Nizo (Dispute) ochish tartibi</h2>
           <p>
             Agar sotuvchi loyihani va drayverlarni topshirishda sustkashlik qilsa yoki yetkazib bermasa, xaridor o'zining "Xaridlar tarixi" (Purchases) bo'limida tegishli buyurtma bo'yicha <strong>Nizo (Dispute)</strong> ochish tugmasini bosishi lozim.
           </p>
@@ -52,7 +52,7 @@ export default function RefundPolicyPage({ setView }: RefundPolicyPageProps) {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-base font-bold text-white uppercase tracking-wider text-secondary">4. Administrator vositachiligi va qarori</h2>
+          <h2 className="text-base font-bold text-on-primary-container uppercase tracking-wider text-secondary">4. Administrator vositachiligi va qarori</h2>
           <p>
             Administrator ochiq nizolarni har tomonlama o'rganib chiqadi:
           </p>
@@ -64,7 +64,7 @@ export default function RefundPolicyPage({ setView }: RefundPolicyPageProps) {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-base font-bold text-white uppercase tracking-wider text-secondary">5. Muloqot va kelishuv</h2>
+          <h2 className="text-base font-bold text-on-primary-container uppercase tracking-wider text-secondary">5. Muloqot va kelishuv</h2>
           <p>
             Biz har doim nizolarni admin aralashuvisiz, o'zaro do'stona va professional muloqot orqali hal qilishni tavsiya qilamiz. Nizoni administrator ko'rib chiqish muddati odatda 1 kundan 3 ish kunigacha davom etishi mumkin.
           </p>

@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { logger } from './logger';
 
 // Development rejimida ENCRYPTION_KEY sozlanmagan bo'lsa, JWT_SECRET bilan bir xil
 // naqshda vaqtinchalik kalit generatsiya qilamiz (faqat shu jarayon uchun keshlanadi,
@@ -16,7 +17,7 @@ function getEncryptionKey(): Buffer {
   }
 
   if (!cachedDevKey) {
-    console.warn("⚠️ ENCRYPTION_KEY topilmadi — faqat shu sessiya uchun tasodifiy vaqtinchalik kalit generatsiya qilindi (development rejimi).");
+    logger.warn("⚠️ ENCRYPTION_KEY topilmadi — faqat shu sessiya uchun tasodifiy vaqtinchalik kalit generatsiya qilindi (development rejimi).");
     cachedDevKey = crypto.randomBytes(32);
   }
   return cachedDevKey;
@@ -32,7 +33,7 @@ export function encryptSecret(text: string): string {
     const tag = cipher.getAuthTag().toString('hex');
     return `${iv.toString('hex')}:${encrypted}:${tag}`;
   } catch (err) {
-    console.error("Encryption failed:", err);
+    logger.error({ err: err }, "Encryption failed");
     throw new Error(`Encryption failed: ${(err as Error).message}`);
   }
 }
@@ -53,7 +54,7 @@ export function decryptSecret(encryptedText: string): string {
     decrypted += decipher.final('utf8');
     return decrypted;
   } catch (err) {
-    console.error("Decryption failed:", err);
+    logger.error({ err: err }, "Decryption failed");
     throw new Error(`Decryption failed: ${(err as Error).message}`);
   }
 }

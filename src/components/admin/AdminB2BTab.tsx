@@ -73,7 +73,7 @@ export const AdminB2BTab: React.FC<AdminB2BTabProps> = ({ onActionToast }) => {
       {/* Pending B2B Requests */}
       <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
         <div className="flex justify-between items-center border-b border-white/5 pb-4">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+          <h2 className="text-lg font-bold text-on-primary-container flex items-center gap-2">
             <Briefcase className="text-secondary w-5 h-5" />
             Tasdiqlash kutilayotgan B2B arizalar ({pendingAccounts.length})
           </h2>
@@ -104,12 +104,12 @@ export const AdminB2BTab: React.FC<AdminB2BTabProps> = ({ onActionToast }) => {
                     <span className="px-2 py-0.5 bg-secondary-container/20 text-secondary text-xs rounded font-bold">Kutilmoqda</span>
                     <span className="text-xs text-on-primary-container font-mono">ID: {b2b.id}</span>
                   </div>
-                  <h4 className="font-bold text-white text-base">{b2b.companyName}</h4>
+                  <h4 className="font-bold text-on-primary-container text-base">{b2b.companyName}</h4>
                   <p className="text-sm text-on-primary-container">
-                    Foydalanuvchi: <span className="text-white font-medium">{b2b.user?.name || b2b.user?.email || `User #${b2b.userId}`}</span> ({b2b.user?.email})
+                    Foydalanuvchi: <span className="text-on-primary-container font-medium">{b2b.user?.name || b2b.user?.email || `User #${b2b.userId}`}</span> ({b2b.user?.email})
                   </p>
                   <div className="flex items-center gap-4 text-xs text-on-primary-container mt-1">
-                    <span>Soliq ID / STIR: <strong className="text-white font-mono">{b2b.taxId || 'Ko\'rsatilmagan'}</strong></span>
+                    <span>Soliq ID / STIR: <strong className="text-on-primary-container font-mono">{b2b.taxId || 'Ko\'rsatilmagan'}</strong></span>
                     <span>Chegirma: <strong className="text-success">{b2b.discount}%</strong></span>
                     <span>Sana: {formatDateTime(b2b.createdAt)}</span>
                   </div>
@@ -144,7 +144,7 @@ export const AdminB2BTab: React.FC<AdminB2BTabProps> = ({ onActionToast }) => {
       {/* Verified B2B Accounts */}
       <div className="bg-primary-container border border-outline-variant/20 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
         <div className="flex justify-between items-center border-b border-white/5 pb-4">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+          <h2 className="text-lg font-bold text-on-primary-container flex items-center gap-2">
             <ShieldCheck className="text-success w-5 h-5" />
             Tasdiqlangan B2B Hisoblar ({verifiedAccounts.length})
           </h2>
@@ -166,12 +166,12 @@ export const AdminB2BTab: React.FC<AdminB2BTabProps> = ({ onActionToast }) => {
                     <span className="px-2 py-0.5 bg-success-container/25 text-success text-xs rounded font-bold">Tasdiqlangan</span>
                     <span className="text-xs text-on-primary-container font-mono">ID: {b2b.id}</span>
                   </div>
-                  <h4 className="font-bold text-white text-base">{b2b.companyName}</h4>
+                  <h4 className="font-bold text-on-primary-container text-base">{b2b.companyName}</h4>
                   <p className="text-sm text-on-primary-container">
-                    Foydalanuvchi: <span className="text-white font-medium">{b2b.user?.name || b2b.user?.email || `User #${b2b.userId}`}</span> ({b2b.user?.email})
+                    Foydalanuvchi: <span className="text-on-primary-container font-medium">{b2b.user?.name || b2b.user?.email || `User #${b2b.userId}`}</span> ({b2b.user?.email})
                   </p>
                   <div className="flex items-center gap-4 text-xs text-on-primary-container mt-1">
-                    <span>Soliq ID / STIR: <strong className="text-white font-mono">{b2b.taxId || 'Ko\'rsatilmagan'}</strong></span>
+                    <span>Soliq ID / STIR: <strong className="text-on-primary-container font-mono">{b2b.taxId || 'Ko\'rsatilmagan'}</strong></span>
                     <span>Chegirma: <strong className="text-success">{b2b.discount}%</strong></span>
                     <span>Sana: {formatDateTime(b2b.createdAt)}</span>
                   </div>

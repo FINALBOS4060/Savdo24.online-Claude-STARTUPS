@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
-import { Mail, ArrowLeft, AlertCircle, CheckCircle, Loader } from 'lucide-react';
+import { Mail, ArrowLeft, AlertCircle, CheckCircle, Loader, Send } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 
 interface ForgotPasswordPageProps {
   onNavigate: (page: string) => void;
 }
 
+type ResetMethod = 'email' | 'telegram';
+
 export default function ForgotPasswordPage({ onNavigate }: ForgotPasswordPageProps) {
   const [email, setEmail] = useState('');
+  const [method, setMethod] = useState<ResetMethod>('email');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -15,7 +18,7 @@ export default function ForgotPasswordPage({ onNavigate }: ForgotPasswordPagePro
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     // Tugma disabled bo'lsa ham, input ichida Enter bosilganda forma submit
-    // bo'lishi mumkin — bu himoyani chetlab o'tib qayta-qayta xat yuborilishi
+    // bo'lishi mumkin — bu himoyani chetlab o'tib qayta-qayta yuborilishi
     // (SellPage/SupportPage/MessagesPage'dagi 60/74/76-band bilan bir xil
     // muammo turi, lekin bu yerda faqat tugma disabled edi, funksiya ichida
     // qayta kirishdan himoya yo'q edi).
@@ -29,8 +32,17 @@ export default function ForgotPasswordPage({ onNavigate }: ForgotPasswordPagePro
     setError('');
     setSuccess('');
 
+    // MUHIM: avval faqat email orqali tiklash bor edi — SMTP server
+    // ishlamasa, xat spam papkaga tushib qolsa yoki foydalanuvchi email
+    // parolini ham unutgan bo'lsa, hisobni tiklashning boshqa yo'li
+    // qolmasdi. Endi Telegram bot orqali ham (agar hisob avval botga
+    // ulangan bo'lsa) tiklash mumkin — tezroq va ko'proq holatlarda ishlaydi.
+    const endpoint = method === 'telegram'
+      ? '/api/auth/forgot-password-telegram'
+      : '/api/auth/forgot-password';
+
     try {
-      const response = await apiFetch('/api/auth/forgot-password', {
+      const response = await apiFetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
@@ -39,11 +51,15 @@ export default function ForgotPasswordPage({ onNavigate }: ForgotPasswordPagePro
       const data = await response.json();
 
       if (response.ok) {
-        setSuccess('Parolni tiklash havolasi email manzilingizga yuborildi. Iltimos, pochtangizni tekshiring.');
+        setSuccess(
+          method === 'telegram'
+            ? "Agar hisobingiz Telegram botga ulangan bo'lsa, parolni tiklash havolasi botga yuborildi. Telegram'ni tekshiring."
+            : 'Parolni tiklash havolasi email manzilingizga yuborildi. Iltimos, pochtangizni tekshiring.'
+        );
       } else {
         setError(data.error || 'Parolni tiklash so\'rovida xatolik yuz berdi.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError('Server bilan bog\'lanishda xatolik yuz berdi.');
     } finally {
       setLoading(false);
@@ -58,7 +74,7 @@ export default function ForgotPasswordPage({ onNavigate }: ForgotPasswordPagePro
             <Mail className="h-8 w-8" />
           </div>
         </div>
-        <h2 className="mt-6 text-center text-3xl font-medium tracking-tight text-white">
+        <h2 className="mt-6 text-center text-3xl font-medium tracking-tight text-on-primary-container">
           Parolni unutdingizmi?
         </h2>
         <p className="mt-2 text-center text-sm text-on-primary-container">
@@ -95,6 +111,36 @@ export default function ForgotPasswordPage({ onNavigate }: ForgotPasswordPagePro
             </div>
           ) : (
             <form className="space-y-6" onSubmit={handleSubmit}>
+              {/* Usul tanlash — Email yoki Telegram */}
+              <div className="flex items-center gap-2 bg-surface-container-low border border-outline/20 p-1.5 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => { setMethod('email'); setError(''); }}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${
+                    method === 'email' ? 'bg-emerald-600 text-white' : 'text-on-primary-container'
+                  }`}
+                >
+                  <Mail className="h-3.5 w-3.5" />
+                  Email orqali
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setMethod('telegram'); setError(''); }}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${
+                    method === 'telegram' ? 'bg-emerald-600 text-white' : 'text-on-primary-container'
+                  }`}
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  Telegram orqali
+                </button>
+              </div>
+
+              {method === 'telegram' && (
+                <p className="text-xs text-on-primary-container bg-white/5 border border-white/10 rounded-xl p-3 leading-relaxed">
+                  ℹ️ Bu usul faqat Telegram hisobingiz saytga avval ulangan bo'lsa ishlaydi (Profil → Sozlamalar bo'limida ulash mumkin). Baribir pastga o'zingizning saytdagi email manzilingizni kiriting — biz hisobingizni shu orqali topamiz.
+                </p>
+              )}
+
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-slate-300">
                   Email manzilingiz
@@ -112,7 +158,7 @@ export default function ForgotPasswordPage({ onNavigate }: ForgotPasswordPagePro
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={loading}
-                    className="block w-full pl-11 pr-4 py-3 bg-surface-container-low border border-outline/20 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm transition-colors duration-200 disabled:opacity-60"
+                    className="block w-full pl-11 pr-4 py-3 bg-surface-container-low border border-outline/20 rounded-xl text-on-primary-container placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm transition-colors duration-200 disabled:opacity-60"
                     placeholder="name@example.com"
                   />
                 </div>
@@ -130,6 +176,8 @@ export default function ForgotPasswordPage({ onNavigate }: ForgotPasswordPagePro
                       <Loader className="animate-spin h-4 w-4 mr-2" />
                       Yuborilmoqda...
                     </>
+                  ) : method === 'telegram' ? (
+                    "Telegram orqali yuborish"
                   ) : (
                     'Parolni tiklash havolasini olish'
                   )}

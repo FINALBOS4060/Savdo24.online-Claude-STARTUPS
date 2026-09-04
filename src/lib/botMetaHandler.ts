@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import path from "path";
 import fs from "fs";
 import { escapeHtml } from "./pure-helpers";
+import { logger } from "./logger";
 
 const botAgents = [
   "facebookexternalhit",
@@ -75,8 +76,8 @@ export function createBotMetaHandler(prisma: any, getSetting: (key: string) => P
       html = html.replace(/<meta property="twitter:image" content=".*?" \/>/g, `<meta property="twitter:image" content="${image}" />`);
 
       res.send(html);
-    } catch (err) {
-      console.error("SEO Bot Meta Inject error:", err);
+    } catch (err: unknown) {
+      logger.error({ err }, "SEO Bot Meta Inject error");
       next();
     }
   };
